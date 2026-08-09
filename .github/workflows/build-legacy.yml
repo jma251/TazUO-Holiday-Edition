@@ -23,7 +23,7 @@ permissions:
 env:
   CUO_PROJECT_PATH: 'src/ClassicUO.Client/ClassicUO.Client.csproj'
   CUO_OUTPUT_PATH: 'bin/dist'
-  CUO_ZIP_NAME: 'TazUO-Legacy.zip'
+  CUO_ZIP_NAME: 'TazUO-Holiday-Edition.zip'
   TAG_NAME: 'latest'
 
   DOTNET_NOLOGO: true
@@ -116,7 +116,7 @@ jobs:
         uses: ncipollo/release-action@v1.16.0
         with:
           artifacts: "${{ env.CUO_OUTPUT_PATH }}/${{ env.CUO_ZIP_NAME }}"
-          name: "TazUO Legacy (latest) - v${{ env.VERSION }}"
+          name: "TazUO Holiday Edition (latest) - v${{ env.VERSION }}"
           body: |
             Automated build of the `legacy` branch (.NET Framework 4.7.2).
 

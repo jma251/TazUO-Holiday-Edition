@@ -143,7 +143,7 @@ the build if any of the three is missing.
 - Triggers on push to `legacy`, or manually from the Actions tab.
 - Builds on `windows-latest`, checks out submodules recursively, publishes the
   client, verifies the natives are present, zips `bin/dist`, and replaces the
-  GitHub release tagged **`latest`** with the new `TazUO-Legacy.zip`.
+  GitHub release tagged **`latest`** with the new `TazUO-Holiday-Edition.zip`.
 - Needs `permissions: contents: write` to manage that release.
 
 **It is the only workflow here that publishes a release automatically, and it
