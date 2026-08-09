@@ -1,12 +1,9 @@
 name: TUO-Dev-Deploy
 
+# Inherited from upstream, and targets upstream's repo/Discord. Manual-only in
+# this fork: the dev branch is not a release path here.
 on:
   workflow_dispatch:
-  workflow_run:
-    branches: [dev]
-    workflows: [Build-Test]
-    types:
-      - completed
 
 concurrency:
   group: maindeploy

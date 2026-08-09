@@ -1,223 +1,173 @@
-# TazUO Project Guide for Claude
+# TazUO Holiday Edition — Guide for Claude
 
-## Project Overview
+Read this first. It describes **this fork**, which is not the same as upstream
+TazUO and has one hard constraint that is easy to break by accident.
 
-**TazUO** is a feature-rich fork of ClassicUO, an open-source implementation of the Ultima Online Classic Client. Originally forked to add quality-of-life features requested by users, TazUO has evolved into an independent project that selectively incorporates updates from the original ClassicUO while focusing on enhanced gameplay features.
+## What this repository is
 
-- **Repository**: https://github.com/PlayTazUO/TazUO
-- **Language**: C# targeting .NET Framework 4.7.2
-- **Platform**: Windows with support for Mac and Linux via Mono
-- **License**: Based on ClassicUO's open-source license
+A private personal fork of [TazUO](https://github.com/PlayTazUO/TazUO), which is
+itself a fork of ClassicUO — an open-source reimplementation of the Ultima
+Online Classic Client, written in C# on top of FNA (an XNA reimplementation).
 
-## Architecture Overview
+## Branches: `legacy` is the one that matters
 
-### Solution Structure
-The project is organized as a Visual Studio solution with the following main components:
+| Branch | Framework | Version | Role |
+| --- | --- | --- | --- |
+| **`legacy`** | .NET Framework **4.7.2** (`net472`) | 4.5.23 | **The only branch that is developed, built, or released here.** |
+| `main` | .NET **10** (`net10.0`) | 5.24.5 | Reference only — a mirror of upstream, kept so fixes can be read out of it. |
+
+**Rules:**
+
+- All work happens on `legacy`. Branch from it, and merge back into it.
+- **Never build, modify, or release `main`.** It exists to be read.
+- Feature branches should be cut from `legacy`, never from `main`.
+
+### Porting a fix from `main` to `legacy`
+
+This is the main reason `main` is present. It is rarely a clean cherry-pick,
+because the two branches have diverged structurally:
+
+- `main` targets `net10.0`; `legacy` targets `net472`. Modern C#/BCL APIs that
+  compile on `main` may not exist on 4.7.2.
+- `main` keeps its MSBuild config at `src/Directory.Build.props`; `legacy` keeps
+  it at the repo root as `Directory.Build.props`.
+- The two are ~1 major version apart (4.5.x vs 5.24.x), so surrounding code
+  often differs.
+
+Expect to read the change on `main` and **re-apply it by hand** to `legacy`,
+rather than cherry-picking the commit.
+
+## The .NET Framework 4.7.2 constraint
+
+Set in `Directory.Build.props` at the repo root:
+
+```xml
+<TargetFramework>net472</TargetFramework>
+<PlatformTarget>x64</PlatformTarget>
+```
+
+This is deliberate — 4.7.2 is what keeps old-style plugins working. When writing
+code for this branch:
+
+- **Do not raise `TargetFramework`.** Not to `net8.0`, not to `net10.0`.
+- Only use language/library features available on .NET Framework 4.7.2. Newer
+  BCL surface reachable on `main` is frequently absent here. Span/Memory APIs
+  are available, but only via the `System.Memory` / `System.Buffers` NuGet
+  packages already referenced in `Directory.Build.props`.
+- Builds are **x64 only**. There is no AnyCPU or x86 configuration.
+- `System.Text.Json` is pinned to `8.0.5` (the last version supporting 4.7.2).
+  Per repo convention, every JSON serialize/deserialize needs a generated
+  serializer context.
+
+## Layout
 
 ```
-ClassicUO.sln
-├── src/
-│   ├── ClassicUO.Client/          # Main executable - game client logic
-│   ├── ClassicUO.Assets/          # Asset loading (animations, art, sounds, etc.)
-│   ├── ClassicUO.Renderer/        # Rendering engine using FNA
-│   ├── ClassicUO.IO/             # I/O operations for UO file formats
-│   └── ClassicUO.Utility/        # Common utilities and helpers
-├── external/                     # Third-party dependencies
-├── tests/                       # Unit tests
-└── tools/                      # Build and development tools
+ClassicUO.sln                     # solution; Debug/Release x64
+Directory.Build.props             # net472 + x64 + shared package refs  <-- the constraint lives here
+src/
+  ClassicUO.Client/               # the executable -> ClassicUO.exe
+    ClassicUO.Client.csproj       #   AssemblyName is "ClassicUO", not "ClassicUO.Client"
+    Main.cs                       #   entry point; calls SetDllDirectory("x64") for natives
+    DllMap.cs                     #   maps managed names -> native .dll/.so/.dylib
+    Game/                         #   game systems, managers, UI gumps
+    Network/                      #   packet handlers + outgoing packets
+    LegionScripting/              #   custom scripting language + IronPython API
+  ClassicUO.Assets/               # UO file-format loaders (art, anims, maps, sounds)
+  ClassicUO.Renderer/             # FNA-based rendering
+  ClassicUO.IO/                   # low-level file I/O
+  ClassicUO.Utility/              # shared helpers
+  APIToMarkdown/                  # generates scripting API docs
+external/
+  FNA/                            # git submodule
+  MP3Sharp/                       # git submodule
+  x64/                            # Windows natives: SDL2.dll, FNA3D.dll, FAudio.dll, ...
+  lib64/                          # Linux natives
+  osx/                            # macOS natives
+  iplib/                          # IronPython runtime, copied next to the exe
+tests/ClassicUO.UnitTests/        # MSTest
+tools/                            # monokickstart, ManifestCreator
 ```
 
-### Key Dependencies
-- **FNA**: XNA reimplementation for cross-platform graphics
-- **FontStashSharp**: Advanced font rendering
-- **MP3Sharp**: MP3 audio decoding
-- **IronPython**: Python scripting integration
-- **Discord SDK**: Discord rich presence integration
+Submodules are required. After a fresh clone:
 
-## Core Features
-
-### Custom Scripting System
-TazUO includes two powerful scripting systems:
-
-1. **Legion Scripting** (`src/ClassicUO.Client/LegionScripting/`)
-   - Custom scripting language designed for UO automation
-   - Documentation: `src/ClassicUO.Client/LegionScripting/LScript.md`
-   - Commands for movement, combat, item manipulation, etc.
-
-2. **Python Integration** (`external/iplib/`)
-   - Full IronPython runtime included
-   - Python API classes in `src/ClassicUO.Client/LegionScripting/PyClasses/`
-   - Auto-generated documentation via `src/APIToMarkdown/`
-
-### Enhanced UI Features
-- **Grid Containers**: Visual inventory management with customizable layouts
-- **Modern UI Elements**: Updated gumps and controls
-- **Custom Fonts**: TTF font support for better readability
-- **Buff Bars**: Customizable status effect displays
-- **Cooldown Bars**: Visual cooldown tracking
-
-### Quality of Life Improvements
-- **Auto Loot System**: Configurable item collection
-- **Grid Highlighting**: Item property-based highlighting
-- **Tooltip Overrides**: Customizable item information display
-- **Controller Support**: Gamepad integration
-- **Enhanced Journal**: Improved chat and message organization
-
-## Build System
-
-### Build Configuration
-- **Framework**: .NET Framework 4.7.2
-- **Platform**: x64 only (`Directory.Build.props`)
-- **Configurations**: Debug and Release
-- **Output**: `bin/Debug/` or `bin/Release/`
-
-### Build Process
-1. Restores NuGet packages
-2. Builds all projects in dependency order
-3. Copies external dependencies (native libraries)
-4. Generates scripting API documentation
-5. Packages for distribution
-
-### External Dependencies Management
-The build system automatically copies platform-specific native libraries:
-- `external/x64/` → Windows x64 libraries
-- `external/lib64/` → Linux x64 libraries  
-- `external/osx/` → macOS libraries
-
-## Development Workflow
-
-### Common File Locations
-
-#### Configuration & Settings
-- `src/ClassicUO.Client/Configuration/` - Game settings and profiles
-- `Directory.Build.props` - MSBuild configuration
-- `ClassicUO.sln.DotSettings` - ReSharper/Rider settings
-
-#### Core Game Logic
-- `src/ClassicUO.Client/Game/` - Main game systems
-- `src/ClassicUO.Client/Game/Managers/` - Game feature managers
-- `src/ClassicUO.Client/Game/UI/Gumps/` - User interface windows
-
-#### Asset Management
-- `src/ClassicUO.Assets/` - UO file format loaders
-- `src/ClassicUO.Client/Resources/` - Embedded resources
-
-#### Network Layer  
-- `src/ClassicUO.Client/Network/` - Client-server communication
-- Includes packet handlers and encryption
-
-### Testing
-- **Unit Tests**: `tests/ClassicUO.UnitTests/`
-- **Test Framework**: MSTest
-- **Coverage**: Primarily utility and I/O functions
-
-## Scripting System Details
-
-### Legion Script
-- **Location**: `src/ClassicUO.Client/LegionScripting/`
-- **Language Files**: `Lexer.cs`, `Interpreter.cs`, `TextParser.cs`
-- **Commands**: Movement, combat, item manipulation, UI interaction
-- **Documentation**: Comprehensive command reference in `LScript.md`
-
-### Python Integration
-- **Runtime**: IronPython 3.4.2
-- **API Classes**: `PyClasses/` directory contains C# wrappers
-- **Documentation**: Auto-generated markdown files in `LegionScripting/docs/`
-
-### Script Management
-- **Editor**: Built-in script editor (`ScriptEditor.cs`)
-- **Browser**: Script file browser (`ScriptBrowser.cs`) 
-- **Manager**: Script execution manager (`ScriptManagerGump.cs`)
-
-## Asset System
-
-### UO File Support
-TazUO reads original Ultima Online data files:
-- **Art**: Static and item graphics
-- **Animations**: Character and creature animations
-- **Maps**: World geography data
-- **Audio**: Music and sound effects
-- **Fonts**: Game fonts and text rendering
-
-### Custom Assets
-- `src/ClassicUO.Assets/gumpartassets/` - Custom UI graphics
-- `src/ClassicUO.Assets/fonts/` - Additional font files
-- Modern UI replacements for legacy UO interface elements
-
-## Network Protocol
-
-### Packet Handling
-- **Location**: `src/ClassicUO.Client/Network/`
-- **Handlers**: `PacketHandlers.cs` - Server message processing
-- **Outgoing**: `OutgoingPackets.cs` - Client message generation
-- **Enhanced**: Custom packet extensions for TazUO features
-
-### Encryption Support
-- Multiple encryption methods supported
-- Legacy and modern UO server compatibility
-
-## Performance Considerations
-
-### Rendering
-- FNA-based rendering pipeline for cross-platform compatibility
-- Texture atlas system for efficient sprite batching
-- Customizable graphics effects (XBR scaling, lighting)
-
-### Memory Management
-- Object pooling for frequently allocated objects
-- Efficient collection management for game entities
-- Asset caching and lazy loading
-
-## Debugging and Troubleshooting
-
-### Debug Features
-- Network statistics display
-- Performance profiler
-- Debug gumps for internal state inspection
-- Comprehensive logging system
-
-## Contributing Guidelines
-
-### Code Style
-- Follow existing C# conventions
-- Use meaningful variable and method names
-- Document public APIs
-- Maintain cross-platform compatibility
-
-### Feature Development
-- Scripting features should have both Legion Script and Python APIs
-- Test on multiple platforms when possible
-
-### Testing
-- Add unit tests for utility functions
-- Test UI changes with different resolutions
-- Verify script API changes don't break existing scripts
-
-## Useful Commands
-
-### Building
 ```bash
-# Build release version
+git submodule update --init --recursive
+```
+
+## Build
+
+From the repository root:
+
+```bash
+# Build everything
 dotnet build -c Release
 
-# Build debug version  
-dotnet build -c Debug
-```
+# Build just the client, laid out ready to run (this is what CI does)
+dotnet publish src/ClassicUO.Client/ClassicUO.Client.csproj -c Release -o bin/dist -p:IS_DEV_BUILD=true
 
-### Testing
-```bash
+# Tests
 dotnet test tests/ClassicUO.UnitTests/
 ```
 
-### Documentation Generation
-The scripting API documentation is automatically generated during build via the `APIToMarkdown` project.
+Notes:
 
-## External Resources
+- Output goes to `bin/Release/` (build) or `bin/dist/` (publish).
+- A modern .NET SDK (8.x is what CI uses) builds the `net472` target fine; the
+  SDK version and the target framework are separate things.
+- `-p:IS_DEV_BUILD=true` switches `OutputType` to `WinExe`, so the client runs
+  without a console window attached.
+- **Building on Linux/macOS does not fully work.** `ClassicUO.Client.csproj` has
+  hardcoded `HintPath`s into `Program Files (x86)\Reference Assemblies` for
+  `System.Net.Http` and `System.Windows.Forms`. Build on Windows.
 
-- **Original ClassicUO**: https://github.com/andreakarasho/ClassicUO
-- **FNA Documentation**: https://fna-xna.github.io/
-- **Ultima Online Technical Resources**: Various community sites for UO file format documentation
-- **Discord Community**: Active development and user community
+### Native libraries — the thing that breaks launches
 
-- All json serialize and deserialize need to have context generated for them.
-- Don't put a licsense at the top of files you create.
+The client is useless without the FNA natives: **SDL2, FNA3D, and FAudio**.
+
+They are not NuGet packages. They live in `external/x64/` (Windows) and are
+copied into the output by the `CopyExternalDeps_build` / `CopyExternalDeps_publish`
+targets at the bottom of `ClassicUO.Client.csproj`, which place them in an
+**`x64/` subfolder** of the output — not next to the exe.
+
+At runtime `Main.cs` calls `SetDllDirectory(<exe path>\x64)` so Windows can find
+them there. This means: **if you repackage, move, or flatten the output, the
+`x64/` folder must survive, or the natives must sit beside `ClassicUO.exe`.**
+Losing them produces a client that exits immediately on launch with no useful
+error. The release workflow copies them to both places for safety and hard-fails
+the build if any of the three is missing.
+
+## CI / releases
+
+`.github/workflows/build-legacy.yml` is the one that matters for this fork:
+
+- Triggers on push to `legacy`, or manually from the Actions tab.
+- Builds on `windows-latest`, checks out submodules recursively, publishes the
+  client, verifies the natives are present, zips `bin/dist`, and replaces the
+  GitHub release tagged **`latest`** with the new `TazUO-Legacy.zip`.
+- Needs `permissions: contents: write` to manage that release.
+
+**It is the only workflow here that publishes a release automatically, and it
+should stay that way.**
+
+The other deploy workflows (`net472-deploy.yml`, `net9-deploy.yml`,
+`tuo-deploy.yml`, `tuo-dev-deploy.yml`) are inherited from upstream and target
+upstream's repo/Discord. They have been deliberately reduced to
+`workflow_dispatch:` only — **do not re-add their `workflow_run:` triggers.**
+They used to chain off `Build-Test` completing:
+
+- `net472-deploy.yml` fired on `legacy`, which would double-build every push and
+  publish a competing `TazUO-Legacy` release alongside `latest`.
+- `tuo-deploy.yml` fired on `main` — the branch that must never be built — and
+  published with `makeLatest: true`, which would steal the "Latest" badge from
+  the legacy release.
+- `tuo-dev-deploy.yml` fired on `dev`, which is not a release path here.
+
+`Build-Test` still runs on every push and PR. That is intentional: it only
+compiles and uploads artifacts, and never publishes a release.
+
+## Conventions
+
+- Match the surrounding code's style, naming, and comment density.
+- Do not add license headers to new files.
+- Every JSON serialize/deserialize needs a generated serializer context.
+- Scripting features should ideally be exposed to both Legion Script and Python.

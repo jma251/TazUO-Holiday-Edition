@@ -1,12 +1,11 @@
 name: Legacy Deploy (net472)
 
+# Inherited from upstream. Manual-only in this fork: build-legacy.yml is the
+# automatic release path for the legacy branch. The workflow_run trigger that
+# used to fire this after Build-Test completed on legacy has been removed so
+# pushes to legacy do not produce two builds and two releases.
 on:
   workflow_dispatch:
-  workflow_run:
-    branches: [legacy]
-    workflows: [Build-Test]
-    types:
-      - completed
 
 concurrency:
   group: legacydeploy
