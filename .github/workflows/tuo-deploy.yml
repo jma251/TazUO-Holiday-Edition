@@ -1,12 +1,11 @@
 name: TUO-Deploy
 
+# Inherited from upstream, and targets upstream's repo/Discord. Manual-only in
+# this fork: main is a read-only reference mirror here and must not be built or
+# released. This also published with makeLatest, which would have taken the
+# "Latest" badge away from the legacy release.
 on:
   workflow_dispatch:
-  workflow_run:
-    branches: [main]
-    workflows: [Build-Test]
-    types:
-      - completed
 
 concurrency:
   group: maindeploy

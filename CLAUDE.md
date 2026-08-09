@@ -146,9 +146,24 @@ the build if any of the three is missing.
   GitHub release tagged **`latest`** with the new `TazUO-Legacy.zip`.
 - Needs `permissions: contents: write` to manage that release.
 
-Other workflows (`net472-deploy.yml`, `net9-deploy.yml`, `tuo-*.yml`) are
-inherited from upstream and target upstream's repo/Discord. They are not the
-release path for this fork.
+**It is the only workflow here that publishes a release automatically, and it
+should stay that way.**
+
+The other deploy workflows (`net472-deploy.yml`, `net9-deploy.yml`,
+`tuo-deploy.yml`, `tuo-dev-deploy.yml`) are inherited from upstream and target
+upstream's repo/Discord. They have been deliberately reduced to
+`workflow_dispatch:` only — **do not re-add their `workflow_run:` triggers.**
+They used to chain off `Build-Test` completing:
+
+- `net472-deploy.yml` fired on `legacy`, which would double-build every push and
+  publish a competing `TazUO-Legacy` release alongside `latest`.
+- `tuo-deploy.yml` fired on `main` — the branch that must never be built — and
+  published with `makeLatest: true`, which would steal the "Latest" badge from
+  the legacy release.
+- `tuo-dev-deploy.yml` fired on `dev`, which is not a release path here.
+
+`Build-Test` still runs on every push and PR. That is intentional: it only
+compiles and uploads artifacts, and never publishes a release.
 
 ## Conventions
 
