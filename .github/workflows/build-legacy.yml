@@ -1,0 +1,132 @@
+name: Build Legacy
+
+# Builds the legacy (.NET Framework 4.7.2) client on a Windows runner and
+# publishes the result as a downloadable zip attached to a GitHub release
+# tagged "latest". Each run replaces the previous "latest" release and zip.
+
+on:
+  # Run automatically whenever the legacy branch is updated.
+  push:
+    branches: [legacy]
+  # Allow starting a build by hand from the Actions tab.
+  workflow_dispatch:
+
+# Only one legacy build at a time; a newer push cancels an in-progress one.
+concurrency:
+  group: build-legacy
+  cancel-in-progress: true
+
+# Needed so the workflow can create/replace the "latest" release and tag.
+permissions:
+  contents: write
+
+env:
+  CUO_PROJECT_PATH: 'src/ClassicUO.Client/ClassicUO.Client.csproj'
+  CUO_OUTPUT_PATH: 'bin/dist'
+  CUO_ZIP_NAME: 'TazUO-Legacy.zip'
+  TAG_NAME: 'latest'
+
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: 1
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
+  NUGET_XMLDOC_MODE: skip
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      # Always build the legacy branch, whether triggered by push or by hand.
+      - name: Check out legacy branch
+        uses: actions/checkout@v4
+        with:
+          ref: legacy
+
+      # Pull in FNA, MP3Sharp, etc. (and anything nested inside them).
+      # The insteadOf rewrite lets old git:// submodule URLs clone over https.
+      - name: Check out submodules (recursive)
+        run: |
+          git config --global url."https://".insteadOf git://
+          git submodule update --init --recursive
+
+      # Read the client version (e.g. 4.5.23) so we can label the release, and
+      # record the exact legacy commit we built (a manual run may be dispatched
+      # from a different branch, so github.sha is not reliable here).
+      - name: Extract version and commit
+        shell: bash
+        run: |
+          export LC_ALL=C.UTF-8
+          echo "VERSION=$(grep -oP '<AssemblyVersion>\K\d+\.\d+\.\d+' src/ClassicUO.Client/ClassicUO.Client.csproj | head -1)" >> $GITHUB_ENV
+          echo "LEGACY_SHA=$(git rev-parse HEAD)" >> $GITHUB_ENV
+
+      # The .NET 8 SDK can build/publish the net472 target on Windows.
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      # Publish the client. IS_DEV_BUILD=true produces a windowed (WinExe) build.
+      # The csproj's post-publish targets copy the native libs into bin/dist/x64.
+      - name: Publish client
+        run: dotnet publish ${{ env.CUO_PROJECT_PATH }} -c Release -o ${{ env.CUO_OUTPUT_PATH }} -p:IS_DEV_BUILD=true
+
+      # The client can load natives from the x64 subfolder, but to be safe we
+      # also place SDL2/FNA3D/FAudio (and the rest) right next to ClassicUO.exe,
+      # then fail the build if any of the three required natives is missing.
+      - name: Place FNA native libraries next to the exe
+        shell: pwsh
+        run: |
+          $dist = "${{ env.CUO_OUTPUT_PATH }}"
+          $x64  = Join-Path $dist "x64"
+          if (Test-Path $x64) {
+            Copy-Item -Path (Join-Path $x64 '*') -Destination $dist -Force -Recurse
+          }
+          foreach ($dll in @('SDL2.dll', 'FNA3D.dll', 'FAudio.dll')) {
+            if (-not (Test-Path (Join-Path $dist $dll))) {
+              Write-Error "Required native library missing next to the exe: $dll"
+              exit 1
+            }
+            Write-Host "Found native library: $dll"
+          }
+          if (-not (Test-Path (Join-Path $dist 'ClassicUO.exe'))) {
+            Write-Error "ClassicUO.exe was not produced by the publish step."
+            exit 1
+          }
+
+      # Zip everything in bin/dist (exe, dlls, natives, data) into one archive.
+      - name: Create zip
+        uses: thedoctor0/zip-release@master
+        with:
+          type: 'zip'
+          directory: ${{ env.CUO_OUTPUT_PATH }}
+          filename: ${{ env.CUO_ZIP_NAME }}
+          exclusions: '*.zip'
+
+      # Remove the previous "latest" release and its tag so the new one is
+      # created fresh against this commit. Ignored if there isn't one yet.
+      - name: Delete previous "latest" release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete "${{ env.TAG_NAME }}" --yes --cleanup-tag || echo "No previous release to delete."
+
+      # Create the single "latest" release with the freshly built zip.
+      - name: Publish "latest" release
+        uses: ncipollo/release-action@v1.16.0
+        with:
+          artifacts: "${{ env.CUO_OUTPUT_PATH }}/${{ env.CUO_ZIP_NAME }}"
+          name: "TazUO Legacy (latest) - v${{ env.VERSION }}"
+          body: |
+            Automated build of the `legacy` branch (.NET Framework 4.7.2).
+
+            - Version: `v${{ env.VERSION }}`
+            - Commit: ${{ env.LEGACY_SHA }}
+
+            Download `${{ env.CUO_ZIP_NAME }}` below, unzip it, and run `ClassicUO.exe`.
+          tag: ${{ env.TAG_NAME }}
+          commit: ${{ env.LEGACY_SHA }}
+          allowUpdates: true      # reuse the existing "latest" release
+          removeArtifacts: true   # drop the old zip before attaching the new one
+          makeLatest: true
+          token: ${{ secrets.GITHUB_TOKEN }}
