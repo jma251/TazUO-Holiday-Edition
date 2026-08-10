@@ -311,10 +311,15 @@ namespace ClassicUO.Game.Scenes
 
                 if (skip) continue;
 
+                // Match MobileView.CheckMouseSelection() exactly so drag select agrees
+                // with normal mouse picking. AnchorOffset is gump spacing and must not
+                // influence the hit test - it made the box move 24px when the "anchor
+                // health bars" display option was toggled.
                 Point p = mobile.RealScreenPosition;
 
-                p.X += (int)mobile.Offset.X + 22 + 5;
-                p.Y += (int)(mobile.Offset.Y - mobile.Offset.Z) + 12 * AnchorOffset;
+                p.Y -= 3;
+                p.X += (int)mobile.Offset.X + 22;
+                p.Y += (int)(mobile.Offset.Y - mobile.Offset.Z) + 22;
                 p.X -= mobile.FrameInfo.X;
                 p.Y -= mobile.FrameInfo.Y;
 
