@@ -264,6 +264,79 @@ namespace ClassicUO.Game.Managers
             }
         }
 
+        // The era that the music config and the file cache were last built for. null
+        // means "never applied", which is not the same as "" (the stock install).
+        private static string _appliedMusicEra;
+
+        /// <summary>
+        /// Lists the subfolders of Music/Digital. Each one is an era the player can
+        /// pick, so adding an era is creating a folder rather than a code change.
+        /// </summary>
+        public static string[] GetAvailableMusicEras()
+        {
+            try
+            {
+                string dir = Path.Combine(UOFileManager.BasePath, "Music", "Digital");
+
+                if (Directory.Exists(dir))
+                {
+                    string[] dirs = Directory.GetDirectories(dir);
+
+                    for (int i = 0; i < dirs.Length; i++)
+                    {
+                        dirs[i] = Path.GetFileName(dirs[i]);
+                    }
+
+                    Array.Sort(dirs, StringComparer.OrdinalIgnoreCase);
+
+                    return dirs;
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"Could not list the music era folders: {ex}");
+            }
+
+            return new string[0];
+        }
+
+        /// <summary>
+        /// Rebuilds the music config and drops the cached tracks when the profile's era
+        /// has moved. Cheap when nothing changed, so it can sit on the play path and
+        /// cover startup and profile switches without hooking into profile loading.
+        /// </summary>
+        private static void EnsureMusicEraApplied()
+        {
+            string era = ProfileManager.CurrentProfile?.MusicEra ?? string.Empty;
+
+            if (string.Equals(era, _appliedMusicEra, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _appliedMusicEra = era;
+
+            SoundsLoader.LoadMusicConfig(string.IsNullOrEmpty(era) ? null : era);
+            Client.Game.Sounds.SetMusicEra(era);
+        }
+
+        /// <summary>
+        /// Applies an era change straight away: stop, rebuild, and restart whatever was
+        /// playing. Without this the change would not be heard until the next track,
+        /// because both the config and the resolved files are cached.
+        /// </summary>
+        public void ReloadMusicEra()
+        {
+            int index = _currentMusicIndices[0];
+            bool warMode = _currentMusic[1] != null;
+
+            StopMusic();
+
+            EnsureMusicEraApplied();
+
+            PlayMusic(index, warMode);
+        }
+
         public void PlayMusic(int music, bool iswarmode = false, bool is_login = false)
         {
             if (!_canReproduceAudio)
@@ -275,6 +348,8 @@ namespace ClassicUO.Game.Managers
             {
                 return;
             }
+
+            EnsureMusicEraApplied();
 
             // Logged here, ahead of the volume and disabled-music early-outs below, so
             // the index is recorded whether or not the track is audible. The point is
