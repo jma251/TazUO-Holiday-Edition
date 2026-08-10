@@ -152,7 +152,9 @@ namespace ClassicUO.Renderer.Animations
 
             if (id >= _dataIndex.Length)
             {
-                Array.Resize(ref _dataIndex, id + 1);
+                // Grow geometrically. Resizing to exactly id + 1 reallocates and
+                // copies the whole array again for every subsequent higher id.
+                Array.Resize(ref _dataIndex, Math.Max(id + 1, _dataIndex.Length * 2));
             }
 
             ref var index = ref _dataIndex[id];
@@ -212,7 +214,9 @@ namespace ClassicUO.Renderer.Animations
                     {
                         if (id >= _dataIndex.Length)
                         {
-                            Array.Resize(ref _dataIndex, id + 1);
+                            // Grow geometrically. Resizing to exactly id + 1 reallocates and
+                // copies the whole array again for every subsequent higher id.
+                Array.Resize(ref _dataIndex, Math.Max(id + 1, _dataIndex.Length * 2));
                         }
 
                         index = ref _dataIndex[id];
