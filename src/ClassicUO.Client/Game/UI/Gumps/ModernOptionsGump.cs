@@ -2325,6 +2325,19 @@ namespace ClassicUO.Game.UI.Gumps
             );
 
             PositionHelper.PositionControl(s.FullControl);
+            PositionHelper.BlankLine();
+
+            // Global rather than per-profile, so it applies to every character.
+            options.Add
+            (
+                s = new SettingsOption
+                (
+                    "", new CheckboxWithLabel(lang.GetExperimental.LogMusicIndices, 0, Settings.GlobalSettings.LogMusicIndices, (b) => { Settings.GlobalSettings.LogMusicIndices = b; }),
+                    MainContent.RightWidth, (int)PAGE.Experimental
+                )
+            );
+
+            PositionHelper.PositionControl(s.FullControl);
         }
 
         private void BuildNameplates()
