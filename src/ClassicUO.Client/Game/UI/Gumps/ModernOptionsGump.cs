@@ -2364,6 +2364,40 @@ namespace ClassicUO.Game.UI.Gumps
             );
 
             PositionHelper.PositionControl(s.FullControl);
+            PositionHelper.BlankLine();
+
+            // Built from whatever folders exist under Music/Digital, so adding an era
+            // pack is creating a folder - no code change and no list to keep in sync.
+            string[] eraFolders = AudioManager.GetAvailableMusicEras();
+            string[] eraOptions = new string[eraFolders.Length + 1];
+            eraOptions[0] = lang.GetExperimental.MusicEraDefault;
+            Array.Copy(eraFolders, 0, eraOptions, 1, eraFolders.Length);
+
+            int selectedEra = Array.FindIndex(eraOptions, o => string.Equals(o, profile.MusicEra, StringComparison.OrdinalIgnoreCase));
+
+            if (selectedEra < 0)
+            {
+                selectedEra = 0;
+            }
+
+            options.Add
+            (
+                s = new SettingsOption
+                (
+                    "", new ComboBoxWithLabel
+                    (
+                        lang.GetExperimental.MusicEra, 0, ThemeSettings.COMBO_BOX_WIDTH, eraOptions, selectedEra, (i, o) =>
+                        {
+                            // Index 0 is "Default", which means the stock install.
+                            profile.MusicEra = i <= 0 ? "" : eraOptions[i];
+
+                            Client.Game.Audio.ReloadMusicEra();
+                        }
+                    ), MainContent.RightWidth, (int)PAGE.Experimental
+                )
+            );
+
+            PositionHelper.PositionControl(s.FullControl);
         }
 
         private void BuildNameplates()

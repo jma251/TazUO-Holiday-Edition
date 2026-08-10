@@ -95,6 +95,10 @@ namespace ClassicUO.Configuration
         public bool EnableCombatMusic { get; set; } = true;
         public bool ReproduceSoundsInBackground { get; set; }
 
+        // Name of a subfolder of Music/Digital to take music from, e.g. "LBR-HiFi".
+        // Empty means stock behaviour: play whatever Music/Digital itself holds.
+        public string MusicEra { get; set; } = "";
+
         // fonts and speech
         public byte ChatFont { get; set; } = 1;
         public int SpeechDelay { get; set; } = 100;
