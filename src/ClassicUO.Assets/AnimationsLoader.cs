@@ -901,7 +901,11 @@ namespace ClassicUO.Assets
                             uint frameCount = reader.ReadUInt32LE();
                             int newGroup = reader.ReadInt32LE();
 
-                            if (frameCount == 0)
+                            // oldGroup comes straight out of AnimationSequence.uop and is
+                            // written into a fixed MAX_ACTIONS-entry buffer, so a shard
+                            // whose file carries an out-of-range or negative group index
+                            // crashed the client during startup.
+                            if (frameCount == 0 && oldGroup >= 0 && oldGroup < MAX_ACTIONS)
                             {
                                 replacedAnimSpan[oldGroup] = newGroup;
                             }
