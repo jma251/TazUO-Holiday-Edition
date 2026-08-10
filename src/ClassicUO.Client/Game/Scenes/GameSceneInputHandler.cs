@@ -185,6 +185,12 @@ namespace ClassicUO.Game.Scenes
 
         private bool DragSelectModifierActive()
         {
+            // Query SDL for the live modifier state. The cached Keyboard.Ctrl/Shift/Alt
+            // fields only update when a key event reaches the client, so they go stale
+            // after alt-tab or a swallowed event. DoDragSelect() already refreshes, so
+            // without this the mouse-down gate and the mouse-up filters can disagree.
+            Keyboard.Refresh();
+
             // src: https://github.com/andreakarasho/ClassicUO/issues/621
             // drag-select should be disabled when using nameplates
             if ((Keyboard.Ctrl && Keyboard.Shift) && ProfileManager.CurrentProfile.DragSelect_NameplateModifier == 0)
