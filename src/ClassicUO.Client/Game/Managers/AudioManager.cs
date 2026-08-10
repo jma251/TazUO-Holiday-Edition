@@ -32,6 +32,8 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
 using ClassicUO.Utility;
 using ClassicUO.Configuration;
 using ClassicUO.IO.Audio;
@@ -183,6 +185,85 @@ namespace ClassicUO.Game.Managers
             }
         }
 
+        private static int _lastLoggedMusicIndex = -1;
+
+        // Diagnostic used to map which music index plays where in-game; nothing on disk
+        // records that. Silent and file-only - no chat, no journal, no on-screen text.
+        // Never allowed to throw: a diagnostic must not be able to interrupt music or
+        // crash the client.
+        private static void LogMusicIndex(int music, bool iswarmode, bool is_login)
+        {
+            if (!Settings.GlobalSettings.LogMusicIndices)
+            {
+                return;
+            }
+
+            // PlayMusic is called repeatedly with the same index; only a change is worth
+            // a line, otherwise the file fills with duplicates.
+            if (music == _lastLoggedMusicIndex)
+            {
+                return;
+            }
+
+            _lastLoggedMusicIndex = music;
+
+            try
+            {
+                string directory = Path.Combine(CUOEnviroment.ExecutablePath, "Data");
+                Directory.CreateDirectory(directory);
+
+                string path = Path.Combine(directory, "musiclog.txt");
+                bool writeHeader = !File.Exists(path);
+
+                // A false result means the index has no mapping, which is itself worth
+                // recording, so it is logged as "?" rather than skipped.
+                string track = "?";
+                bool loop = false;
+
+                if (SoundsLoader.Instance.TryGetMusicData(music, out string name, out bool doesLoop))
+                {
+                    track = name;
+                    loop = doesLoop;
+                }
+
+                string x = "-", y = "-", z = "-";
+
+                if (World.Player != null)
+                {
+                    x = World.Player.X.ToString(CultureInfo.InvariantCulture);
+                    y = World.Player.Y.ToString(CultureInfo.InvariantCulture);
+                    z = World.Player.Z.ToString(CultureInfo.InvariantCulture);
+                }
+
+                string flags = is_login ? "login" : iswarmode ? "warmode" : "-";
+
+                if (writeHeader)
+                {
+                    File.AppendAllText(path, "# timestamp\tidx\ttrack\tloop\tmap\tx\ty\tz\tflags" + Environment.NewLine);
+                }
+
+                string line = string.Format(
+                    CultureInfo.InvariantCulture,
+                    "{0}\tidx={1}\ttrack={2}\tloop={3}\tmap={4}\tx={5}\ty={6}\tz={7}\tflags={8}",
+                    DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture),
+                    music,
+                    track,
+                    loop,
+                    World.MapIndex,
+                    x,
+                    y,
+                    z,
+                    flags
+                );
+
+                File.AppendAllText(path, line + Environment.NewLine);
+            }
+            catch
+            {
+                // Swallowed deliberately - see above.
+            }
+        }
+
         public void PlayMusic(int music, bool iswarmode = false, bool is_login = false)
         {
             if (!_canReproduceAudio)
@@ -194,6 +275,11 @@ namespace ClassicUO.Game.Managers
             {
                 return;
             }
+
+            // Logged here, ahead of the volume and disabled-music early-outs below, so
+            // the index is recorded whether or not the track is audible. The point is
+            // mapping indices to places, not hearing them.
+            LogMusicIndex(music, iswarmode, is_login);
 
             float volume;
 
