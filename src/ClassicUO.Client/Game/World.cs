@@ -340,6 +340,8 @@ namespace ClassicUO.Game
 
                     if (do_delete && item.OnGround && item.Distance > ClientViewRange /*CheckToRemove(item, ClientViewRange)*/)
                     {
+                        HouseDiagnostics.LogItemCulled(item);
+
                         if (item.IsMulti)
                         {
                             if (HouseManager.TryToRemove(item, ClientViewRange))

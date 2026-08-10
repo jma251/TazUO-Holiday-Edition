@@ -103,6 +103,11 @@ namespace ClassicUO.Configuration
         // Global rather than per-profile so it applies to every character.
         [JsonPropertyName("log_music_indices")] public bool LogMusicIndices { get; set; } = false;
 
+        // Temporary diagnostic for house contents failing to load; writes
+        // Data/houselog.txt. Global rather than per-profile so it applies to every
+        // character. Remove with HouseDiagnostics once the cause is known.
+        [JsonPropertyName("log_house_diagnostics")] public bool LogHouseDiagnostics { get; set; } = false;
+
         [JsonPropertyName("shard_type")] public int ShardType { get; set; } // 0 = normal (no customization), 1 = old, 2 = outlands??
 
         [JsonPropertyName("fixed_time_step")] public bool FixedTimeStep { get; set; } = true;

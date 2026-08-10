@@ -382,6 +382,7 @@ namespace ClassicUO.Network
                 for (int i = 0; i < Handler._customHouseRequests.Count; ++i)
                 {
                     NetClient.Socket.Send_CustomHouseDataRequest(Handler._customHouseRequests[i]);
+                    HouseDiagnostics.LogHouseRequest(Handler._customHouseRequests[i]);
                 }
 
                 Handler._customHouseRequests.Clear();
@@ -2655,6 +2656,8 @@ namespace ClassicUO.Network
         private static void ClientViewRange(ref StackDataReader p)
         {
             World.ClientViewRange = p.ReadUInt8();
+
+            HouseDiagnostics.LogViewRange(World.ClientViewRange);
         }
 
         private static void BulletinBoardData(ref StackDataReader p)
@@ -5458,6 +5461,10 @@ namespace ClassicUO.Network
             uint serial = p.ReadUInt32BE();
             Item foundation = World.Items.Get(serial);
             uint revision = p.ReadUInt32BE();
+
+            // Logged before the early-outs below so an answer that arrives for a house
+            // the client has already dropped still shows up as answered.
+            HouseDiagnostics.LogHouseResponse(serial);
 
             if (foundation == null)
             {
