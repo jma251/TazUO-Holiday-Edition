@@ -13,29 +13,9 @@ namespace ClassicUO.Renderer.Animations
         private readonly PixelPicker _picker = new PixelPicker();
         private IndexAnimation[] _dataIndex = new IndexAnimation[MAX_ANIMATIONS_DATA_INDEX_COUNT];
 
-        private AnimationDirection[][][] _cache;
-
         public Animations(GraphicsDevice device)
         {
             _atlas = new TextureAtlas(device, 4096, 4096, SurfaceFormat.Color);
-        }
-
-
-        private ref AnimationDirection GetSprite(int body, int action, int dir)
-        {
-            if (_cache == null)
-                _cache = new AnimationDirection[Math.Max(body, MAX_ANIMATIONS_DATA_INDEX_COUNT)][][];
-
-            if (body >= _cache.Length)
-                Array.Resize(ref _cache, body);
-
-            if (_cache[body] == null)
-                _cache[body] = new AnimationDirection[AnimationsLoader.MAX_ACTIONS][];
-
-            if (_cache[body][action] == null)
-                _cache[body][action] = new AnimationDirection[AnimationsLoader.MAX_DIRECTIONS];
-
-            return ref _cache[body][action][dir];
         }
 
         public int MaxAnimationCount => _dataIndex.Length;
