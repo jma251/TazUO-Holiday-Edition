@@ -657,11 +657,17 @@ namespace ClassicUO
                             break;
 
                         case SDL_WindowEventID.SDL_WINDOWEVENT_FOCUS_GAINED:
+                            // Re-sync on the way back in: modifiers may have been pressed
+                            // or released while another window had focus.
+                            Keyboard.Refresh();
                             Plugin.OnFocusGained();
 
                             break;
 
                         case SDL_WindowEventID.SDL_WINDOWEVENT_FOCUS_LOST:
+                            // No key-up arrives for a modifier still held when focus is
+                            // lost, so it would otherwise stay stuck on.
+                            Keyboard.ClearModifiers();
                             Plugin.OnFocusLost();
 
                             break;
