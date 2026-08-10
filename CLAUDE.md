@@ -142,12 +142,49 @@ the build if any of the three is missing.
 
 - Triggers on push to `legacy`, or manually from the Actions tab.
 - Builds on `windows-latest`, checks out submodules recursively, publishes the
-  client, verifies the natives are present, zips `bin/dist`, and replaces the
-  GitHub release tagged **`latest`** with the new `TazUO-Holiday-Edition.zip`.
-- Needs `permissions: contents: write` to manage that release.
+  client, verifies the natives are present, and zips `bin/dist` into
+  `TazUO-Holiday-Edition.zip`.
+- Needs `permissions: contents: write` to manage releases and tags.
 
 **It is the only workflow here that publishes a release automatically, and it
 should stay that way.**
+
+### Two releases per build
+
+Every build publishes the same zip twice, to two different releases:
+
+| Release | Tag | Lifetime | Purpose |
+| --- | --- | --- | --- |
+| Rolling | **`latest`** | Deleted and recreated each build | Fixed download URL, carries the "Latest" badge |
+| Permanent | **`v<base>-h<N>`** e.g. `v4.5.23-h4` | Never updated, never deleted | Rollback history |
+
+`<base>` is TazUO's version, read from `ClassicUO.Client.csproj` as before. `<N>`
+is the Holiday increment, and it is **not stored anywhere in the repo** — it is
+derived at build time from the tags that already exist:
+
+```bash
+git tag -l "v${VERSION}-h*"   # highest N wins, +1 for this build
+```
+
+That keeps the counter durable (tags are never pruned) without the workflow
+having to commit a counter file back to `legacy`, which would retrigger itself.
+
+Two consequences worth knowing:
+
+- **Numbering is per base version.** If TazUO's version moves to 4.5.24, the next
+  Holiday build is `v4.5.24-h1`, not a continuation of the 4.5.23 series.
+- **Re-running a build for an already-tagged commit does not mint a new number.**
+  The workflow detects a Holiday tag on `HEAD` and skips the permanent release;
+  `latest` still refreshes. This stops manual re-runs filling the releases page
+  with identical entries.
+
+Both releases' notes carry the commit SHA and the commits since the previous
+Holiday tag, so the releases page reads as a running changelog.
+
+Only the `latest` tag is ever deleted (`gh release delete latest --cleanup-tag`).
+**Holiday tags and releases must never be pruned** — they are the rollback
+history. `makeLatest: false` on the permanent release keeps the "Latest" badge
+on `latest`.
 
 The other deploy workflows (`net472-deploy.yml`, `net9-deploy.yml`,
 `tuo-deploy.yml`, `tuo-dev-deploy.yml`) are inherited from upstream and target
