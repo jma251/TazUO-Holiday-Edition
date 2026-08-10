@@ -3655,16 +3655,28 @@ namespace ClassicUO.Game.UI.Gumps
 
             content.AddToRight
             (
-                GenerateFontSelector(lang.GetTazUO.NameplateFont, ProfileManager.CurrentProfile.NamePlateFont, (i, s) => { ProfileManager.CurrentProfile.NamePlateFont = s; }),
-                true, page
+                GenerateFontSelector
+                (
+                    lang.GetTazUO.NameplateFont, ProfileManager.CurrentProfile.NamePlateFont, (i, s) =>
+                    {
+                        ProfileManager.CurrentProfile.NamePlateFont = s;
+                        NameOverheadGump.UpdateAllOptions();
+                    }
+                ), true, page
             );
 
             content.Indent();
 
             content.AddToRight
             (
-                new SliderWithLabel(lang.GetTazUO.SharedSize, 0, ThemeSettings.SLIDER_WIDTH, minFontSize, maxFontSize, profile.NamePlateFontSize, (i) => { profile.NamePlateFontSize = i; }), true,
-                page
+                new SliderWithLabel
+                (
+                    lang.GetTazUO.SharedSize, 0, ThemeSettings.SLIDER_WIDTH, minFontSize, maxFontSize, profile.NamePlateFontSize, (i) =>
+                    {
+                        profile.NamePlateFontSize = i;
+                        NameOverheadGump.UpdateAllOptions();
+                    }
+                ), true, page
             );
 
             content.RemoveIndent();
