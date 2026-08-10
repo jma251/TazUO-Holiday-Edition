@@ -62,6 +62,17 @@ namespace ClassicUO.Renderer.Animations
             int y
         )
         {
+            // Same validation GetAnimationFrames performs. This is the hover /
+            // mouse-selection entry point and had none of its own: an out-of-range
+            // group reached ReplaceUopGroup, which indexes a fixed 80-entry table
+            // with a byte. It stayed safe only because callers happen to run the
+            // drawing path (which does validate) first, so the guard was really
+            // just an accident of call order.
+            if (group >= AnimationsLoader.MAX_ACTIONS || direction >= AnimationsLoader.MAX_DIRECTIONS)
+            {
+                return false;
+            }
+
             ConvertBodyIfNeeded(ref animID);
 
             if (uop)
