@@ -1406,6 +1406,8 @@ namespace ClassicUO.Game.Scenes
 
             if (UIManager.KeyboardFocusControl != UIManager.SystemChat.TextBoxControl)
             {
+                KeyDiagnostics.LogSceneStop(e.keysym.sym, "focus-not-chat");
+
                 return;
             }
 
@@ -1515,6 +1517,8 @@ namespace ClassicUO.Game.Scenes
                 && ProfileManager.CurrentProfile.ActivateChatAfterEnter
             )
             {
+                KeyDiagnostics.LogSceneStop(e.keysym.sym, "chat-active");
+
                 return;
             }
 
@@ -1528,6 +1532,8 @@ namespace ClassicUO.Game.Scenes
                     Keyboard.Ctrl,
                     Keyboard.Shift
                 );
+
+                KeyDiagnostics.LogMacroLookup(e.keysym.sym, Keyboard.Alt, Keyboard.Ctrl, Keyboard.Shift, macro?.Name);
 
                 if (macro != null && e.keysym.sym != SDL.SDL_Keycode.SDLK_UNKNOWN)
                 {
@@ -1623,6 +1629,10 @@ namespace ClassicUO.Game.Scenes
                         }
                     }
                 }
+            }
+            else
+            {
+                KeyDiagnostics.LogSceneStop(e.keysym.sym, "cannot-execute-macro");
             }
 
             if (e.keysym.sym != SDL.SDL_Keycode.SDLK_UNKNOWN)
