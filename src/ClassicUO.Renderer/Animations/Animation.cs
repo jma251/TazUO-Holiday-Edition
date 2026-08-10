@@ -111,7 +111,9 @@ namespace ClassicUO.Renderer.Animations
 
             var frames = GetAnimationFrames(graphic, animGroup, dir, out _, out _, true);
 
-            if (!frames.IsEmpty && frames[frameIndex].Texture != null)
+            // frameIndex is a byte and can exceed the number of frames actually
+            // returned; IsEmpty alone does not cover that.
+            if (!frames.IsEmpty && frameIndex < frames.Length && frames[frameIndex].Texture != null)
             {
                 centerX = frames[frameIndex].Center.X;
                 centerY = frames[frameIndex].Center.Y;
