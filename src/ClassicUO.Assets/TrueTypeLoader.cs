@@ -151,7 +151,9 @@ namespace ClassicUO.Assets
             // '/f[font, size]', so an oversized value cannot reach the atlas.
             size = ClampFontSize(size);
 
-            if (_fonts.TryGetValue(name, out var font))
+            // A null or empty name cannot be looked up - Dictionary.TryGetValue throws
+            // on a null key - so skip straight to the fallback below.
+            if (!string.IsNullOrEmpty(name) && _fonts.TryGetValue(name, out var font))
             {
                 return font.GetFont(size);
             }
