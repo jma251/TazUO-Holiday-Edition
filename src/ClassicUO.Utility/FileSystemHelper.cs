@@ -115,5 +115,20 @@ namespace ClassicUO.Utility
                 diSourceSubDir.CopyAllTo(nextTargetSubDir);
             }
         }
+
+        /// <summary>
+        /// Reads a file while tolerating another process holding it open for writing.
+        /// File.ReadAllText opens with FileShare.Read, which does not permit a
+        /// concurrent writer, so two clients sharing an install can collide on files
+        /// the client generates for itself.
+        /// </summary>
+        public static string ReadAllTextShared(string filePath)
+        {
+            using (FileStream fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+            using (StreamReader reader = new StreamReader(fs, new UTF8Encoding(false)))
+            {
+                return reader.ReadToEnd();
+            }
+        }
     }
 }
