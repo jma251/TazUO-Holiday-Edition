@@ -53,6 +53,11 @@ namespace ClassicUO.Game.UI.Controls
         private Color _color;
         private bool _dirty = false;
 
+        // The stroke size baked into the current layout. Compared against the live
+        // setting each Update so an existing TextBox picks up a changed value
+        // without having to be recreated. int.MinValue means "nothing built yet".
+        private int _appliedStrokeSize = int.MinValue;
+
         private int getStrokeSize
         {
             get
@@ -141,11 +146,25 @@ namespace ClassicUO.Game.UI.Controls
 
             if (Options.StrokeEffect)
             {
-                text = $"/es[{getStrokeSize}]" + text;
+                _appliedStrokeSize = getStrokeSize;
+                text = $"/es[{_appliedStrokeSize}]" + text;
+            }
+            else
+            {
+                _appliedStrokeSize = int.MinValue;
             }
 
             return text;
         }
+
+        /// <summary>
+        /// True when the border setting has moved since this layout was built.
+        /// Reading the current value rather than tracking a change event means this
+        /// also covers text created before the profile loaded, when getStrokeSize
+        /// falls back to 1.
+        /// </summary>
+        private bool StrokeSizeIsStale =>
+            _rtl != null && Options != null && Options.StrokeEffect && _appliedStrokeSize != getStrokeSize;
 
         private static string StripStrokeCommand(string text)
         {
@@ -415,7 +434,7 @@ namespace ClassicUO.Game.UI.Controls
 
         public override void Update()
         {
-            if (_dirty || WantUpdateSize)
+            if (_dirty || WantUpdateSize || StrokeSizeIsStale)
             {
                 var text = _rtl.Text ?? string.Empty;
 
