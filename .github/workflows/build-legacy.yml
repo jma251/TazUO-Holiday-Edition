@@ -37,10 +37,14 @@ jobs:
 
     steps:
       # Always build the legacy branch, whether triggered by push or by hand.
+      # fetch-depth: 0 pulls full history and all tags. Both are required: the
+      # Holiday increment is derived from existing tags, and the release notes
+      # need the commit range since the previous Holiday tag.
       - name: Check out legacy branch
         uses: actions/checkout@v4
         with:
           ref: legacy
+          fetch-depth: 0
 
       # Pull in FNA, MP3Sharp, etc. (and anything nested inside them).
       # The insteadOf rewrite lets old git:// submodule URLs clone over https.
@@ -58,6 +62,71 @@ jobs:
           export LC_ALL=C.UTF-8
           echo "VERSION=$(grep -oP '<AssemblyVersion>\K\d+\.\d+\.\d+' src/ClassicUO.Client/ClassicUO.Client.csproj | head -1)" >> $GITHUB_ENV
           echo "LEGACY_SHA=$(git rev-parse HEAD)" >> $GITHUB_ENV
+
+      # Work out this build's Holiday tag, e.g. v4.5.23-h4. The counter is derived
+      # from the tags already on the repo rather than stored in a file, so nothing
+      # has to be committed back (which would retrigger this workflow).
+      #
+      # Numbering is per base version: if Taz's version moves to 4.5.24, the next
+      # Holiday build is v4.5.24-h1, not a continuation of the 4.5.23 series.
+      #
+      # If this exact commit already carries a Holiday tag (a manual re-run of a
+      # build that already published), the permanent release is skipped rather
+      # than minting a second number for identical code. "latest" still refreshes.
+      - name: Compute Holiday increment
+        shell: bash
+        run: |
+          export LC_ALL=C.UTF-8
+
+          HIGHEST=0
+          for t in $(git tag -l "v${VERSION}-h*"); do
+            n=${t##*-h}
+            case "$n" in ''|*[!0-9]*) continue ;; esac
+            if [ "$n" -gt "$HIGHEST" ]; then HIGHEST="$n"; fi
+          done
+
+          if [ "$HIGHEST" -gt 0 ]; then
+            echo "PREV_TAG=v${VERSION}-h${HIGHEST}" >> $GITHUB_ENV
+          else
+            echo "PREV_TAG=" >> $GITHUB_ENV
+          fi
+
+          EXISTING=$(git tag --points-at HEAD -l "v${VERSION}-h*" | head -1)
+          if [ -n "$EXISTING" ]; then
+            echo "This commit already has Holiday tag $EXISTING; skipping a new permanent release."
+            echo "HOLIDAY_TAG=$EXISTING" >> $GITHUB_ENV
+            echo "SKIP_PERMANENT=true" >> $GITHUB_ENV
+          else
+            echo "HOLIDAY_TAG=v${VERSION}-h$((HIGHEST + 1))" >> $GITHUB_ENV
+            echo "SKIP_PERMANENT=false" >> $GITHUB_ENV
+          fi
+
+      # Collect the commits since the previous Holiday build so each release's
+      # notes read as a running list of what changed.
+      - name: Build release notes
+        shell: bash
+        run: |
+          export LC_ALL=C.UTF-8
+
+          if [ -n "$PREV_TAG" ]; then
+            HEADER="Changes since \`${PREV_TAG}\`:"
+            LOG=$(git log --no-merges --pretty=format:'- %s (%h)' "${PREV_TAG}..HEAD")
+          else
+            HEADER="Recent changes (first Holiday build of v${VERSION}):"
+            LOG=$(git log --no-merges -20 --pretty=format:'- %s (%h)')
+          fi
+
+          if [ -z "$LOG" ]; then
+            LOG="- No new commits since the previous build."
+          fi
+
+          {
+            echo "NOTES<<HOLIDAY_NOTES_EOF"
+            echo "$HEADER"
+            echo ""
+            echo "$LOG"
+            echo "HOLIDAY_NOTES_EOF"
+          } >> $GITHUB_ENV
 
       # The .NET 8 SDK can build/publish the net472 target on Windows.
       - name: Setup .NET SDK
@@ -102,8 +171,35 @@ jobs:
           filename: ${{ env.CUO_ZIP_NAME }}
           exclusions: '*.zip'
 
+      # Permanent, numbered release. Never updated, never deleted - these
+      # accumulate to form the rollback history. makeLatest is false so the
+      # "Latest" badge stays on the "latest" release below.
+      - name: Publish permanent Holiday release
+        if: env.SKIP_PERMANENT == 'false'
+        uses: ncipollo/release-action@v1.16.0
+        with:
+          artifacts: "${{ env.CUO_OUTPUT_PATH }}/${{ env.CUO_ZIP_NAME }}"
+          name: "TazUO Holiday Edition ${{ env.HOLIDAY_TAG }}"
+          body: |
+            Permanent Holiday build of the `legacy` branch (.NET Framework 4.7.2).
+
+            - Holiday build: `${{ env.HOLIDAY_TAG }}`
+            - Base version: `v${{ env.VERSION }}` (from TazUO)
+            - Commit: ${{ env.LEGACY_SHA }}
+
+            Download `${{ env.CUO_ZIP_NAME }}` below, unzip it, and run `ClassicUO.exe`.
+
+            ${{ env.NOTES }}
+          tag: ${{ env.HOLIDAY_TAG }}
+          commit: ${{ env.LEGACY_SHA }}
+          allowUpdates: false   # these are immutable once published
+          makeLatest: false     # the "latest" release keeps the badge
+          prerelease: false
+          token: ${{ secrets.GITHUB_TOKEN }}
+
       # Remove the previous "latest" release and its tag so the new one is
       # created fresh against this commit. Ignored if there isn't one yet.
+      # Only the "latest" tag is touched - Holiday tags are never deleted.
       - name: Delete previous "latest" release
         shell: bash
         env:
@@ -119,11 +215,15 @@ jobs:
           name: "TazUO Holiday Edition (latest) - v${{ env.VERSION }}"
           body: |
             Automated build of the `legacy` branch (.NET Framework 4.7.2).
+            This release always points at the newest build; its download URL never changes.
 
             - Version: `v${{ env.VERSION }}`
+            - Holiday build: `${{ env.HOLIDAY_TAG }}` (permanent copy, for rollback)
             - Commit: ${{ env.LEGACY_SHA }}
 
             Download `${{ env.CUO_ZIP_NAME }}` below, unzip it, and run `ClassicUO.exe`.
+
+            ${{ env.NOTES }}
           tag: ${{ env.TAG_NAME }}
           commit: ${{ env.LEGACY_SHA }}
           allowUpdates: true      # reuse the existing "latest" release
