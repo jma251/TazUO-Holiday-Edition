@@ -248,10 +248,19 @@ namespace ClassicUO.Game.Scenes
                 _selectionEnd.Y = Mouse.Position.Y;
             }
 
-            _rectangleObj.X = _selectionStart.X - Camera.Bounds.X;
-            _rectangleObj.Y = _selectionStart.Y - Camera.Bounds.Y;
-            _rectangleObj.Width = _selectionEnd.X - Camera.Bounds.X - _rectangleObj.X;
-            _rectangleObj.Height = _selectionEnd.Y - Camera.Bounds.Y - _rectangleObj.Y;
+            // Convert viewport-local mouse positions to game space so the intersection
+            // check matches RealScreenPosition (which is also in game space, pre-zoom).
+            Point selMin = Camera.ScreenToWorld(
+                new Point(_selectionStart.X - Camera.Bounds.X, _selectionStart.Y - Camera.Bounds.Y)
+            );
+            Point selMax = Camera.ScreenToWorld(
+                new Point(_selectionEnd.X - Camera.Bounds.X, _selectionEnd.Y - Camera.Bounds.Y)
+            );
+
+            _rectangleObj.X = selMin.X;
+            _rectangleObj.Y = selMin.Y;
+            _rectangleObj.Width = selMax.X - selMin.X;
+            _rectangleObj.Height = selMax.Y - selMin.Y;
 
             int finalX = ProfileManager.CurrentProfile.DragSelectStartX;
             int finalY = ProfileManager.CurrentProfile.DragSelectStartY;
@@ -325,11 +334,9 @@ namespace ClassicUO.Game.Scenes
 
                 Point size = new Point(p.X + mobile.FrameInfo.Width, p.Y + mobile.FrameInfo.Height);
 
-                p = Camera.WorldToScreen(p);
+                // Keep in game space (RealScreenPosition space) to match _rectangleObj
                 _rectanglePlayer.X = p.X;
                 _rectanglePlayer.Y = p.Y;
-
-                size = Camera.WorldToScreen(size);
                 _rectanglePlayer.Width = size.X - p.X;
                 _rectanglePlayer.Height = size.Y - p.Y;
 
