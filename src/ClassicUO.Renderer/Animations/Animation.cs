@@ -13,29 +13,9 @@ namespace ClassicUO.Renderer.Animations
         private readonly PixelPicker _picker = new PixelPicker();
         private IndexAnimation[] _dataIndex = new IndexAnimation[MAX_ANIMATIONS_DATA_INDEX_COUNT];
 
-        private AnimationDirection[][][] _cache;
-
         public Animations(GraphicsDevice device)
         {
             _atlas = new TextureAtlas(device, 4096, 4096, SurfaceFormat.Color);
-        }
-
-
-        private ref AnimationDirection GetSprite(int body, int action, int dir)
-        {
-            if (_cache == null)
-                _cache = new AnimationDirection[Math.Max(body, MAX_ANIMATIONS_DATA_INDEX_COUNT)][][];
-
-            if (body >= _cache.Length)
-                Array.Resize(ref _cache, body);
-
-            if (_cache[body] == null)
-                _cache[body] = new AnimationDirection[AnimationsLoader.MAX_ACTIONS][];
-
-            if (_cache[body][action] == null)
-                _cache[body][action] = new AnimationDirection[AnimationsLoader.MAX_DIRECTIONS];
-
-            return ref _cache[body][action][dir];
         }
 
         public int MaxAnimationCount => _dataIndex.Length;
@@ -62,6 +42,17 @@ namespace ClassicUO.Renderer.Animations
             int y
         )
         {
+            // Same validation GetAnimationFrames performs. This is the hover /
+            // mouse-selection entry point and had none of its own: an out-of-range
+            // group reached ReplaceUopGroup, which indexes a fixed 80-entry table
+            // with a byte. It stayed safe only because callers happen to run the
+            // drawing path (which does validate) first, so the guard was really
+            // just an accident of call order.
+            if (group >= AnimationsLoader.MAX_ACTIONS || direction >= AnimationsLoader.MAX_DIRECTIONS)
+            {
+                return false;
+            }
+
             ConvertBodyIfNeeded(ref animID);
 
             if (uop)
@@ -100,7 +91,9 @@ namespace ClassicUO.Renderer.Animations
 
             var frames = GetAnimationFrames(graphic, animGroup, dir, out _, out _, true);
 
-            if (!frames.IsEmpty && frames[frameIndex].Texture != null)
+            // frameIndex is a byte and can exceed the number of frames actually
+            // returned; IsEmpty alone does not cover that.
+            if (!frames.IsEmpty && frameIndex < frames.Length && frames[frameIndex].Texture != null)
             {
                 centerX = frames[frameIndex].Center.X;
                 centerY = frames[frameIndex].Center.Y;
@@ -139,7 +132,9 @@ namespace ClassicUO.Renderer.Animations
 
             if (id >= _dataIndex.Length)
             {
-                Array.Resize(ref _dataIndex, id + 1);
+                // Grow geometrically. Resizing to exactly id + 1 reallocates and
+                // copies the whole array again for every subsequent higher id.
+                Array.Resize(ref _dataIndex, Math.Max(id + 1, _dataIndex.Length * 2));
             }
 
             ref var index = ref _dataIndex[id];
@@ -199,7 +194,9 @@ namespace ClassicUO.Renderer.Animations
                     {
                         if (id >= _dataIndex.Length)
                         {
-                            Array.Resize(ref _dataIndex, id + 1);
+                            // Grow geometrically. Resizing to exactly id + 1 reallocates and
+                // copies the whole array again for every subsequent higher id.
+                Array.Resize(ref _dataIndex, Math.Max(id + 1, _dataIndex.Length * 2));
                         }
 
                         index = ref _dataIndex[id];

@@ -53,6 +53,11 @@ namespace ClassicUO.Game.UI.Controls
         private Color _color;
         private bool _dirty = false;
 
+        // The stroke size baked into the current layout. Compared against the live
+        // setting each Update so an existing TextBox picks up a changed value
+        // without having to be recreated. int.MinValue means "nothing built yet".
+        private int _appliedStrokeSize = int.MinValue;
+
         private int getStrokeSize
         {
             get
@@ -112,6 +117,67 @@ namespace ClassicUO.Game.UI.Controls
         /// <param name="text"></param>
         /// <param name="width">Leave null to make width fit the text.</param>
         /// <param name="applyTextFormatting">True will add a stroke, and convert html colors if those are true. Set to false to keep text as is.</param>
+        /// <summary>
+        /// Turns a raw string into what actually gets stored on the layout. Used by
+        /// both CreateRichTextLayout and the Text setter so the two cannot drift:
+        /// the setter used to skip the stroke entirely, which is why nameplates -
+        /// constructed empty and assigned their name afterwards - had no border
+        /// while text created with its content in one call did.
+        /// </summary>
+        private string ApplyTextFormatting(string text)
+        {
+            text ??= string.Empty;
+
+            if (Options == null)
+            {
+                return text;
+            }
+
+            // Strip any stroke command already on the string before re-applying.
+            // Update() feeds the stored text back through here on a rebuild, so
+            // without this the old value would either stack or, with the previous
+            // StartsWith check, stick permanently at whatever it was first built at.
+            text = StripStrokeCommand(text);
+
+            if (Options.ConvertHtmlColors)
+            {
+                text = ConvertHTMLColorsToFSS(text);
+            }
+
+            if (Options.StrokeEffect)
+            {
+                _appliedStrokeSize = getStrokeSize;
+                text = $"/es[{_appliedStrokeSize}]" + text;
+            }
+            else
+            {
+                _appliedStrokeSize = int.MinValue;
+            }
+
+            return text;
+        }
+
+        /// <summary>
+        /// True when the border setting has moved since this layout was built.
+        /// Reading the current value rather than tracking a change event means this
+        /// also covers text created before the profile loaded, when getStrokeSize
+        /// falls back to 1.
+        /// </summary>
+        private bool StrokeSizeIsStale =>
+            _rtl != null && Options != null && Options.StrokeEffect && _appliedStrokeSize != getStrokeSize;
+
+        private static string StripStrokeCommand(string text)
+        {
+            if (string.IsNullOrEmpty(text) || !text.StartsWith("/es["))
+            {
+                return text;
+            }
+
+            int end = text.IndexOf(']');
+
+            return end < 0 ? text : text.Substring(end + 1);
+        }
+
         private void CreateRichTextLayout(string text)
         {
             text ??= string.Empty;  //Prevent null ref error while still updating everything else
@@ -124,11 +190,7 @@ namespace ClassicUO.Game.UI.Controls
                 Options = RTLOptions.Default();
             }
 
-            if (Options.ConvertHtmlColors)
-                text = ConvertHTMLColorsToFSS(text);
-
-            if (Options.StrokeEffect && !text.StartsWith("/es"))
-                text = $"/es[{getStrokeSize}]" + text;
+            text = ApplyTextFormatting(text);
 
             if (_rtl == null || _rtl.Text != text || _rtl.Width != Options.Width)
                 _rtl = new RichTextLayout
@@ -242,14 +304,15 @@ namespace ClassicUO.Game.UI.Controls
                     return;
                 }
 
-                if (_rtl.Text == value)
+                // Format first, then compare like against like. The stored string
+                // carries the "/es[n]" stroke prefix, so comparing it to the raw
+                // incoming value never matched and the early-out never fired.
+                string formatted = ApplyTextFormatting(value);
+
+                if (_rtl.Text == formatted)
                     return;
 
-
-                if (Options.ConvertHtmlColors)
-                    _rtl.Text = ConvertHTMLColorsToFSS(value);
-                else
-                    _rtl.Text = value;
+                _rtl.Text = formatted;
 
                 _dirty = true;
             }
@@ -371,7 +434,7 @@ namespace ClassicUO.Game.UI.Controls
 
         public override void Update()
         {
-            if (_dirty || WantUpdateSize)
+            if (_dirty || WantUpdateSize || StrokeSizeIsStale)
             {
                 var text = _rtl.Text ?? string.Empty;
 

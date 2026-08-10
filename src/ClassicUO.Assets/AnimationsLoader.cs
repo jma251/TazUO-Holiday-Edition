@@ -270,6 +270,14 @@ namespace ClassicUO.Assets
 
         public bool ReplaceUopGroup(ushort body, ref byte group)
         {
+            // ReplacedAnimations is a fixed MAX_ACTIONS-entry buffer and group is a
+            // byte, so it can address well past the end. Callers currently validate
+            // beforehand, but this is public and must not depend on that.
+            if (group >= MAX_ACTIONS)
+            {
+                return false;
+            }
+
             if (_uopInfos.TryGetValue(body, out var uopInfo))
             {
                 group = (byte)uopInfo.ReplacedAnimations[group];
