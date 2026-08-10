@@ -3614,6 +3614,48 @@ namespace ClassicUO.Game.UI.Gumps
             content.RemoveIndent();
             content.BlankLine();
 
+            // The line you type into is a classic bitmap font, not a TTF one, so it has
+            // its own setting rather than sharing the font/size pair above.
+            List<string> chatInputFontNames = new List<string>();
+            List<byte> chatInputFontIds = new List<byte>();
+
+            for (byte chatFont = 0; chatFont < 20; chatFont++)
+            {
+                if (FontsLoader.Instance.UnicodeFontExists(chatFont))
+                {
+                    chatInputFontNames.Add($"Font {chatFont}");
+                    chatInputFontIds.Add(chatFont);
+                }
+            }
+
+            if (chatInputFontNames.Count > 0)
+            {
+                int selectedChatInputFont = chatInputFontIds.IndexOf(profile.ChatFont);
+
+                content.AddToRight
+                (
+                    new ComboBoxWithLabel
+                    (
+                        lang.GetTazUO.ChatInputFont, 0, ThemeSettings.COMBO_BOX_WIDTH, chatInputFontNames.ToArray(), selectedChatInputFont, (i, s) =>
+                        {
+                            if (i < 0 || i >= chatInputFontIds.Count)
+                            {
+                                return;
+                            }
+
+                            profile.ChatFont = chatInputFontIds[i];
+
+                            if (UIManager.SystemChat != null && UIManager.SystemChat.TextBoxControl != null)
+                            {
+                                UIManager.SystemChat.TextBoxControl.Font = profile.ChatFont;
+                            }
+                        }
+                    ), true, page
+                );
+
+                content.BlankLine();
+            }
+
             content.AddToRight
             (
                 GenerateFontSelector
@@ -3668,16 +3710,28 @@ namespace ClassicUO.Game.UI.Gumps
 
             content.AddToRight
             (
-                GenerateFontSelector(lang.GetTazUO.NameplateFont, ProfileManager.CurrentProfile.NamePlateFont, (i, s) => { ProfileManager.CurrentProfile.NamePlateFont = s; }),
-                true, page
+                GenerateFontSelector
+                (
+                    lang.GetTazUO.NameplateFont, ProfileManager.CurrentProfile.NamePlateFont, (i, s) =>
+                    {
+                        ProfileManager.CurrentProfile.NamePlateFont = s;
+                        NameOverheadGump.UpdateAllOptions();
+                    }
+                ), true, page
             );
 
             content.Indent();
 
             content.AddToRight
             (
-                new SliderWithLabel(lang.GetTazUO.SharedSize, 0, ThemeSettings.SLIDER_WIDTH, minFontSize, maxFontSize, profile.NamePlateFontSize, (i) => { profile.NamePlateFontSize = i; }), true,
-                page
+                new SliderWithLabel
+                (
+                    lang.GetTazUO.SharedSize, 0, ThemeSettings.SLIDER_WIDTH, minFontSize, maxFontSize, profile.NamePlateFontSize, (i) =>
+                    {
+                        profile.NamePlateFontSize = i;
+                        NameOverheadGump.UpdateAllOptions();
+                    }
+                ), true, page
             );
 
             content.RemoveIndent();

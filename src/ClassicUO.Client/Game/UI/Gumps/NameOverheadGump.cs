@@ -529,6 +529,39 @@ namespace ClassicUO.Game.UI.Gumps
             base.OnMouseExit(x, y);
         }
 
+        /// <summary>
+        /// Re-applies the nameplate font settings to every open nameplate. The font is
+        /// only read when the TextBox is built, so without this a nameplate keeps
+        /// whatever font it was created with until its entity leaves view and comes
+        /// back - which reads as the setting doing nothing at all.
+        /// </summary>
+        public static void UpdateAllOptions()
+        {
+            for (var node = UIManager.Gumps.First; node != null; node = node.Next)
+            {
+                if (node.Value is NameOverheadGump nameGump && !nameGump.IsDisposed)
+                {
+                    nameGump.UpdateOptions();
+                }
+            }
+        }
+
+        private void UpdateOptions()
+        {
+            if (_text == null || _text.IsDisposed || ProfileManager.CurrentProfile == null)
+            {
+                return;
+            }
+
+            _text.Font = ProfileManager.CurrentProfile.NamePlateFont;
+            _text.FontSize = ProfileManager.CurrentProfile.NamePlateFontSize;
+
+            // Rebuild now so SetName sees the new measurements when it resizes us.
+            _text.Update();
+
+            SetName();
+        }
+
         private static List<NameOverheadGump> GetAllVisibleNameOverheads()
         {
             var result = new List<NameOverheadGump>();

@@ -58,6 +58,14 @@ namespace ClassicUO.Game.UI.Controls
         // without having to be recreated. int.MinValue means "nothing built yet".
         private int _appliedStrokeSize = int.MinValue;
 
+        // The font and size baked into the current layout. CreateRichTextLayout only
+        // rebuilds when something it can see has changed, and it used to look at the
+        // text and width only - so assigning Font or FontSize on an existing TextBox
+        // marked it dirty, rebuilt with the same string, and silently kept the old
+        // font. Tracking what was actually applied makes those setters work.
+        private string _appliedFont;
+        private float _appliedSize = float.MinValue;
+
         private int getStrokeSize
         {
             get
@@ -192,7 +200,8 @@ namespace ClassicUO.Game.UI.Controls
 
             text = ApplyTextFormatting(text);
 
-            if (_rtl == null || _rtl.Text != text || _rtl.Width != Options.Width)
+            if (_rtl == null || _rtl.Text != text || _rtl.Width != Options.Width || _appliedFont != _font || _appliedSize != _size)
+            {
                 _rtl = new RichTextLayout
                 {
                     Font = TrueTypeLoader.Instance.GetFont(_font, _size),
@@ -202,6 +211,10 @@ namespace ClassicUO.Game.UI.Controls
                     CalculateGlyphs = Options.CalculateGlyphs,
                     Width = Options.Width
                 };
+
+                _appliedFont = _font;
+                _appliedSize = _size;
+            }
 
             base.Width = Options.Width ?? _rtl.Size.X;
             base.Height = Height;
@@ -389,6 +402,9 @@ namespace ClassicUO.Game.UI.Controls
             Alpha = 1f;
             _dirty = false;
             WantUpdateSize = false;
+            _appliedFont = null;
+            _appliedSize = float.MinValue;
+            _appliedStrokeSize = int.MinValue;
         }
 
         private static readonly Regex _baseFontColorRegex = RegexHelper.GetRegex("<basefont color=\"?'?(?<color>.*?)\"?'?>", RegexOptions.Multiline | RegexOptions.IgnoreCase);
