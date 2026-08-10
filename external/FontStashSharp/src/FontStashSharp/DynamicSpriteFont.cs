@@ -137,7 +137,14 @@ namespace FontStashSharp
 			if (device == null || glyph.Texture != null)
 				return glyph;
 
-			FontSystem.RenderGlyphOnAtlas(device, glyph);
+			// HOLIDAY EDITION: a glyph too large for the atlas is reported as missing
+			// rather than throwing. Returning null routes it through the existing
+			// not-found handling (DefaultCharacter fallback, else the character is
+			// skipped) instead of handing the renderer a glyph with a null Texture.
+			if (!FontSystem.RenderGlyphOnAtlas(device, glyph))
+			{
+				return null;
+			}
 
 			return glyph;
 		}

@@ -1,6 +1,9 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using ClassicUO.Utility.Logging;
 
 namespace ClassicUO.Configuration
 {
@@ -22,15 +25,45 @@ namespace ClassicUO.Configuration
 
         public static void Load()
         {
-            if (File.Exists(languageFilePath))
+            // Called from Main before anything else. Running several clients against a
+            // shared install means two of them can touch this file at the same moment,
+            // so nothing in here is allowed to be fatal.
+            try
             {
-                Language f = JsonSerializer.Deserialize<Language>(File.ReadAllText(languageFilePath));
-                Instance = f;
-                Save(); //To update language file with new additions as needed
+                if (File.Exists(languageFilePath))
+                {
+                    string raw = ReadAllTextShared(languageFilePath);
+
+                    Language f = JsonSerializer.Deserialize<Language>(raw);
+
+                    // A concurrent writer can leave the file momentarily empty or
+                    // truncated, which deserialises to null. Keep the built-in defaults
+                    // rather than nulling Instance and failing everywhere downstream.
+                    if (f != null)
+                    {
+                        Instance = f;
+                    }
+
+                    // Rewrite only when the file is actually out of date. The old code
+                    // wrote on every single startup, which is what put two clients into
+                    // a write race in the first place.
+                    string current = Serialize();
+
+                    if (!string.Equals(raw, current, StringComparison.Ordinal))
+                    {
+                        Save();
+                    }
+                }
+                else
+                {
+                    CreateNewLanguageFile();
+                }
             }
-            else
+            catch (Exception e)
             {
-                CreateNewLanguageFile();
+                // The client runs on the built-in defaults if this cannot be read or
+                // rewritten. Losing translations beats failing to start.
+                Log.Error($"Failed to load language file '{languageFilePath}': {e}");
             }
         }
 
@@ -38,14 +71,48 @@ namespace ClassicUO.Configuration
         {
             Directory.CreateDirectory(Path.Combine(CUOEnviroment.ExecutablePath, "Data"));
 
-            string defaultLanguage = JsonSerializer.Serialize<Language>(Instance, new JsonSerializerOptions() { WriteIndented = true });
-            File.WriteAllText(languageFilePath, defaultLanguage);
+            WriteAtomic(languageFilePath, Serialize());
         }
 
         private static void Save()
         {
-            string language = JsonSerializer.Serialize<Language>(Instance, new JsonSerializerOptions() { WriteIndented = true });
-            File.WriteAllText(languageFilePath, language);
+            WriteAtomic(languageFilePath, Serialize());
+        }
+
+        private static string Serialize()
+        {
+            return JsonSerializer.Serialize<Language>(Instance, new JsonSerializerOptions() { WriteIndented = true });
+        }
+
+        // FileShare.ReadWrite | Delete so a client writing this file at the same moment
+        // does not make our read throw, and our read does not make their write throw.
+        // File.ReadAllText opens with FileShare.Read, which is what caused the sharing
+        // violation between clients.
+        private static string ReadAllTextShared(string path)
+        {
+            using (FileStream fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+            using (StreamReader reader = new StreamReader(fs, new UTF8Encoding(false)))
+            {
+                return reader.ReadToEnd();
+            }
+        }
+
+        // Write alongside the target then swap it in, so a client reading concurrently
+        // sees either the whole old file or the whole new one, never a partial write.
+        private static void WriteAtomic(string path, string contents)
+        {
+            string temp = path + ".tmp";
+
+            File.WriteAllText(temp, contents, new UTF8Encoding(false));
+
+            if (File.Exists(path))
+            {
+                File.Replace(temp, path, null, true);
+            }
+            else
+            {
+                File.Move(temp, path);
+            }
         }
 
         private static string languageFilePath { get { return Path.Combine(CUOEnviroment.ExecutablePath, "Data", "Language.json"); } }

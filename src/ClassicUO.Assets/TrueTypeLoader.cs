@@ -43,6 +43,35 @@ namespace ClassicUO.Assets
     {
         public const string EMBEDDED_FONT = "Roboto-Regular";
 
+        private const float MIN_FONT_SIZE = 1f;
+
+        // Oversized sizes produce glyphs too big for FontStashSharp's fixed 1024x1024
+        // atlas, which throws and takes the client down. Real UI text never gets near
+        // this, so clamping cannot affect anything legitimate.
+        private const float MAX_FONT_SIZE = 200f;
+
+        // Clamps a requested font size to a range the atlas can rasterize, normalizing
+        // NaN. Written out rather than using Math.Clamp, which does not exist on net472.
+        private static float ClampFontSize(float size)
+        {
+            if (float.IsNaN(size))
+            {
+                return MIN_FONT_SIZE;
+            }
+
+            if (size < MIN_FONT_SIZE)
+            {
+                return MIN_FONT_SIZE;
+            }
+
+            if (size > MAX_FONT_SIZE)
+            {
+                return MAX_FONT_SIZE;
+            }
+
+            return size;
+        }
+
         private Dictionary<string, FontSystem> _fonts = new();
 
         private TrueTypeLoader()
@@ -118,7 +147,13 @@ namespace ClassicUO.Assets
 
         public SpriteFontBase GetFont(string name, float size)
         {
-            if (_fonts.TryGetValue(name, out var font))
+            // Single choke point for every font request, including rich-text
+            // '/f[font, size]', so an oversized value cannot reach the atlas.
+            size = ClampFontSize(size);
+
+            // A null or empty name cannot be looked up - Dictionary.TryGetValue throws
+            // on a null key - so skip straight to the fallback below.
+            if (!string.IsNullOrEmpty(name) && _fonts.TryGetValue(name, out var font))
             {
                 return font.GetFont(size);
             }
