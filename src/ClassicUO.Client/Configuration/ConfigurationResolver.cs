@@ -30,6 +30,7 @@
 
 #endregion
 
+using System;
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -61,7 +62,31 @@ namespace ClassicUO.Configuration
                 RegexOptions.IgnorePatternWhitespace
             );
 
-            return JsonSerializer.Deserialize(text, typeof(T), ctx) as T;
+            try
+            {
+                return JsonSerializer.Deserialize(text, typeof(T), ctx) as T;
+            }
+            catch (JsonException e)
+            {
+                // A truncated or malformed settings.json / profile otherwise throws out
+                // of startup and the client cannot open at all. Keep the bad file for
+                // inspection and carry on with defaults, which is what main does.
+                Log.Error($"'{file}' is corrupt and could not be read: {e.Message}");
+
+                try
+                {
+                    string corruptFile = file + ".corrupt";
+
+                    File.Copy(file, corruptFile, true);
+                    Log.Error($"A copy has been saved as '{corruptFile}'. Defaults will be used.");
+                }
+                catch (Exception copyError)
+                {
+                    Log.Error($"Could not preserve the corrupt file: {copyError.Message}");
+                }
+
+                return null;
+            }
         }
 
         public static void Save<T>(T obj, string file, JsonSerializerContext ctx) where T : class
