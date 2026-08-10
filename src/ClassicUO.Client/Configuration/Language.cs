@@ -200,6 +200,8 @@ namespace ClassicUO.Configuration
             public string DragPlayersOnly { get; set; } = "Players only";
             public string DragMobsOnly { get; set; } = "Monsters only";
             public string DragNameplatesOnly { get; set; } = "Visible nameplates only";
+            public string DragMonstersSkipFriendly { get; set; } = "Monsters filter: ignore blue, ally, invulnerable and own pets";
+            public string DragPlayersSkipInvulnerable { get; set; } = "Players filter: ignore invulnerable";
             public string DragX { get; set; } = "X Position of healthbars";
             public string DragY { get; set; } = "Y Position of healthbars";
             public string DragAnchored { get; set; } = "Anchor opened health bars together";

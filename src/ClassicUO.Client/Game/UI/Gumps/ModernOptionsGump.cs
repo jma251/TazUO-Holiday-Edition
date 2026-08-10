@@ -540,6 +540,9 @@ namespace ClassicUO.Game.UI.Gumps
             );
 
             content.AddToRight
+                (new CheckboxWithLabel(lang.GetGeneral.DragPlayersSkipInvulnerable, isChecked: profile.DragSelect_PlayersSkipInvulnerable, valueChanged: (b) => { profile.DragSelect_PlayersSkipInvulnerable = b; }), true, page);
+
+            content.AddToRight
             (
                 new ComboBoxWithLabel
                 (
@@ -548,6 +551,9 @@ namespace ClassicUO.Game.UI.Gumps
                     profile.DragSelect_MonstersModifier, (s, n) => { profile.DragSelect_MonstersModifier = s; }
                 ), true, page
             );
+
+            content.AddToRight
+                (new CheckboxWithLabel(lang.GetGeneral.DragMonstersSkipFriendly, isChecked: profile.DragSelect_MonstersSkipFriendly, valueChanged: (b) => { profile.DragSelect_MonstersSkipFriendly = b; }), true, page);
 
             content.AddToRight
             (
