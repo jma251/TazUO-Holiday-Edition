@@ -326,7 +326,7 @@ namespace ClassicUO.Assets
         /// <param name="line">A line from the file.</param>
         /// <param name="?">If successful, contains a tuple with these fields: int songIndex, string songName, bool doesLoop</param>
         /// <returns>true if line could be parsed, false otherwise.</returns>
-        private bool TryParseConfigLine(string line, out Tuple<int, string, bool> songData)
+        private static bool TryParseConfigLine(string line, out Tuple<int, string, bool> songData)
         {
             songData = null;
 
