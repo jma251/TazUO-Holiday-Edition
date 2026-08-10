@@ -135,14 +135,25 @@ namespace ClassicUO
             }
 
             Settings.GlobalSettings = ConfigurationResolver.Load<Settings>(globalSettingsPath, SettingsJsonContext.Default);
+
+            // Must run before anything reads GlobalSettings. Load returns null when the
+            // file is missing or unreadable, and both the IsOutlands line below and
+            // ReadSettingsFromArgs dereference it. The save is deliberately deferred
+            // until after the args are applied, as it was before.
+            bool freshSettings = false;
+
+            if (Settings.GlobalSettings == null)
+            {
+                Settings.GlobalSettings = new Settings();
+                freshSettings = true;
+            }
+
             CUOEnviroment.IsOutlands = Settings.GlobalSettings.ShardType == 2;
 
             ReadSettingsFromArgs(args);
 
-            // still invalid, cannot load settings
-            if (Settings.GlobalSettings == null)
+            if (freshSettings)
             {
-                Settings.GlobalSettings = new Settings();
                 Settings.GlobalSettings.Save();
             }
 

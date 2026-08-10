@@ -42,6 +42,18 @@ namespace ClassicUO.Input
         public static bool Shift { get; private set; }
         public static bool Ctrl { get; private set; }
 
+        /// <summary>
+        /// Drops the cached modifier state. The key-up event is never delivered when the
+        /// window loses focus, so alt-tabbing away mid-chord otherwise leaves Alt, Shift
+        /// or Ctrl stuck on until the next key event.
+        /// </summary>
+        public static void ClearModifiers()
+        {
+            Alt = false;
+            Shift = false;
+            Ctrl = false;
+        }
+
         public static void OnKeyUp(SDL.SDL_KeyboardEvent e) => OnKeyEvent(e);
 
         public static void OnKeyDown(SDL.SDL_KeyboardEvent e) => OnKeyEvent(e);

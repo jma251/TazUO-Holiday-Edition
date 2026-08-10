@@ -464,6 +464,7 @@ namespace ClassicUO.Configuration
             public string DisableTabToggleWarmode { get; set; } = "Disable tab (toggle warmode)";
             public string DisableCtrlQWMessageHistory { get; set; } = "Disable Ctrl + Q/W (message history)";
             public string DisableRightLeftClickAutoMove { get; set; } = "Disable right + left click auto move";
+            public string LogHouseDiagnostics { get; set; } = "Log house loading diagnostics to Data/houselog.txt";
             public string LogMusicIndices { get; set; } = "Log music indices to Data/musiclog.txt";
         }
 

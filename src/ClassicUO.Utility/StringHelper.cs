@@ -342,6 +342,13 @@ namespace ClassicUO.Utility
 
         public static string GetPluralAdjustedString(string str, bool plural = false)
         {
+            // Item data names can legitimately be null or empty; str.Contains would
+            // throw. Reached while adding items to a container.
+            if (string.IsNullOrEmpty(str))
+            {
+                return str;
+            }
+
             if (str.Contains("%"))
             {
                 string[] parts = str.Split(new[] { '%' }, System.StringSplitOptions.RemoveEmptyEntries);
