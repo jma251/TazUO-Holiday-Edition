@@ -2,6 +2,7 @@ using ClassicUO.Configuration;
 using ClassicUO.Game.Data;
 using ClassicUO.Game.GameObjects;
 using ClassicUO.Game.Managers;
+using ClassicUO.Network;
 using ClassicUO.Utility;
 using System;
 
@@ -12,6 +13,11 @@ namespace ClassicUO.Game.Managers
         public static BandageManager Instance { get; private set; } = new();
 
         private long nextBandageTime = 0;
+        private long bandagingBuffSetTime = 0;
+
+        // Safety net in case a buff-removed event is ever missed: treat the bandaging
+        // buff as expired after this long so the agent cannot get stuck never healing.
+        private const long MAX_BANDAGE_BUFF_AGE_MS = 15_000;
         private bool isEnabled => ProfileManager.CurrentProfile?.EnableBandageAgent ?? false;
         private int healDelayMs => ProfileManager.CurrentProfile?.BandageAgentDelay ?? 3000;
         private bool checkForBuff => ProfileManager.CurrentProfile?.BandageAgentCheckForBuff ?? false;
@@ -43,14 +49,28 @@ namespace ClassicUO.Game.Managers
             if (e.Buff.Type == BuffIconType.Healing)
             {
                 HasBandagingBuff = true;
+                bandagingBuffSetTime = Time.Ticks;
             }
         }
+
+        /// <summary>
+        /// Whether the bandaging buff is currently considered active. Includes a maximum
+        /// age so a missed buff-removed event cannot permanently disable healing.
+        /// </summary>
+        private bool IsBandagingBuffActive => HasBandagingBuff && (Time.Ticks - bandagingBuffSetTime) < MAX_BANDAGE_BUFF_AGE_MS;
 
         private void OnBuffRemoved(object sender, BuffEventArgs e)
         {
             if (e.Buff.Type == BuffIconType.Healing)
             {
                 HasBandagingBuff = false;
+
+                // Small delay after the buff clears, rather than the full heal delay, so
+                // buff mode stays responsive now that the time gate below always applies.
+                if (checkForBuff && Time.Ticks >= nextBandageTime)
+                {
+                    nextBandageTime = Time.Ticks + NetClient.Socket.Statistics.Ping;
+                }
             }
         }
 
@@ -75,12 +95,14 @@ namespace ClassicUO.Game.Managers
                 currentHpPercentage >= hpPercentageThreshold)
                 return;
 
-            // If using buff checking, only prevent healing if buff is present
-            if (checkForBuff && HasBandagingBuff)
+            // If using buff checking, only prevent healing while the buff is present
+            if (checkForBuff && IsBandagingBuffActive)
                 return;
 
-            // If using delay checking (not buff checking), check time delay
-            if (!checkForBuff && Time.Ticks < nextBandageTime)
+            // Always honor the minimum time before the next bandage. In buff mode this
+            // covers the short window between sending a heal and the buff packet
+            // arriving, which is what allowed a duplicate bandage to be applied.
+            if (Time.Ticks < nextBandageTime)
                 return;
 
             AttemptHeal();
