@@ -679,13 +679,23 @@ namespace ClassicUO
 
                     Keyboard.OnKeyDown(sdlEvent->key);
 
-                    if (
-                        Plugin.ProcessHotkeys(
-                            (int)sdlEvent->key.keysym.sym,
-                            (int)sdlEvent->key.keysym.mod,
-                            true
-                        )
-                    )
+                    // A plugin returning false here makes the client drop the press
+                    // entirely, so the result is captured rather than tested inline -
+                    // the diagnostic needs to see it.
+                    bool pluginAllowedThrough = Plugin.ProcessHotkeys(
+                        (int)sdlEvent->key.keysym.sym,
+                        (int)sdlEvent->key.keysym.mod,
+                        true
+                    );
+
+                    KeyDiagnostics.LogKeyDown(
+                        sdlEvent->key.keysym.sym,
+                        sdlEvent->key.keysym.mod,
+                        sdlEvent->key.repeat != 0,
+                        pluginAllowedThrough
+                    );
+
+                    if (pluginAllowedThrough)
                     {
                         _ignoreNextTextInput = false;
 

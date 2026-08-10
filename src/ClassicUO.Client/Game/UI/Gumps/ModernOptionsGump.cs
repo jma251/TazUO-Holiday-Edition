@@ -2351,6 +2351,19 @@ namespace ClassicUO.Game.UI.Gumps
             );
 
             PositionHelper.PositionControl(s.FullControl);
+            PositionHelper.BlankLine();
+
+            // Temporary diagnostic, global like the two above.
+            options.Add
+            (
+                s = new SettingsOption
+                (
+                    "", new CheckboxWithLabel(lang.GetExperimental.LogKeyPresses, 0, Settings.GlobalSettings.LogKeyPresses, (b) => { Settings.GlobalSettings.LogKeyPresses = b; }),
+                    MainContent.RightWidth, (int)PAGE.Experimental
+                )
+            );
+
+            PositionHelper.PositionControl(s.FullControl);
         }
 
         private void BuildNameplates()
