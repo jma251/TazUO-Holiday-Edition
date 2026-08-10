@@ -248,6 +248,8 @@ namespace ClassicUO.Configuration
         public int DragSelect_PlayersModifier { get; set; } = 0;
         public int DragSelect_MonstersModifier { get; set; } = 0;
         public int DragSelect_NameplateModifier { get; set; } = 0;
+        public bool DragSelect_MonstersSkipFriendly { get; set; } = true;
+        public bool DragSelect_PlayersSkipInvulnerable { get; set; } = true;
         public bool OverrideContainerLocation { get; set; }
 
         public int OverrideContainerLocationSetting { get; set; } // 0 = container position, 1 = top right of screen, 2 = last dragged position, 3 = remember every container

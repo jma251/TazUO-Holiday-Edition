@@ -183,6 +183,19 @@ namespace ClassicUO.Game.Scenes
                 || obj is Item tmpitem && tmpitem.IsLocked;
         }
 
+        // Mobiles the monsters filter should leave alone when
+        // DragSelect_MonstersSkipFriendly is set: blue (Innocent), allied,
+        // invulnerable, and the player's own pets/followers (IsRenamable).
+        // Written as explicit comparisons rather than an "is ... or ..." pattern
+        // to match the rest of this codebase, which uses none.
+        private static bool IsFriendlyForDragSelect(Mobile mobile)
+        {
+            return mobile.IsRenamable
+                || mobile.NotorietyFlag == NotorietyFlag.Innocent
+                || mobile.NotorietyFlag == NotorietyFlag.Ally
+                || mobile.NotorietyFlag == NotorietyFlag.Invulnerable;
+        }
+
         private bool DragSelectModifierActive()
         {
             // Query SDL for the live modifier state. The cached Keyboard.Ctrl/Shift/Alt
@@ -286,17 +299,35 @@ namespace ClassicUO.Game.Scenes
 
             foreach (Mobile mobile in World.Mobiles.Values)
             {
-                if ((
-                        (ProfileManager.CurrentProfile.DragSelect_PlayersModifier == 1 && ctrl) ||
-                        (ProfileManager.CurrentProfile.DragSelect_PlayersModifier == 2 && shift) ||
-                        (ProfileManager.CurrentProfile.DragSelect_PlayersModifier == 3 && alt)
-                    ) && !(mobile.IsHuman || mobile.IsGargoyle))
+                bool playersFilterActive =
+                    (ProfileManager.CurrentProfile.DragSelect_PlayersModifier == 1 && ctrl) ||
+                    (ProfileManager.CurrentProfile.DragSelect_PlayersModifier == 2 && shift) ||
+                    (ProfileManager.CurrentProfile.DragSelect_PlayersModifier == 3 && alt);
+
+                bool monstersFilterActive =
+                    (ProfileManager.CurrentProfile.DragSelect_MonstersModifier == 1 && ctrl) ||
+                    (ProfileManager.CurrentProfile.DragSelect_MonstersModifier == 2 && shift) ||
+                    (ProfileManager.CurrentProfile.DragSelect_MonstersModifier == 3 && alt);
+
+                if (playersFilterActive && !(mobile.IsHuman || mobile.IsGargoyle))
                     continue;
-                if ((
-                        (ProfileManager.CurrentProfile.DragSelect_MonstersModifier == 1 && ctrl) ||
-                        (ProfileManager.CurrentProfile.DragSelect_MonstersModifier == 2 && shift) ||
-                        (ProfileManager.CurrentProfile.DragSelect_MonstersModifier == 3 && alt)
-                    ) && (mobile.IsHuman || mobile.IsGargoyle))
+
+                // Narrow the players filter: yellow (invulnerable) staff are not
+                // wanted when deliberately boxing players.
+                if (playersFilterActive
+                    && ProfileManager.CurrentProfile.DragSelect_PlayersSkipInvulnerable
+                    && mobile.NotorietyFlag == NotorietyFlag.Invulnerable)
+                    continue;
+
+                if (monstersFilterActive && (mobile.IsHuman || mobile.IsGargoyle))
+                    continue;
+
+                // Narrow the monsters filter: blue and allied creatures, invulnerable
+                // mobiles, and the player's own pets are not wanted when deliberately
+                // boxing monsters.
+                if (monstersFilterActive
+                    && ProfileManager.CurrentProfile.DragSelect_MonstersSkipFriendly
+                    && IsFriendlyForDragSelect(mobile))
                     continue;
 
                 bool skip = false;

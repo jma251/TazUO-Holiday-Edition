@@ -165,6 +165,26 @@ They used to chain off `Build-Test` completing:
 `Build-Test` still runs on every push and PR. That is intentional: it only
 compiles and uploads artifacts, and never publishes a release.
 
+### Zip layout — deliberately flat, do not "fix" it
+
+`build-legacy.yml` zips the **contents** of `bin/dist`, so `ClassicUO.exe` and
+friends sit at the root of the zip with no containing folder. That is what the
+launcher expects: it unzips straight into `<launcher dir>/TazUO`. Adding a
+`TazUO/` folder inside the zip would produce `<launcher>/TazUO/TazUO/` and the
+launcher would not find the client.
+
+Windows naming the extracted folder after the zip file when you double-click it
+is Windows' own behaviour, not something to work around in the build.
+
+This will be revisited when the launcher fork is worked on — the likely end
+state is a `TazUO/` folder inside the zip **plus** a matching launcher change to
+step into it. That decision belongs with the launcher. Do not pre-empt it here.
+
+One related constraint: the launcher picks its download by platform zip suffix,
+falling back to **any asset whose filename starts with `TazUO`**. If a second zip
+is ever attached to a release, it must **not** start with `TazUO`, or asset
+selection becomes ambiguous.
+
 ## Conventions
 
 - Match the surrounding code's style, naming, and comment density.
