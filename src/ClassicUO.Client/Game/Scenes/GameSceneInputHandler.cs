@@ -185,6 +185,12 @@ namespace ClassicUO.Game.Scenes
 
         private bool DragSelectModifierActive()
         {
+            // Query SDL for the live modifier state. The cached Keyboard.Ctrl/Shift/Alt
+            // fields only update when a key event reaches the client, so they go stale
+            // after alt-tab or a swallowed event. DoDragSelect() already refreshes, so
+            // without this the mouse-down gate and the mouse-up filters can disagree.
+            Keyboard.Refresh();
+
             // src: https://github.com/andreakarasho/ClassicUO/issues/621
             // drag-select should be disabled when using nameplates
             if ((Keyboard.Ctrl && Keyboard.Shift) && ProfileManager.CurrentProfile.DragSelect_NameplateModifier == 0)
@@ -242,10 +248,19 @@ namespace ClassicUO.Game.Scenes
                 _selectionEnd.Y = Mouse.Position.Y;
             }
 
-            _rectangleObj.X = _selectionStart.X - Camera.Bounds.X;
-            _rectangleObj.Y = _selectionStart.Y - Camera.Bounds.Y;
-            _rectangleObj.Width = _selectionEnd.X - Camera.Bounds.X - _rectangleObj.X;
-            _rectangleObj.Height = _selectionEnd.Y - Camera.Bounds.Y - _rectangleObj.Y;
+            // Convert viewport-local mouse positions to game space so the intersection
+            // check matches RealScreenPosition (which is also in game space, pre-zoom).
+            Point selMin = Camera.ScreenToWorld(
+                new Point(_selectionStart.X - Camera.Bounds.X, _selectionStart.Y - Camera.Bounds.Y)
+            );
+            Point selMax = Camera.ScreenToWorld(
+                new Point(_selectionEnd.X - Camera.Bounds.X, _selectionEnd.Y - Camera.Bounds.Y)
+            );
+
+            _rectangleObj.X = selMin.X;
+            _rectangleObj.Y = selMin.Y;
+            _rectangleObj.Width = selMax.X - selMin.X;
+            _rectangleObj.Height = selMax.Y - selMin.Y;
 
             int finalX = ProfileManager.CurrentProfile.DragSelectStartX;
             int finalY = ProfileManager.CurrentProfile.DragSelectStartY;
@@ -305,20 +320,23 @@ namespace ClassicUO.Game.Scenes
 
                 if (skip) continue;
 
+                // Match MobileView.CheckMouseSelection() exactly so drag select agrees
+                // with normal mouse picking. AnchorOffset is gump spacing and must not
+                // influence the hit test - it made the box move 24px when the "anchor
+                // health bars" display option was toggled.
                 Point p = mobile.RealScreenPosition;
 
-                p.X += (int)mobile.Offset.X + 22 + 5;
-                p.Y += (int)(mobile.Offset.Y - mobile.Offset.Z) + 12 * AnchorOffset;
+                p.Y -= 3;
+                p.X += (int)mobile.Offset.X + 22;
+                p.Y += (int)(mobile.Offset.Y - mobile.Offset.Z) + 22;
                 p.X -= mobile.FrameInfo.X;
                 p.Y -= mobile.FrameInfo.Y;
 
                 Point size = new Point(p.X + mobile.FrameInfo.Width, p.Y + mobile.FrameInfo.Height);
 
-                p = Camera.WorldToScreen(p);
+                // Keep in game space (RealScreenPosition space) to match _rectangleObj
                 _rectanglePlayer.X = p.X;
                 _rectanglePlayer.Y = p.Y;
-
-                size = Camera.WorldToScreen(size);
                 _rectanglePlayer.Width = size.X - p.X;
                 _rectanglePlayer.Height = size.Y - p.Y;
 
