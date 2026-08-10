@@ -195,9 +195,9 @@ namespace FontStashSharp
 		}
 
 #if MONOGAME || FNA || STRIDE
-		internal void RenderGlyphOnAtlas(GraphicsDevice device, DynamicFontGlyph glyph)
+		internal bool RenderGlyphOnAtlas(GraphicsDevice device, DynamicFontGlyph glyph)
 #else
-		internal void RenderGlyphOnAtlas(ITexture2DManager device, DynamicFontGlyph glyph)
+		internal bool RenderGlyphOnAtlas(ITexture2DManager device, DynamicFontGlyph glyph)
 #endif
 		{
 			var textureSize = new Point(TextureWidth, TextureHeight);
@@ -227,7 +227,12 @@ namespace FontStashSharp
 				// Try to add again
 				if (!currentAtlas.AddRect(gw, gh, ref gx, ref gy))
 				{
-					throw new Exception(string.Format("Could not add rect to the newly created atlas. gw={0}, gh={1}", gw, gh));
+					// HOLIDAY EDITION: this used to throw, which escapes mid-frame through
+					// the render path and kills the client. A glyph too large for a fresh
+					// atlas is reported as a failure instead; the caller treats it as a
+					// missing glyph, so the character is skipped or falls back to
+					// DefaultCharacter. A missing character beats a lost session.
+					return false;
 				}
 			}
 
@@ -237,6 +242,8 @@ namespace FontStashSharp
 			currentAtlas.RenderGlyph(device, glyph, FontSources[glyph.FontSourceIndex], PremultiplyAlpha, KernelWidth, KernelHeight);
 
 			glyph.Texture = currentAtlas.Texture;
+
+			return true;
 		}
 	}
 }
