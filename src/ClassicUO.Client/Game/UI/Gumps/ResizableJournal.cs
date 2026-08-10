@@ -422,10 +422,24 @@ namespace ClassicUO.Game.UI.Gumps
 
         private void InitJournalEntries()
         {
+            // Only take the newest entries the display list will actually keep.
+            // AddJournalEntry builds two TextBox objects per entry and then trims the
+            // overflow straight back off the front, so feeding it the whole history
+            // meant building and immediately destroying most of them on every open.
+            // That waste scales with the history limit, so it has to go before the
+            // limit is raised.
+            int keep = ProfileManager.CurrentProfile == null ? 200 : ProfileManager.CurrentProfile.MaxJournalEntries;
+            int skip = JournalManager.Entries.Count - keep;
+            int index = 0;
+
             foreach (JournalEntry entry in JournalManager.Entries)
             {
+                if (index++ < skip)
+                    continue;
+
                 if (entry == null)
                     continue;
+
                 AddJournalEntry(entry);
             }
         }

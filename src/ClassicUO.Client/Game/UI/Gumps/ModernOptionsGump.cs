@@ -2830,7 +2830,7 @@ namespace ClassicUO.Game.UI.Gumps
             content.AddToRight
             (
                 new SliderWithLabel
-                    (lang.GetTazUO.MaxJournalEntries, 0, ThemeSettings.SLIDER_WIDTH, 100, 2000, profile.MaxJournalEntries, (i) => { profile.MaxJournalEntries = i; }), true, page
+                    (lang.GetTazUO.MaxJournalEntries, 0, ThemeSettings.SLIDER_WIDTH, 100, Constants.MAX_JOURNAL_HISTORY_COUNT, profile.MaxJournalEntries, (i) => { profile.MaxJournalEntries = i; }), true, page
             );
 
             content.BlankLine();

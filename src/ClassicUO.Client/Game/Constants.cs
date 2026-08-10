@@ -118,7 +118,10 @@ namespace ClassicUO.Game
 
         public const ushort HIGHLIGHT_CURRENT_OBJECT_HUE = 0x014;
 
-        public const int MAX_JOURNAL_HISTORY_COUNT = 1000;
+        // Must be at least the maximum of the MaxJournalEntries slider, or the slider
+        // lies: the journal refills from this store when reopened, so anything above
+        // this was only ever held while the window stayed open.
+        public const int MAX_JOURNAL_HISTORY_COUNT = 5000;
 
         public const byte MIN_CONTAINER_SIZE_PERC = 50;
         public const byte MAX_CONTAINER_SIZE_PERC = 200;
