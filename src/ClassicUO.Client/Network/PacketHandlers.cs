@@ -2365,6 +2365,10 @@ namespace ClassicUO.Network
         {
             ushort index = p.ReadUInt16BE();
 
+            // Logged before anything can decide to ignore it, so a repeated packet
+            // for the track already playing still shows up.
+            Game.Managers.MusicDiagnostics.ServerPacket(index);
+
             Client.Game.Audio.PlayMusic(index);
         }
 

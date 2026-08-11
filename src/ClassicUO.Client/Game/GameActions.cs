@@ -61,6 +61,8 @@ namespace ClassicUO.Game
 
         public static void RequestWarMode(bool war)
         {
+            Managers.MusicDiagnostics.WarMode(war);
+
             if (!World.Player.IsDead)
             {
                 if (war && ProfileManager.CurrentProfile != null && ProfileManager.CurrentProfile.EnableMusic)

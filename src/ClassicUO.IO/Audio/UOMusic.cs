@@ -58,6 +58,14 @@ namespace ClassicUO.IO.Audio
 
         private string Path { get; }
 
+        /// <summary>True when this track is configured to repeat.</summary>
+        public bool IsLooping => m_Repeat;
+
+        // Fired when a track restarts or runs out. This assembly cannot see the
+        // client's settings or world, so the diagnostic subscribes from there.
+        public static Action<UOMusic> Looped;
+        public static Action<UOMusic> Ended;
+
         public void Update()
         {
             // sanity - if the buffer empties, we will lose our sound effect. Thus we must continually check if it is dead.
@@ -78,11 +86,15 @@ namespace ClassicUO.IO.Audio
                         {
                             m_Stream.Position = 0;
                             m_Stream.Read(m_WaveBuffer, bytesReturned, m_WaveBuffer.Length - bytesReturned);
+
+                            Looped?.Invoke(this);
                         }
                         else
                         {
                             if (bytesReturned == 0)
                             {
+                                Ended?.Invoke(this);
+
                                 Stop();
                             }
                         }

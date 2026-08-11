@@ -70,6 +70,11 @@ namespace ClassicUO.Game.Managers
 
             Client.Game.Activated += OnWindowActivated;
             Client.Game.Deactivated += OnWindowDeactivated;
+
+            // UOMusic lives in an assembly that cannot see the settings or the world,
+            // so the diagnostic is attached from here.
+            UOMusic.Looped = MusicDiagnostics.Looped;
+            UOMusic.Ended = MusicDiagnostics.Ended;
         }
 
         private void OnWindowDeactivated(object sender, EventArgs e)
@@ -185,85 +190,6 @@ namespace ClassicUO.Game.Managers
             }
         }
 
-        private static int _lastLoggedMusicIndex = -1;
-
-        // Diagnostic used to map which music index plays where in-game; nothing on disk
-        // records that. Silent and file-only - no chat, no journal, no on-screen text.
-        // Never allowed to throw: a diagnostic must not be able to interrupt music or
-        // crash the client.
-        private static void LogMusicIndex(int music, bool iswarmode, bool is_login)
-        {
-            if (!Settings.GlobalSettings.LogMusicIndices)
-            {
-                return;
-            }
-
-            // PlayMusic is called repeatedly with the same index; only a change is worth
-            // a line, otherwise the file fills with duplicates.
-            if (music == _lastLoggedMusicIndex)
-            {
-                return;
-            }
-
-            _lastLoggedMusicIndex = music;
-
-            try
-            {
-                string directory = Path.Combine(CUOEnviroment.ExecutablePath, "Data");
-                Directory.CreateDirectory(directory);
-
-                string path = Path.Combine(directory, "musiclog.txt");
-                bool writeHeader = !File.Exists(path);
-
-                // A false result means the index has no mapping, which is itself worth
-                // recording, so it is logged as "?" rather than skipped.
-                string track = "?";
-                bool loop = false;
-
-                if (SoundsLoader.Instance.TryGetMusicData(music, out string name, out bool doesLoop))
-                {
-                    track = name;
-                    loop = doesLoop;
-                }
-
-                string x = "-", y = "-", z = "-";
-
-                if (World.Player != null)
-                {
-                    x = World.Player.X.ToString(CultureInfo.InvariantCulture);
-                    y = World.Player.Y.ToString(CultureInfo.InvariantCulture);
-                    z = World.Player.Z.ToString(CultureInfo.InvariantCulture);
-                }
-
-                string flags = is_login ? "login" : iswarmode ? "warmode" : "-";
-
-                if (writeHeader)
-                {
-                    File.AppendAllText(path, "# timestamp\tidx\ttrack\tloop\tmap\tx\ty\tz\tflags" + Environment.NewLine);
-                }
-
-                string line = string.Format(
-                    CultureInfo.InvariantCulture,
-                    "{0}\tidx={1}\ttrack={2}\tloop={3}\tmap={4}\tx={5}\ty={6}\tz={7}\tflags={8}",
-                    DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture),
-                    music,
-                    track,
-                    loop,
-                    World.MapIndex,
-                    x,
-                    y,
-                    z,
-                    flags
-                );
-
-                File.AppendAllText(path, line + Environment.NewLine);
-            }
-            catch
-            {
-                // Swallowed deliberately - see above.
-            }
-        }
-
         // The era that the music config and the file cache were last built for. null
         // means "never applied", which is not the same as "" (the stock install).
         private static string _appliedMusicEra;
@@ -353,11 +279,6 @@ namespace ClassicUO.Game.Managers
 
             EnsureMusicEraApplied();
 
-            // Logged here, ahead of the volume and disabled-music early-outs below, so
-            // the index is recorded whether or not the track is audible. The point is
-            // mapping indices to places, not hearing them.
-            LogMusicIndex(music, iswarmode, is_login);
-
             float volume;
 
             if (is_login)
@@ -404,6 +325,13 @@ namespace ClassicUO.Game.Managers
                 _currentMusic[idx] = (UOMusic) m;
 
                 _currentMusic[idx].Play(Time.Ticks, volume);
+
+                MusicDiagnostics.Started(music, _currentMusic[idx].IsLooping, is_login ? "login" : iswarmode ? "warmode" : "");
+            }
+            else if (m != null)
+            {
+                // Already playing this track, so the request changes nothing.
+                MusicDiagnostics.SameTrack(music);
             }
         }
 
@@ -466,6 +394,11 @@ namespace ClassicUO.Game.Managers
 
         public void StopMusic()
         {
+            if (_currentMusic[0] != null || _currentMusic[1] != null)
+            {
+                MusicDiagnostics.Stopped(_currentMusic[0]?.Index ?? _currentMusic[1]?.Index ?? -1);
+            }
+
             for (int i = 0; i < 2; i++)
             {
                 if (_currentMusic[i] != null)
@@ -504,6 +437,9 @@ namespace ClassicUO.Game.Managers
             {
                 return;
             }
+
+            MusicDiagnostics.CheckMapChange();
+            MusicDiagnostics.CheckZone();
 
             bool runninWarMusic = _currentMusic[1] != null;
             Profile currentProfile = ProfileManager.CurrentProfile;
