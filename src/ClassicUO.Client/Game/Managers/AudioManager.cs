@@ -424,9 +424,31 @@ namespace ClassicUO.Game.Managers
             _currentMusicIndices[1] = -1;
         }
 
+        /// <summary>
+        /// Leaving war mode. Stopping the combat track was only ever a side effect of
+        /// restarting the region track - PlayMusic calls StopMusic on its way to
+        /// starting it - so where the server has said this region has no music there
+        /// was nothing to restart, nothing stopped it, and the combat loop ran on to
+        /// its end. The war slot is stopped directly instead.
+        /// </summary>
         public void StopWarMusic()
         {
-            PlayMusic(_currentMusicIndices[0]);
+            if (_currentMusic[1] != null)
+            {
+                MusicDiagnostics.Stopped(_currentMusic[1].Index);
+
+                _currentMusic[1].Stop();
+                _currentMusic[1].Dispose();
+                _currentMusic[1] = null;
+            }
+
+            // Only bring the region track back if there is one. -1 means the server
+            // told us this region has none, and restarting the last town track out in
+            // the open was the other half of the same bug.
+            if (_currentMusicIndices[0] >= 0)
+            {
+                PlayMusic(_currentMusicIndices[0]);
+            }
         }
 
         public void StopSounds()
