@@ -138,7 +138,12 @@
   <Target Name="CopyExternalDeps_build" AfterTargets="Build">
     <ItemGroup>
       <MonockickstartPath Include="$(ProjectDir)..\..\tools\monokickstart\*.*" />
+      <!-- Shipped data files, e.g. the music map. Data/ is also where the client
+           writes its own logs at runtime, so this only ever adds to it. -->
+      <DataFiles_Data Include="$(ProjectDir)..\..\Data\*.*" />
     </ItemGroup>
+
+    <Copy SourceFiles="@(DataFiles_Data)" DestinationFolder="$(TargetDir)\Data\" SkipUnchangedFiles="true" />
 
     <Copy SourceFiles="@(DataFiles_iplib)" DestinationFiles="@(DataFiles_iplib -> '$(TargetDir)\iplib\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
     <Copy SourceFiles="@(DataFiles_x64)" DestinationFolder="$(TargetDir)\x64\" SkipUnchangedFiles="true" />
@@ -156,7 +161,10 @@
   <Target Name="CopyExternalDeps_publish" AfterTargets="Publish">
     <ItemGroup>
       <MonockickstartPath Include="$(ProjectDir)..\..\tools\monokickstart\*.*" />
+      <DataFiles_Data Include="$(ProjectDir)..\..\Data\*.*" />
     </ItemGroup>
+
+    <Copy SourceFiles="@(DataFiles_Data)" DestinationFolder="$(PublishDir)\Data\" SkipUnchangedFiles="true" />
 
     <Copy SourceFiles="@(DataFiles_iplib)" DestinationFiles="@(DataFiles_iplib -> '$(PublishDir)\iplib\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
     <Copy SourceFiles="@(DataFiles_x64)" DestinationFolder="$(PublishDir)\x64\" SkipUnchangedFiles="true" />

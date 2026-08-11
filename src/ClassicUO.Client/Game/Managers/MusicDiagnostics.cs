@@ -74,6 +74,16 @@ namespace ClassicUO.Game.Managers
 
         public static void WarMode(bool on) => Write(on ? "WAR_ON" : "WAR_OFF");
 
+        /// <summary>The music map covered this spot and supplied a track.</summary>
+        public static void MapHit(int track, string areaName) => Write("MAP_HIT", track, null, areaName ?? "");
+
+        /// <summary>Nothing in the music map covers this spot, so the answer is silence.</summary>
+        public static void MapMiss() => Write("MAP_MISS");
+
+        /// <summary>The raw bytes of a music packet, so the wire can be read directly.</summary>
+        public static void RawMusicPacket(ushort index) =>
+            Write("RAW6D", -1, null, $"6D {(index >> 8) & 0xFF:X2} {index & 0xFF:X2}");
+
         /// <summary>
         /// Called from the play/update path rather than hooked into World, so a map
         /// change is noticed wherever it happens.

@@ -2367,6 +2367,7 @@ namespace ClassicUO.Network
 
             // Logged before anything can decide to ignore it, so a repeated packet
             // for the track already playing still shows up.
+            Game.Managers.MusicDiagnostics.RawMusicPacket(index);
             Game.Managers.MusicDiagnostics.ServerPacket(index);
 
             // The server sends this on every region change, including into a region
@@ -2381,6 +2382,8 @@ namespace ClassicUO.Network
                 return;
             }
 
+            // A real track: the server is back in charge of the music.
+            Client.Game.Audio.NotifyServerTrack();
             Client.Game.Audio.PlayMusic(index);
         }
 

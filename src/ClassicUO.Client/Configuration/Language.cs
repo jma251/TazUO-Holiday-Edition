@@ -468,6 +468,9 @@ namespace ClassicUO.Configuration
             public string LogMusicIndices { get; set; } = "Log music indices to Data/musiclog.txt";
             public string MusicEra { get; set; } = "Music era";
             public string MusicEraDefault { get; set; } = "Default";
+            public string MusicMapMode { get; set; } = "Region music (when the server has none)";
+            public string MusicMapOff { get; set; } = "Off - server only";
+            public string MusicMapAuthentic { get; set; } = "Authentic (1998)";
         }
 
         public class NamePlates

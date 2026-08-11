@@ -422,6 +422,100 @@ namespace ClassicUO.Game.Managers
 
             _currentMusicIndices[0] = -1;
             _currentMusicIndices[1] = -1;
+
+            // The server has nothing for this area, so the music map gets its turn.
+            // Until the server names a real track again, position drives the music.
+            _musicMapDriving = true;
+            _lastMusicBlock = int.MinValue;
+
+            ApplyMusicMap();
+        }
+
+        /// <summary>
+        /// The server named a real track, so it takes the music back. Called from the
+        /// packet handler rather than from PlayMusic, because the music map plays
+        /// through PlayMusic too and must not switch itself off doing so.
+        /// </summary>
+        public void NotifyServerTrack()
+        {
+            _musicMapDriving = false;
+        }
+
+        // True while the server has told us the current area has no music of its own.
+        // Cleared the moment it names a real track again - the server always wins.
+        private bool _musicMapDriving;
+        private int _lastMusicBlock = int.MinValue;
+
+        /// <summary>
+        /// Looks up where the player is and plays whatever the music map says belongs
+        /// there. Nothing covering the spot means silence, which is the same answer
+        /// the 1998 server gave for an unpainted block.
+        /// </summary>
+        private void ApplyMusicMap()
+        {
+            if (Settings.GlobalSettings.MusicMapMode <= 0 || World.Player == null)
+            {
+                return;
+            }
+
+            MusicMapManager.Load();
+
+            _lastMusicBlock = MusicMapManager.BlockOf(World.Player.X, World.Player.Y);
+
+            if (MusicMapManager.TryGetTrack(World.MapIndex, World.Player.X, World.Player.Y, World.Player.Z, out int track, out string areaName))
+            {
+                MusicDiagnostics.MapHit(track, areaName);
+
+                PlayMusic(track);
+            }
+            else
+            {
+                MusicDiagnostics.MapMiss();
+            }
+        }
+
+        /// <summary>
+        /// Re-checks the map when the player crosses into a different 8x8 block, and
+        /// only acts when the answer has actually changed - the rule the 1998 server
+        /// used. A non-looping track that has run out is left alone: silence until the
+        /// area changes is the intended behaviour, not a gap to fill.
+        /// </summary>
+        private void UpdateMusicMap()
+        {
+            if (!_musicMapDriving || Settings.GlobalSettings.MusicMapMode <= 0 || World.Player == null)
+            {
+                return;
+            }
+
+            int block = MusicMapManager.BlockOf(World.Player.X, World.Player.Y);
+
+            if (block == _lastMusicBlock)
+            {
+                return;
+            }
+
+            _lastMusicBlock = block;
+
+            MusicMapManager.Load();
+
+            if (MusicMapManager.TryGetTrack(World.MapIndex, World.Player.X, World.Player.Y, World.Player.Z, out int track, out string areaName))
+            {
+                if (track != _currentMusicIndices[0])
+                {
+                    MusicDiagnostics.MapHit(track, areaName);
+
+                    PlayMusic(track);
+                }
+            }
+            else if (_currentMusicIndices[0] >= 0)
+            {
+                // Walked out of a mapped area into one with nothing.
+                MusicDiagnostics.MapMiss();
+
+                StopMusic();
+
+                _currentMusicIndices[0] = -1;
+            }
         }
 
         /// <summary>
@@ -476,6 +570,8 @@ namespace ClassicUO.Game.Managers
 
             MusicDiagnostics.CheckMapChange();
             MusicDiagnostics.CheckZone();
+
+            UpdateMusicMap();
 
             bool runninWarMusic = _currentMusic[1] != null;
             Profile currentProfile = ProfileManager.CurrentProfile;
