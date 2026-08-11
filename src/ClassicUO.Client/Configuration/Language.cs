@@ -466,7 +466,6 @@ namespace ClassicUO.Configuration
             public string DisableRightLeftClickAutoMove { get; set; } = "Disable right + left click auto move";
             public string LogHouseDiagnostics { get; set; } = "Log house loading diagnostics to Data/houselog.txt";
             public string LogMusicIndices { get; set; } = "Log music indices to Data/musiclog.txt";
-            public string LogKeyPresses { get; set; } = "Log key presses to Data/keylog.txt";
             public string MusicEra { get; set; } = "Music era";
             public string MusicEraDefault { get; set; } = "Default";
         }

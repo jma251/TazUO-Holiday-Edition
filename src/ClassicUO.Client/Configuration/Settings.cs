@@ -99,6 +99,12 @@ namespace ClassicUO.Configuration
 
         [JsonPropertyName("login_music_volume")] public int LoginMusicVolume { get; set; } = 70;
 
+        // Name of a subfolder of Music/Digital to take music from, e.g. "LBR-HiFi".
+        // Empty means stock behaviour: play whatever Music/Digital itself holds.
+        // Global rather than per-profile, alongside LoginMusic above, because the
+        // login screen plays before a profile is loaded.
+        [JsonPropertyName("music_era")] public string MusicEra { get; set; } = "";
+
         // Diagnostic: append every music index change to Data/musiclog.txt.
         // Global rather than per-profile so it applies to every character.
         [JsonPropertyName("log_music_indices")] public bool LogMusicIndices { get; set; } = false;
@@ -107,11 +113,6 @@ namespace ClassicUO.Configuration
         // Data/houselog.txt. Global rather than per-profile so it applies to every
         // character. Remove with HouseDiagnostics once the cause is known.
         [JsonPropertyName("log_house_diagnostics")] public bool LogHouseDiagnostics { get; set; } = false;
-
-        // Temporary diagnostic for keys that will not work as hotkeys; writes
-        // Data/keylog.txt. Global rather than per-profile so it applies to every
-        // character. Remove with KeyDiagnostics once the cause is known.
-        [JsonPropertyName("log_key_presses")] public bool LogKeyPresses { get; set; } = false;
 
         [JsonPropertyName("shard_type")] public int ShardType { get; set; } // 0 = normal (no customization), 1 = old, 2 = outlands??
 
