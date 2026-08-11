@@ -301,13 +301,15 @@ namespace ClassicUO.Game.Managers
         }
 
         /// <summary>
-        /// Rebuilds the music config and drops the cached tracks when the profile's era
+        /// Rebuilds the music config and drops the cached tracks when the selected era
         /// has moved. Cheap when nothing changed, so it can sit on the play path and
         /// cover startup and profile switches without hooking into profile loading.
+        /// The era is global, so this also applies on the login screen, which plays
+        /// before any profile exists.
         /// </summary>
         private static void EnsureMusicEraApplied()
         {
-            string era = ProfileManager.CurrentProfile?.MusicEra ?? string.Empty;
+            string era = Settings.GlobalSettings.MusicEra ?? string.Empty;
 
             if (string.Equals(era, _appliedMusicEra, StringComparison.Ordinal))
             {

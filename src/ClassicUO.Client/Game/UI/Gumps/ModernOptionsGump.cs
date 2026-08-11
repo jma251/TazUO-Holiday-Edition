@@ -2373,7 +2373,7 @@ namespace ClassicUO.Game.UI.Gumps
             eraOptions[0] = lang.GetExperimental.MusicEraDefault;
             Array.Copy(eraFolders, 0, eraOptions, 1, eraFolders.Length);
 
-            int selectedEra = Array.FindIndex(eraOptions, o => string.Equals(o, profile.MusicEra, StringComparison.OrdinalIgnoreCase));
+            int selectedEra = Array.FindIndex(eraOptions, o => string.Equals(o, Settings.GlobalSettings.MusicEra, StringComparison.OrdinalIgnoreCase));
 
             if (selectedEra < 0)
             {
@@ -2389,7 +2389,7 @@ namespace ClassicUO.Game.UI.Gumps
                         lang.GetExperimental.MusicEra, 0, ThemeSettings.COMBO_BOX_WIDTH, eraOptions, selectedEra, (i, o) =>
                         {
                             // Index 0 is "Default", which means the stock install.
-                            profile.MusicEra = i <= 0 ? "" : eraOptions[i];
+                            Settings.GlobalSettings.MusicEra = i <= 0 ? "" : eraOptions[i];
 
                             Client.Game.Audio.ReloadMusicEra();
                         }
