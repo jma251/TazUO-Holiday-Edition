@@ -95,6 +95,11 @@ namespace ClassicUO.Game
 
         public const int MAX_MUSIC_DATA_INDEX_COUNT = 150;
 
+        // MusicName.Invalid (-1) as the unsigned short the server actually puts on the
+        // wire. A region with no music of its own sends this, and it means "stop", not
+        // "play track 65535".
+        public const ushort MUSIC_STOP_INDEX = 0xFFFF;
+
 
         public const ushort FIELD_REPLACE_GRAPHIC = 0x1826;
         public const ushort TREE_REPLACE_GRAPHIC = 0x0E59;

@@ -410,6 +410,20 @@ namespace ClassicUO.Game.Managers
             }
         }
 
+        /// <summary>
+        /// The server has told us the current region has no music. Stops playback and
+        /// forgets which track was playing, so that toggling war mode afterwards -
+        /// StopWarMusic resumes _currentMusicIndices[0] - cannot bring the old town
+        /// music back while the player is stood out in the wilderness.
+        /// </summary>
+        public void StopMusicFromServer()
+        {
+            StopMusic();
+
+            _currentMusicIndices[0] = -1;
+            _currentMusicIndices[1] = -1;
+        }
+
         public void StopWarMusic()
         {
             PlayMusic(_currentMusicIndices[0]);
