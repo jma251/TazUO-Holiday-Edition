@@ -2385,6 +2385,36 @@ namespace ClassicUO.Game.UI.Gumps
             );
 
             PositionHelper.PositionControl(s.FullControl);
+            PositionHelper.BlankLine();
+
+            // Fills in music where the server says the area has none, from
+            // Data/MusicMap.txt. The server always wins when it names a real track.
+            string[] mapModes =
+            {
+                lang.GetExperimental.MusicMapOff,
+                lang.GetExperimental.MusicMapAuthentic
+            };
+
+            int mapMode = Settings.GlobalSettings.MusicMapMode;
+
+            if (mapMode < 0 || mapMode >= mapModes.Length)
+            {
+                mapMode = 0;
+            }
+
+            options.Add
+            (
+                s = new SettingsOption
+                (
+                    "", new ComboBoxWithLabel
+                    (
+                        lang.GetExperimental.MusicMapMode, 0, ThemeSettings.COMBO_BOX_WIDTH, mapModes, mapMode,
+                        (i, o) => { Settings.GlobalSettings.MusicMapMode = i < 0 ? 0 : i; }
+                    ), MainContent.RightWidth, (int)PAGE.Experimental
+                )
+            );
+
+            PositionHelper.PositionControl(s.FullControl);
         }
 
         private void BuildNameplates()

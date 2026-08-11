@@ -105,6 +105,11 @@ namespace ClassicUO.Configuration
         // login screen plays before a profile is loaded.
         [JsonPropertyName("music_era")] public string MusicEra { get; set; } = "";
 
+        // Fills in music where the server says it has none, from Data/MusicMap.txt.
+        // 0 = off (server only), 1 = authentic: play on area change, let non-looping
+        // tracks end into silence. Global, like the music era it sits beside.
+        [JsonPropertyName("music_map_mode")] public int MusicMapMode { get; set; } = 0;
+
         // Diagnostic: append every music index change to Data/musiclog.txt.
         // Global rather than per-profile so it applies to every character.
         [JsonPropertyName("log_music_indices")] public bool LogMusicIndices { get; set; } = false;
