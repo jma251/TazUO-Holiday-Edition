@@ -56,7 +56,8 @@ namespace ClassicUO.IO.Audio
             Path = fileName;
         }
 
-        private string Path { get; }
+        // Public so the music diagnostic can report which file was actually opened.
+        public string Path { get; }
 
         public void Update()
         {

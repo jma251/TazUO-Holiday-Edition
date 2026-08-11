@@ -339,6 +339,66 @@ namespace ClassicUO.Game.Managers
             PlayMusic(index, warMode);
         }
 
+        private static int _lastLoggedPathIndex = -1;
+        private static string _lastLoggedPathEra;
+
+        /// <summary>
+        /// Records which file the era resolution actually picked. Reading the code
+        /// cannot answer that - only the running client knows whether it opened
+        /// Music/Digital/x.mp3 or Music/Digital/&lt;Era&gt;/x.mp3 - so the music
+        /// diagnostic reports the resolved path alongside the era it was resolved
+        /// under. Never allowed to throw.
+        /// </summary>
+        private static void LogResolvedMusicPath(int music, Sound m)
+        {
+            if (!Settings.GlobalSettings.LogMusicIndices)
+            {
+                return;
+            }
+
+            string era = Client.Game.Sounds.MusicEra;
+
+            // PlayMusic fires repeatedly for the same track; a line is only worth
+            // writing when the track or the era has actually moved.
+            if (music == _lastLoggedPathIndex && string.Equals(era, _lastLoggedPathEra, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _lastLoggedPathIndex = music;
+            _lastLoggedPathEra = era;
+
+            try
+            {
+                string directory = Path.Combine(CUOEnviroment.ExecutablePath, "Data");
+                Directory.CreateDirectory(directory);
+
+                string logPath = Path.Combine(directory, "musiclog.txt");
+
+                string resolved = (m as UOMusic)?.Path ?? "<none>";
+                bool exists = resolved != "<none>" && File.Exists(resolved);
+
+                File.AppendAllText(
+                    logPath,
+                    string.Format(
+                        CultureInfo.InvariantCulture,
+                        "{0}\tresolve\tidx={1}\tera={2}\terafiles={3}\texists={4}\tpath={5}{6}",
+                        DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture),
+                        music,
+                        string.IsNullOrEmpty(era) ? "<default>" : era,
+                        Client.Game.Sounds.MusicEraFileCount,
+                        exists,
+                        resolved,
+                        Environment.NewLine
+                    )
+                );
+            }
+            catch
+            {
+                // A diagnostic must never interrupt the game or crash the client.
+            }
+        }
+
         public void PlayMusic(int music, bool iswarmode = false, bool is_login = false)
         {
             if (!_canReproduceAudio)
@@ -390,6 +450,8 @@ namespace ClassicUO.Game.Managers
             }
 
             Sound m = Client.Game.Sounds.GetMusic(music);
+
+            LogResolvedMusicPath(music, m);
 
             if (m == null && _currentMusic[0] != null)
             {
