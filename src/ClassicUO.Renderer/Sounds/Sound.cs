@@ -36,6 +36,10 @@ namespace ClassicUO.Renderer.Sounds
         /// </summary>
         public string MusicEra => _era;
 
+        /// <summary>Number of files found in the era folder. 0 means the folder was
+        /// missing or empty, which is why nothing would resolve out of it.</summary>
+        public int MusicEraFileCount => _eraFiles.Length;
+
         public void SetMusicEra(string era)
         {
             era = era ?? string.Empty;
