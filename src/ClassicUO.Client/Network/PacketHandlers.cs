@@ -2369,6 +2369,18 @@ namespace ClassicUO.Network
             // for the track already playing still shows up.
             Game.Managers.MusicDiagnostics.ServerPacket(index);
 
+            // The server sends this on every region change, including into a region
+            // with no music of its own, where it means stop. AudioManager rejects any
+            // index at or above MAX_MUSIC_DATA_INDEX_COUNT before it can reach the
+            // branch that would have stopped playback, so the sentinel is handled here
+            // rather than loosening that bounds check for every stray value.
+            if (index == Game.Constants.MUSIC_STOP_INDEX)
+            {
+                Client.Game.Audio.StopMusicFromServer();
+
+                return;
+            }
+
             Client.Game.Audio.PlayMusic(index);
         }
 
