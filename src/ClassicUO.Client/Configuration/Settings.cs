@@ -114,11 +114,6 @@ namespace ClassicUO.Configuration
         // character. Remove with HouseDiagnostics once the cause is known.
         [JsonPropertyName("log_house_diagnostics")] public bool LogHouseDiagnostics { get; set; } = false;
 
-        // Temporary diagnostic for keys that will not work as hotkeys; writes
-        // Data/keylog.txt. Global rather than per-profile so it applies to every
-        // character. Remove with KeyDiagnostics once the cause is known.
-        [JsonPropertyName("log_key_presses")] public bool LogKeyPresses { get; set; } = false;
-
         [JsonPropertyName("shard_type")] public int ShardType { get; set; } // 0 = normal (no customization), 1 = old, 2 = outlands??
 
         [JsonPropertyName("fixed_time_step")] public bool FixedTimeStep { get; set; } = true;
