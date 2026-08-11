@@ -36,7 +36,7 @@ namespace ClassicUO.Game.Managers
         private static int _anchorY = -1;
         private static int _anchorMap = -1;
         private static DateTime _anchorTime = DateTime.Now;
-        private static bool _zoneLoggedForAnchor;
+        private static int _lastZoneBand;
         private static int _lastMapIndex = int.MinValue;
 
         /// <summary>
@@ -56,7 +56,7 @@ namespace ClassicUO.Game.Managers
             }
 
             _anchorTime = DateTime.Now;
-            _zoneLoggedForAnchor = false;
+            _lastZoneBand = 0;
         }
 
         /// <summary>The requested track is the one already playing, so nothing happens.</summary>
@@ -98,24 +98,34 @@ namespace ClassicUO.Game.Managers
         }
 
         /// <summary>
-        /// Logged once when the player first gets more than ZONE_DISTANCE tiles from
-        /// where the last server packet arrived. One line per anchor, so the gap
-        /// between a ZONE line and the next SERVER line is the answer to "how far do
-        /// I get before anything else fires".
+        /// Logged every ZONE_DISTANCE tiles walked away from where the last server
+        /// packet arrived - 20, 40, 60 and so on - so the log shows how far the player
+        /// actually gets before anything else fires. The count resets when the next
+        /// SERVER event sets a new anchor.
+        ///
+        /// Only a new furthest band is logged, so pacing back and forth over a
+        /// boundary does not fill the file.
         /// </summary>
         public static void CheckZone()
         {
-            if (!IsEnabled || _zoneLoggedForAnchor || World.Player == null || _anchorX < 0)
+            if (!IsEnabled || World.Player == null || _anchorX < 0)
             {
                 return;
             }
 
-            if (World.MapIndex != _anchorMap || Distance() <= ZONE_DISTANCE)
+            if (World.MapIndex != _anchorMap)
             {
                 return;
             }
 
-            _zoneLoggedForAnchor = true;
+            int band = Distance() / ZONE_DISTANCE;
+
+            if (band <= _lastZoneBand)
+            {
+                return;
+            }
+
+            _lastZoneBand = band;
 
             Write("ZONE");
         }
