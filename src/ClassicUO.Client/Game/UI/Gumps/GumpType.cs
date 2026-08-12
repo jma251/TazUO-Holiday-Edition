@@ -57,6 +57,7 @@ namespace ClassicUO.Game.UI.Gumps
 
         Debug,
         NetStats,
+        MusicInfo,
 
         NameOverHeadHandler,
         ScriptManager,

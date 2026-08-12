@@ -354,12 +354,21 @@ namespace ClassicUO.Game.Managers
 
                 _currentMusic[idx].Play(Time.Ticks, volume);
 
-                MusicDiagnostics.Started(
-                    music,
-                    _currentMusic[idx].IsLooping,
-                    is_login ? "login" : iswarmode ? "warmode" : "",
-                    _currentMusic[idx].Path
-                );
+                if (_currentMusic[idx].IsStreaming)
+                {
+                    MusicDiagnostics.Started(
+                        music,
+                        _currentMusic[idx].IsLooping,
+                        is_login ? "login" : iswarmode ? "warmode" : "",
+                        _currentMusic[idx].Path
+                    );
+                }
+                else
+                {
+                    // The decoder could not open the file. It says nothing about it,
+                    // which is heard as a moment of audio and then silence.
+                    MusicDiagnostics.StartFailed(music, _currentMusic[idx].Path);
+                }
             }
             else if (m != null)
             {
@@ -460,6 +469,9 @@ namespace ClassicUO.Game.Managers
         {
             int playing = _currentMusicIndices[0];
 
+            _lastServerIndex = Constants.MUSIC_STOP_INDEX;
+            _lastServerAt = Time.Ticks;
+
             _currentMusicIndices[1] = -1;
 
             bool keep = playing >= 0 && StillGoing()
@@ -515,9 +527,70 @@ namespace ClassicUO.Game.Managers
         /// The server named a real track, so it owns the music. The map lets go of
         /// whatever it was holding; from here it only fills silence.
         /// </summary>
-        public void NotifyServerTrack()
+        public void NotifyServerTrack(int index)
         {
+            _lastServerIndex = index;
+            _lastServerAt = Time.Ticks;
+
             ForgetMapTrack();
+        }
+
+        // What the server last asked for, and when. -1 before it has said anything,
+        // and Constants.MUSIC_STOP_INDEX when what it said was "this region has none".
+        private int _lastServerIndex = -1;
+        private uint _lastServerAt;
+
+        /// <summary>
+        /// Everything the music system is doing right now, for the overlay. A snapshot
+        /// rather than live properties, so what is drawn is self-consistent.
+        /// </summary>
+        public struct MusicStatus
+        {
+            public int Index;          // what is loaded in the region slot, -1 for none
+            public string File;        // the file it resolved to, era folder included
+            public bool Loops;
+            public bool Playing;       // actually sounding, not merely loaded
+            public bool FromMap;       // the map put it there rather than the server
+            public int WarIndex;       // combat track over the top, -1 for none
+
+            public int ServerIndex;    // the last thing the server asked for
+            public int ServerSecs;     // how long ago
+
+            public bool MapHasAnswer;  // what the map says belongs where you stand
+            public int MapTrack;
+            public string MapArea;
+
+            public string Era;
+            public int Mode;
+            public bool IgnoreStop;
+        }
+
+        public MusicStatus GetMusicStatus()
+        {
+            MusicStatus st = new MusicStatus
+            {
+                Index = _currentMusic[0] == null ? -1 : _currentMusicIndices[0],
+                File = _currentMusic[0]?.Path,
+                Loops = _currentMusic[0] != null && _currentMusic[0].IsLooping,
+                Playing = StillGoing(),
+                FromMap = _mapPlayedTrack >= 0 && _currentMusicIndices[0] == _mapPlayedTrack,
+                WarIndex = _currentMusic[1] == null ? -1 : _currentMusicIndices[1],
+                ServerIndex = _lastServerIndex,
+                ServerSecs = _lastServerIndex < 0 ? -1 : (int)((Time.Ticks - _lastServerAt) / 1000),
+                MapTrack = -1,
+                Era = Settings.GlobalSettings.MusicEra,
+                Mode = Settings.GlobalSettings.MusicMapMode,
+                IgnoreStop = Settings.GlobalSettings.IgnoreServerStopMusic
+            };
+
+            if (World.Player != null && MapCoversHere() && TryResolve(out int track, out string area))
+            {
+                st.MapHasAnswer = true;
+                st.MapTrack = track;
+                st.MapArea = area;
+            }
+
+            return st;
         }
 
         /// <summary>

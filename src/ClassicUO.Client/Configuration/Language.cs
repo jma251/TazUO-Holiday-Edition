@@ -474,6 +474,7 @@ namespace ClassicUO.Configuration
             public string MusicMapSeamless { get; set; } = "Seamless - let tracks finish, silence after";
             public string MusicMapContinuous { get; set; } = "Continuous (1996) - let tracks finish, always playing";
             public string IgnoreServerStopMusic { get; set; } = "Ignore the server's stop-music packet";
+            public string MusicOverlay { get; set; } = "Show what music is playing, on screen";
         }
 
         public class NamePlates

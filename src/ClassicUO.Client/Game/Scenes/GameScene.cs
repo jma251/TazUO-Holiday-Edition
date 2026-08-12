@@ -210,6 +210,11 @@ namespace ClassicUO.Game.Scenes
             GridContainerSaveData.Instance.Load();
 
             Client.Game.GameCursor.ItemHold.Clear();
+
+            // The choice is global, so it survives a relog rather than needing to be
+            // ticked again every session.
+            UI.Gumps.MusicInfoGump.Toggle(Settings.GlobalSettings.MusicOverlay);
+
             Hotkeys = new HotkeysManager();
             Macros = new MacroManager();
             Macros.Load();

@@ -120,6 +120,14 @@ namespace ClassicUO.Game.Managers
         public static void SeasonPacket(int season, int playSound) =>
             Write("SEASON", -1, null, $"BC {season:X2} {playSound:X2}");
 
+        /// <summary>
+        /// The track was asked to play and did not. The decoder swallows a missing or
+        /// unreadable file and simply does not start, which is heard as a fraction of a
+        /// second of audio and then nothing - and left no trace in the log at all.
+        /// </summary>
+        public static void StartFailed(int index, string path) =>
+            Write("START_FAILED", index, null, path ?? "(no file resolved)");
+
         /// <summary>The server's stop packet arrived and was thrown away on request.</summary>
         public static void StopIgnored() => Write("STOP_IGNORED");
 

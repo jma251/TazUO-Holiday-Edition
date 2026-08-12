@@ -2399,7 +2399,7 @@ namespace ClassicUO.Network
             // this rather than whatever the season packet last left behind.
             World.OldMusicIndex = index;
 
-            Client.Game.Audio.NotifyServerTrack();
+            Client.Game.Audio.NotifyServerTrack(index);
             Client.Game.Audio.PlayMusic(index);
         }
 
