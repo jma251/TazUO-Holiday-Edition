@@ -34,10 +34,7 @@ namespace ClassicUO.Game.UI.Gumps
             AcceptMouseInput = true;
             AcceptKeyboardInput = false;
 
-            // Not written into the profile's gump list. Whether it is shown is a global
-            // setting, and GameScene puts it back on login from that - saving it as
-            // well would give two sources of truth for one checkbox.
-            CanBeSaved = false;
+            // Not written into the profile's gump list - see ShouldBeSaved below.
 
             Width = 260;
             Height = 90;
@@ -54,6 +51,11 @@ namespace ClassicUO.Game.UI.Gumps
         public bool IsMinimized { get; set; }
 
         public override GumpType GumpType => GumpType.MusicInfo;
+
+        // Whether it is shown is a global setting, and GameScene puts it back on login
+        // from that. Saving it here as well would give one checkbox two sources of
+        // truth, and they would disagree the first time a profile was copied.
+        public override bool ShouldBeSaved => false;
 
         /// <summary>
         /// Shows or hides the panel. Called from the option, and again on entering the
