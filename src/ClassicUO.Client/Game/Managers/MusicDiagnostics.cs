@@ -149,6 +149,11 @@ namespace ClassicUO.Game.Managers
         {
             Settings s = Settings.GlobalSettings;
 
+            // The banner is written on the first event, which can be before anything
+            // has asked the map a question - so it reported zero areas on a map that
+            // was about to work perfectly well.
+            MusicMapManager.Load();
+
             string era = string.IsNullOrEmpty(s.MusicEra) ? "(default)" : s.MusicEra;
             string mode = s.MusicMapMode == 0 ? "off"
                         : s.MusicMapMode == 1 ? "authentic"
