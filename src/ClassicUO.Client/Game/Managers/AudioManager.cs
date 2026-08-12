@@ -417,25 +417,71 @@ namespace ClassicUO.Game.Managers
         }
 
         /// <summary>
-        /// The server has told us the current region has no music. Stops playback and
-        /// forgets which track was playing, so that toggling war mode afterwards -
-        /// StopWarMusic resumes _currentMusicIndices[0] - cannot bring the old town
-        /// music back while the player is stood out in the wilderness.
+        /// The server has told us the current region has no music. The map gets its
+        /// turn, and whatever was playing stops - unless the map was going to ask for
+        /// that very track anyway, in which case stopping it only to start it again
+        /// from the beginning is a cut for no reason. Standing at the Britain bank,
+        /// where stepping in and out of the blessed area produces a stop packet every
+        /// few seconds, that restart was the whole of the problem.
         /// </summary>
         public void StopMusicFromServer()
         {
-            StopMusic();
+            int playing = _currentMusicIndices[0];
 
-            _currentMusicIndices[0] = -1;
+            // A track that repeats is always still going. One that does not is only
+            // still going if it is ours and we have not been told it ran out - the
+            // slot keeps hold of a finished track, so its presence proves nothing.
+            bool stillGoing = _currentMusic[0] != null
+                              && (_currentMusic[0].IsLooping || (playing == _mapPlayedTrack && _mapTrackRunning));
+
             _currentMusicIndices[1] = -1;
 
             // The server has nothing for this area, so the music map gets its turn.
             // Until the server names a real track again, position drives the music.
             _musicMapDriving = true;
             _lastMusicBlock = int.MinValue;
+
+            if (Settings.GlobalSettings.MusicMapMode > MAP_OFF && World.Player != null && MapCoversHere())
+            {
+                _lastMusicBlock = MusicMapManager.BlockOf(World.Player.X, World.Player.Y);
+
+                if (stillGoing && TryResolve(out int track, out string areaName) && track == playing)
+                {
+                    // Already the right track. Adopt it rather than cutting it off:
+                    // from here on the map owns it and will change it at the next
+                    // area boundary, which is where a change belongs.
+                    MusicDiagnostics.MapHit(track, areaName);
+
+                    _mapPlayedTrack = track;
+                    _mapTrackEnded = false;
+                    _mapTrackRunning = true;
+                    _mapTrackLoops = _currentMusic[0].IsLooping;
+
+                    return;
+                }
+            }
+
+            StopMusic();
+
+            _currentMusicIndices[0] = -1;
             _mapPlayedTrack = -1;
+            _mapTrackRunning = false;
 
             ApplyMusicMap();
+        }
+
+        /// <summary>
+        /// Whether the season packet - the only thing that plays music when the facet
+        /// changes - is allowed to. It used to hold off whenever anything at all was
+        /// playing, and the music map starting a track milliseconds before the facet
+        /// change was enough to silence Tokuno for the whole visit. Music the map put
+        /// there is a stand-in for exactly this, so it does not count.
+        /// </summary>
+        public bool CanSeasonMusicTakeOver()
+        {
+            UOMusic current = GetCurrentMusic();
+
+            return current == null || current.Index == LoginMusicIndex || current.Index == _mapPlayedTrack;
         }
 
         /// <summary>
@@ -499,7 +545,7 @@ namespace ClassicUO.Game.Managers
         /// </summary>
         private void ApplyMusicMap()
         {
-            if (Settings.GlobalSettings.MusicMapMode <= MAP_OFF || World.Player == null)
+            if (Settings.GlobalSettings.MusicMapMode <= MAP_OFF || World.Player == null || !MapCoversHere())
             {
                 return;
             }
@@ -527,7 +573,7 @@ namespace ClassicUO.Game.Managers
         {
             int mode = Settings.GlobalSettings.MusicMapMode;
 
-            if (mode <= MAP_OFF || World.Player == null)
+            if (mode <= MAP_OFF || World.Player == null || !MapCoversHere())
             {
                 return;
             }
@@ -617,6 +663,19 @@ namespace ClassicUO.Game.Managers
             }
 
             PlayFromMap(nextTrack, nextArea);
+        }
+
+        /// <summary>
+        /// Whether the map is entitled to an opinion about where the player is. On a
+        /// facet it has no data for at all it is not, and says nothing rather than
+        /// answering "silence" - that answer arriving on the way into Tokuno stopped
+        /// the music the server had just started there.
+        /// </summary>
+        private static bool MapCoversHere()
+        {
+            MusicMapManager.Load();
+
+            return MusicMapManager.CoversMap(World.MapIndex);
         }
 
         private bool TryResolve(out int track, out string areaName)

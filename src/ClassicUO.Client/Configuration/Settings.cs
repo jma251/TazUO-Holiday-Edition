@@ -111,6 +111,12 @@ namespace ClassicUO.Configuration
         // (let it finish, then pick again). Global, like the music era it sits beside.
         [JsonPropertyName("music_map_mode")] public int MusicMapMode { get; set; } = 0;
 
+        // Throw away the server's stop-music packet instead of acting on it, so music
+        // only ever changes when the server names a real track. Experimental: shards
+        // paint small regions whose only effect on music is a stop on the way in and
+        // another on the way out. Global, like the two above.
+        [JsonPropertyName("ignore_server_stop_music")] public bool IgnoreServerStopMusic { get; set; } = false;
+
         // Diagnostic: append every music index change to Data/musiclog.txt.
         // Global rather than per-profile so it applies to every character.
         [JsonPropertyName("log_music_indices")] public bool LogMusicIndices { get; set; } = false;
