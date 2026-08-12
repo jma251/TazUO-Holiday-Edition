@@ -351,7 +351,15 @@ namespace ClassicUO.Game
                 {
                     item.Update();
 
-                    if (do_delete && item.OnGround && item.Distance > ClientViewRange /*CheckToRemove(item, ClientViewRange)*/)
+                    // A multi is kept while any part of it is in range, not only its
+                    // centre - the same rule HouseManager uses when deciding whether to
+                    // let go of it. Testing the centre alone condemned a large house
+                    // every frame and pardoned it every frame, because TryToRemove then
+                    // refused: twenty passes a second, for as long as the player stood
+                    // there. In one log 97.6% of all cull work was that loop.
+                    int keepWithin = ClientViewRange + (item.IsMulti ? item.MultiDistanceBonus : 0);
+
+                    if (do_delete && item.OnGround && item.Distance > keepWithin)
                     {
                         HouseDiagnostics.LogItemCulled(item);
 

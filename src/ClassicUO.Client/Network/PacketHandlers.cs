@@ -4821,6 +4821,12 @@ namespace ClassicUO.Network
 
                         UIManager.GetGump<MiniMapGump>()?.RequestUpdateContents();
 
+                        HouseDiagnostics.LogHouseGenerated(
+                            serial,
+                            World.HouseManager.EntityIntoHouse(serial, World.Player),
+                            house.Components.Count
+                        );
+
                         if (World.HouseManager.EntityIntoHouse(serial, World.Player))
                         {
                             Client.Game.GetScene<GameScene>()?.UpdateMaxDrawZ(true);
@@ -5589,6 +5595,12 @@ namespace ClassicUO.Network
             }
 
             UIManager.GetGump<MiniMapGump>()?.RequestUpdateContents();
+
+            HouseDiagnostics.LogHouseGenerated(
+                serial,
+                World.HouseManager.EntityIntoHouse(serial, World.Player),
+                house.Components.Count
+            );
 
             if (World.HouseManager.EntityIntoHouse(serial, World.Player))
             {
