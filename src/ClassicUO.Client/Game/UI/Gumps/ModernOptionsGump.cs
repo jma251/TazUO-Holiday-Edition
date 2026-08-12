@@ -2376,7 +2376,16 @@ namespace ClassicUO.Game.UI.Gumps
                         lang.GetExperimental.MusicEra, 0, ThemeSettings.COMBO_BOX_WIDTH, eraOptions, selectedEra, (i, o) =>
                         {
                             // Index 0 is "Default", which means the stock install.
-                            Settings.GlobalSettings.MusicEra = i <= 0 ? "" : eraOptions[i];
+                            string picked = i <= 0 ? "" : eraOptions[i];
+
+                            // Reloading restarts the current track, so picking the era
+                            // that is already set should do nothing at all.
+                            if (string.Equals(picked, Settings.GlobalSettings.MusicEra, StringComparison.Ordinal))
+                            {
+                                return;
+                            }
+
+                            Settings.GlobalSettings.MusicEra = picked;
 
                             Client.Game.Audio.ReloadMusicEra();
                         }
