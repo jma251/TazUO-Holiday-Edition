@@ -252,6 +252,8 @@ namespace ClassicUO.Game.Managers
 
             SoundsLoader.LoadMusicConfig(string.IsNullOrEmpty(era) ? null : era);
             Client.Game.Sounds.SetMusicEra(era);
+
+            MusicDiagnostics.EraChanged(era);
         }
 
         /// <summary>
@@ -352,7 +354,12 @@ namespace ClassicUO.Game.Managers
 
                 _currentMusic[idx].Play(Time.Ticks, volume);
 
-                MusicDiagnostics.Started(music, _currentMusic[idx].IsLooping, is_login ? "login" : iswarmode ? "warmode" : "");
+                MusicDiagnostics.Started(
+                    music,
+                    _currentMusic[idx].IsLooping,
+                    is_login ? "login" : iswarmode ? "warmode" : "",
+                    _currentMusic[idx].Path
+                );
             }
             else if (m != null)
             {
@@ -537,10 +544,11 @@ namespace ClassicUO.Game.Managers
         private int _mapPlayedTrack = -1;
         private bool _mapTrackLoops;
 
-        // The block the map last gave an answer for, and whether that answer was
-        // silence. Without the second one, standing still in an area the map has
-        // nothing for would re-ask - and re-log - every frame.
+        // The block and facet the map last gave an answer for, and whether that
+        // answer was silence. Without the last one, standing still in an area the map
+        // has nothing for would re-ask - and re-log - every frame.
         private int _lastMusicBlock = int.MinValue;
+        private int _lastMusicMap = int.MinValue;
         private bool _mapChoseSilence;
 
         // Set from the decoder, which is not always the main thread, so it is only
@@ -568,6 +576,7 @@ namespace ClassicUO.Game.Managers
             _mapTrackEnded = false;
             _mapChoseSilence = false;
             _lastMusicBlock = World.Player == null ? int.MinValue : MusicMapManager.BlockOf(World.Player.X, World.Player.Y);
+            _lastMusicMap = World.MapIndex;
         }
 
         private void ForgetMapTrack()
@@ -577,6 +586,7 @@ namespace ClassicUO.Game.Managers
             _mapTrackEnded = false;
             _mapChoseSilence = false;
             _lastMusicBlock = int.MinValue;
+            _lastMusicMap = int.MinValue;
         }
 
         private static bool MapIsOn()
@@ -629,11 +639,18 @@ namespace ClassicUO.Game.Managers
             }
 
             int block = MusicMapManager.BlockOf(World.Player.X, World.Player.Y);
-            bool moved = block != _lastMusicBlock;
+
+            // A facet change is not the same area continuing. Arriving in Umbra with
+            // Ilshenar's jungle track still running kept it playing to the end, and
+            // Umbra never got its own music - so this counts as a move whatever the
+            // block works out to, and overrides letting the track finish.
+            bool facetChanged = World.MapIndex != _lastMusicMap;
+            bool moved = facetChanged || block != _lastMusicBlock;
 
             if (moved)
             {
                 _lastMusicBlock = block;
+                _lastMusicMap = World.MapIndex;
                 _mapChoseSilence = false;
             }
 
@@ -647,9 +664,12 @@ namespace ClassicUO.Game.Managers
 
                 // Seamless and continuous let a track finish before changing area.
                 // A track that repeats never finishes, so those cut over regardless -
-                // waiting for a town track to end would mean never leaving town.
-                if (mode != MAP_AUTHENTIC && !_mapTrackLoops)
+                // waiting for a town track to end would mean never leaving town - and
+                // so does a facet change, which is a different world, not a boundary.
+                if (mode != MAP_AUTHENTIC && !_mapTrackLoops && !facetChanged)
                 {
+                    MusicDiagnostics.MapWait(_mapPlayedTrack, "track_unfinished");
+
                     return;
                 }
 
@@ -675,6 +695,8 @@ namespace ClassicUO.Game.Managers
                 return;
             }
 
+            MusicDiagnostics.MapLook(mode, ended);
+
             if (!TryResolve(out int track, out string areaName))
             {
                 NothingHere(mode);
@@ -687,6 +709,8 @@ namespace ClassicUO.Game.Managers
                 // The track that just ran out here is the same one this area asks for.
                 // Authentic and seamless both go quiet rather than loop it round; only
                 // continuous plays it again.
+                MusicDiagnostics.MapSilent("track_ended_same_area");
+
                 _mapChoseSilence = true;
 
                 return;

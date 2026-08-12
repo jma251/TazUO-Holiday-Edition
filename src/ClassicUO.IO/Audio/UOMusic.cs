@@ -56,7 +56,12 @@ namespace ClassicUO.IO.Audio
             Path = fileName;
         }
 
-        private string Path { get; }
+        /// <summary>
+        /// The file this track actually resolved to. Public so the log can record it -
+        /// an index means nothing on its own once music eras can remap them, and
+        /// "which file did that index become" was a question the log could not answer.
+        /// </summary>
+        public string Path { get; }
 
         /// <summary>True when this track is configured to repeat.</summary>
         public bool IsLooping => m_Repeat;
