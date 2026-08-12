@@ -117,6 +117,10 @@ namespace ClassicUO.Configuration
         // another on the way out. Global, like the two above.
         [JsonPropertyName("ignore_server_stop_music")] public bool IgnoreServerStopMusic { get; set; } = false;
 
+        // On-screen panel showing what is playing, what the server asked for, and what
+        // the music map says belongs where you stand. Global like the rest of these.
+        [JsonPropertyName("music_overlay")] public bool MusicOverlay { get; set; } = false;
+
         // Diagnostic: append every music index change to Data/musiclog.txt.
         // Global rather than per-profile so it applies to every character.
         [JsonPropertyName("log_music_indices")] public bool LogMusicIndices { get; set; } = false;

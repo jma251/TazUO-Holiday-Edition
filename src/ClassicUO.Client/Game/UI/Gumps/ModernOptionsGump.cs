@@ -2443,6 +2443,26 @@ namespace ClassicUO.Game.UI.Gumps
             );
 
             PositionHelper.PositionControl(s.FullControl);
+            PositionHelper.BlankLine();
+
+            options.Add
+            (
+                s = new SettingsOption
+                (
+                    "", new CheckboxWithLabel
+                    (
+                        lang.GetExperimental.MusicOverlay, 0, Settings.GlobalSettings.MusicOverlay,
+                        (b) =>
+                        {
+                            Settings.GlobalSettings.MusicOverlay = b;
+
+                            MusicInfoGump.Toggle(b);
+                        }
+                    ), MainContent.RightWidth, (int)PAGE.Experimental
+                )
+            );
+
+            PositionHelper.PositionControl(s.FullControl);
         }
 
         private void BuildNameplates()
