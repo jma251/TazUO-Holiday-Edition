@@ -551,6 +551,11 @@ namespace ClassicUO.Game.Managers
         private int _lastMusicMap = int.MinValue;
         private bool _mapChoseSilence;
 
+        // The area the map last went quiet in. Silence is decided per block, but it is
+        // only news once per area - walking around Umbra after its track ran out wrote
+        // twenty identical pairs of lines saying nothing had changed.
+        private string _silentArea;
+
         // Set from the decoder, which is not always the main thread, so it is only
         // ever a flag; what to do about it is decided in Update.
         private volatile bool _mapTrackEnded;
@@ -587,6 +592,7 @@ namespace ClassicUO.Game.Managers
             _mapChoseSilence = false;
             _lastMusicBlock = int.MinValue;
             _lastMusicMap = int.MinValue;
+            _silentArea = null;
         }
 
         private static bool MapIsOn()
@@ -695,8 +701,6 @@ namespace ClassicUO.Game.Managers
                 return;
             }
 
-            MusicDiagnostics.MapLook(mode, ended);
-
             if (!TryResolve(out int track, out string areaName))
             {
                 NothingHere(mode);
@@ -709,12 +713,22 @@ namespace ClassicUO.Game.Managers
                 // The track that just ran out here is the same one this area asks for.
                 // Authentic and seamless both go quiet rather than loop it round; only
                 // continuous plays it again.
-                MusicDiagnostics.MapSilent("track_ended_same_area");
+                if (!string.Equals(areaName, _silentArea, StringComparison.Ordinal))
+                {
+                    MusicDiagnostics.MapLook(mode, true);
+                    MusicDiagnostics.MapSilent("track_ended_same_area " + (areaName ?? ""));
+
+                    _silentArea = areaName;
+                }
 
                 _mapChoseSilence = true;
 
                 return;
             }
+
+            MusicDiagnostics.MapLook(mode, ended);
+
+            _silentArea = null;
 
             PlayFromMap(track, areaName);
         }
