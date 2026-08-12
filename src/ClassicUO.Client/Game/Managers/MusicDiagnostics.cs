@@ -38,6 +38,7 @@ namespace ClassicUO.Game.Managers
         private static DateTime _anchorTime = DateTime.Now;
         private static int _lastZoneBand;
         private static int _lastMapIndex = int.MinValue;
+        private static bool _bannerWritten;
 
         /// <summary>
         /// A music packet arrived from the server. Logged every time, even when it
@@ -62,7 +63,34 @@ namespace ClassicUO.Game.Managers
         /// <summary>The requested track is the one already playing, so nothing happens.</summary>
         public static void SameTrack(int index) => Write("SAME", index);
 
-        public static void Started(int index, bool loop, string flags) => Write("START", index, loop, flags);
+        /// <summary>
+        /// A track started. path is what the index actually resolved to, which is the
+        /// only way to tell from the log which era supplied it.
+        /// </summary>
+        public static void Started(int index, bool loop, string flags, string path = null)
+        {
+            string where = string.IsNullOrEmpty(path) ? "" : System.IO.Path.GetFileName(path);
+            string dir = string.IsNullOrEmpty(path) ? "" : Directory.GetParent(path)?.Name ?? "";
+
+            Write("START", index, loop, Join(flags, string.IsNullOrEmpty(where) ? "" : dir + "/" + where));
+        }
+
+        /// <summary>
+        /// The map is about to decide what belongs where the player is standing.
+        /// Logged before the answer so an unexpected silence has a visible cause.
+        /// </summary>
+        public static void MapLook(int mode, bool afterEnd) =>
+            Write("MAP_LOOK", -1, null, (afterEnd ? "after_track_ended" : "silence") + " mode=" + mode.ToString(CultureInfo.InvariantCulture));
+
+        private static string Join(string a, string b)
+        {
+            if (string.IsNullOrEmpty(a))
+            {
+                return b ?? "";
+            }
+
+            return string.IsNullOrEmpty(b) ? a : a + " " + b;
+        }
 
         public static void Stopped(int index) => Write("STOP", index);
 
@@ -94,6 +122,52 @@ namespace ClassicUO.Game.Managers
 
         /// <summary>The server's stop packet arrived and was thrown away on request.</summary>
         public static void StopIgnored() => Write("STOP_IGNORED");
+
+        /// <summary>
+        /// The map had an answer and did not use it, because the mode says to let the
+        /// current track finish first. Without this the log showed a block change and
+        /// then nothing, which reads the same as the map being broken.
+        /// </summary>
+        public static void MapWait(int track, string why) => Write("MAP_WAIT", track, null, why);
+
+        /// <summary>
+        /// The map deliberately chose silence, and why. Distinct from MAP_MISS, which
+        /// only says nothing covers the spot.
+        /// </summary>
+        public static void MapSilent(string why) => Write("MAP_SILENT", -1, null, why);
+
+        /// <summary>The music era changed, with the folder it now resolves against.</summary>
+        public static void EraChanged(string era) =>
+            Write("ERA", -1, null, string.IsNullOrEmpty(era) ? "(default - stock Music/Digital)" : era);
+
+        /// <summary>
+        /// Written once when the log is first opened in a session. Without it, an
+        /// appended file makes an old run look like the current one - which is exactly
+        /// how tracks fixed several builds ago kept appearing to still be playing.
+        /// </summary>
+        private static void WriteSessionBanner(string path)
+        {
+            Settings s = Settings.GlobalSettings;
+
+            string era = string.IsNullOrEmpty(s.MusicEra) ? "(default)" : s.MusicEra;
+            string mode = s.MusicMapMode == 0 ? "off"
+                        : s.MusicMapMode == 1 ? "authentic"
+                        : s.MusicMapMode == 2 ? "seamless"
+                        : s.MusicMapMode == 3 ? "continuous"
+                        : s.MusicMapMode.ToString(CultureInfo.InvariantCulture);
+
+            File.AppendAllText(
+                path,
+                "#" + Environment.NewLine +
+                "# ==== session " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture) + " ====" + Environment.NewLine +
+                "#   client            " + CUOEnviroment.Version + Environment.NewLine +
+                "#   music era         " + era + Environment.NewLine +
+                "#   region music      " + mode + Environment.NewLine +
+                "#   ignore stop       " + (s.IgnoreServerStopMusic ? "yes" : "no") + Environment.NewLine +
+                "#   music map areas   " + MusicMapManager.AreaCount.ToString(CultureInfo.InvariantCulture) + Environment.NewLine +
+                "#" + Environment.NewLine
+            );
+        }
 
         /// <summary>
         /// A stop packet arrived and the track was left playing anyway - either because
@@ -194,8 +268,15 @@ namespace ClassicUO.Game.Managers
                     {
                         File.AppendAllText(
                             path,
-                            "# timestamp\tevent\tidx\ttrack\tloop\tmap\tx\ty\tz\tdist\tsecs\tflags" + Environment.NewLine
+                            "# timestamp\tevent\tidx\ttrack\tloop\tmap\tx\ty\tz\tdist\tsecs\tvol\tflags" + Environment.NewLine
                         );
+                    }
+
+                    if (!_bannerWritten)
+                    {
+                        _bannerWritten = true;
+
+                        WriteSessionBanner(path);
                     }
 
                     string idx = index < 0 ? "" : index.ToString(CultureInfo.InvariantCulture);
@@ -220,11 +301,18 @@ namespace ClassicUO.Game.Managers
 
                     double secs = (DateTime.Now - _anchorTime).TotalSeconds;
 
+                    // So a silent log line can be told apart from a silent client.
+                    Profile profile = ProfileManager.CurrentProfile;
+
+                    string vol = profile == null ? "-"
+                               : !profile.EnableMusic ? "off"
+                               : profile.MusicVolume.ToString(CultureInfo.InvariantCulture);
+
                     File.AppendAllText(
                         path,
                         string.Format(
                             CultureInfo.InvariantCulture,
-                            "{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}\t{10:0.0}\t{11}{12}",
+                            "{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}\t{10:0.0}\t{11}\t{12}{13}",
                             DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture),
                             ev,
                             idx,
@@ -236,6 +324,7 @@ namespace ClassicUO.Game.Managers
                             z,
                             Distance(),
                             secs,
+                            vol,
                             flags ?? "",
                             Environment.NewLine
                         )
