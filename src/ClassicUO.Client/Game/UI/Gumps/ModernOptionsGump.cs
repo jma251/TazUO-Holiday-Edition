@@ -2392,7 +2392,9 @@ namespace ClassicUO.Game.UI.Gumps
             string[] mapModes =
             {
                 lang.GetExperimental.MusicMapOff,
-                lang.GetExperimental.MusicMapAuthentic
+                lang.GetExperimental.MusicMapAuthentic,
+                lang.GetExperimental.MusicMapSeamless,
+                lang.GetExperimental.MusicMapContinuous
             };
 
             int mapMode = Settings.GlobalSettings.MusicMapMode;
