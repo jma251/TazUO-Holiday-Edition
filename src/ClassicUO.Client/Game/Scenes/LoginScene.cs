@@ -169,6 +169,7 @@ namespace ClassicUO.Game.Scenes
 
             Client.Game.Audio?.StopMusic();
             Client.Game.Audio?.StopSounds();
+            Client.Game.Audio?.ForgetMusicState();
 
             UIManager.GetGump<LoginBackground>()?.Dispose();
 

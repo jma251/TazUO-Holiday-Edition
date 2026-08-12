@@ -264,19 +264,30 @@ namespace ClassicUO.Game.Managers
             int index = _currentMusicIndices[0];
             bool warMode = _currentMusic[1] != null;
 
-            // Only what is actually loaded gets restarted. The index outlives the
+            // Only something actually sounding gets restarted. The index outlives the
             // track - nothing clears it when playback stops - so on a change of era in
             // silence this used to resurrect whatever played last, which after walking
             // in from the login screen is the login music.
-            bool wasPlaying = _currentMusic[0] != null || _currentMusic[1] != null;
+            bool wasPlaying = StillGoing() || (_currentMusic[1] != null && _currentMusic[1].IsStreaming);
+
+            bool wasOurs = index >= 0 && index == _mapPlayedTrack;
 
             StopMusic();
 
             EnsureMusicEraApplied();
 
-            if (wasPlaying && index >= 0)
+            if (!wasPlaying || index < 0)
             {
-                PlayMusic(index, warMode);
+                return;
+            }
+
+            PlayMusic(index, warMode);
+
+            // The map keeps hold of it across the rebuild, so it still changes at the
+            // next area boundary rather than being left as somebody else's track.
+            if (wasOurs && !warMode && StillGoing())
+            {
+                AdoptAsMapTrack(index);
             }
         }
 
@@ -426,67 +437,34 @@ namespace ClassicUO.Game.Managers
         }
 
         /// <summary>
-        /// The server has told us the current region has no music, so the map gets its
-        /// turn. Whatever was playing stops - unless the map was going to ask for that
-        /// very track anyway, in which case stopping it only to start it again from the
-        /// beginning is a cut for no reason. Stepping in and out of the blessed area at
-        /// the Britain bank produces a stop packet every few seconds, and that restart
-        /// was the whole of the problem.
+        /// The server has told us the current region has no music. Everything stops,
+        /// and the map fills the silence on the next frame - unless the track playing
+        /// is the one the map would ask for anyway, in which case stopping it only to
+        /// start it again from the beginning is a cut for no reason. Stepping in and
+        /// out of the blessed area at the Britain bank produces a stop packet every
+        /// few seconds, and that restart was the whole of the problem.
         ///
-        /// keepPlaying is the "ignore the stop packet" option, and means exactly that:
-        /// the server does not get to cut the track short. It does not mean the map
-        /// stops working - the map still takes over, and still changes the track at the
-        /// next area boundary or when it runs out, whichever the mode calls for.
+        /// keepPlaying is the "ignore the stop packet" option and means exactly that:
+        /// the server does not get to cut a track short. Any track, from anywhere - a
+        /// track that does not repeat was exactly the kind still being cut, which is
+        /// what made the option look like it did nothing.
         /// </summary>
         public void StopMusicFromServer(bool keepPlaying = false)
         {
             int playing = _currentMusicIndices[0];
 
-            // A track that repeats is always still going. One that does not is only
-            // still going if it is ours and we have not been told it ran out - the
-            // slot keeps hold of a finished track, so its presence proves nothing.
-            bool stillGoing = _currentMusic[0] != null
-                              && (_currentMusic[0].IsLooping || (playing == _mapPlayedTrack && _mapTrackRunning));
-
             _currentMusicIndices[1] = -1;
 
-            // The server has nothing for this area, so the music map gets its turn.
-            // Until the server names a real track again, position drives the music.
-            _musicMapDriving = true;
-            _lastMusicBlock = int.MinValue;
+            bool keep = playing >= 0 && StillGoing()
+                        && (keepPlaying || (MapIsOn() && TryResolve(out int wanted, out _) && wanted == playing));
 
-            if (Settings.GlobalSettings.MusicMapMode > MAP_OFF && World.Player != null && MapCoversHere())
+            if (keep)
             {
-                _lastMusicBlock = MusicMapManager.BlockOf(World.Player.X, World.Player.Y);
+                // Adopted, so the map changes it at the next area boundary or when it
+                // runs out - it just is not cut short to get there.
+                MusicDiagnostics.Kept(playing, keepPlaying ? "stop_ignored" : "same_track");
 
-                // Two reasons to let the track carry on: the option says the server
-                // may not cut it, or the map was about to ask for it anyway.
-                bool keep = stillGoing;
-
-                if (keep && !keepPlaying)
-                {
-                    keep = TryResolve(out int wanted, out _) && wanted == playing;
-                }
-
-                if (keep)
-                {
-                    // The map takes ownership of it from here, so it still changes at
-                    // the next area boundary - it just is not cut short to get there.
-                    MusicDiagnostics.Kept(playing, keepPlaying ? "stop_ignored" : "same_track");
-
-                    _mapPlayedTrack = playing;
-                    _mapTrackEnded = false;
-                    _mapTrackRunning = true;
-                    _mapTrackLoops = _currentMusic[0].IsLooping;
-
-                    return;
-                }
-            }
-            else if (keepPlaying && stillGoing)
-            {
-                // No map to hand over to - with it off, or on a facet it has no data
-                // for, ignoring the stop just means the track carries on.
-                MusicDiagnostics.Kept(playing, "stop_ignored");
+                AdoptAsMapTrack(playing);
 
                 return;
             }
@@ -494,37 +472,58 @@ namespace ClassicUO.Game.Managers
             StopMusic();
 
             _currentMusicIndices[0] = -1;
-            _mapPlayedTrack = -1;
-            _mapTrackRunning = false;
 
-            ApplyMusicMap();
+            ForgetMapTrack();
         }
 
         /// <summary>
-        /// Whether the season packet - the only thing that plays music when the facet
-        /// changes - is allowed to. It used to hold off whenever anything at all was
-        /// playing, and the music map starting a track milliseconds before the facet
-        /// change was enough to silence Tokuno for the whole visit. Music the map put
-        /// there is a stand-in for exactly this, so it does not count.
+        /// Whether the region track is still audible. UOMusic knows this for certain -
+        /// its decoder flag is cleared when a track is stopped or runs out - whereas
+        /// Sound.IsPlaying only knows about the last buffer submitted, about a second
+        /// of audio, and so reports "not playing" over almost any track that is.
+        /// </summary>
+        private bool StillGoing()
+        {
+            return _currentMusic[0] != null && _currentMusic[0].IsStreaming;
+        }
+
+        /// <summary>
+        /// Whether the season packet - which some callers still use to set music, such
+        /// as the death screen - is allowed to. Music the map put there does not count
+        /// as something else playing; it is a stand-in for exactly this.
         /// </summary>
         public bool CanSeasonMusicTakeOver()
         {
-            UOMusic current = GetCurrentMusic();
+            if (!StillGoing())
+            {
+                return true;
+            }
 
-            return current == null || current.Index == LoginMusicIndex || current.Index == _mapPlayedTrack;
+            int playing = _currentMusicIndices[0];
+
+            return playing == LoginMusicIndex || playing == _mapPlayedTrack;
         }
 
         /// <summary>
-        /// The server named a real track, so it takes the music back. Called from the
-        /// packet handler rather than from PlayMusic, because the music map plays
-        /// through PlayMusic too and must not switch itself off doing so.
+        /// The server named a real track, so it owns the music. The map lets go of
+        /// whatever it was holding; from here it only fills silence.
         /// </summary>
         public void NotifyServerTrack()
         {
-            _musicMapDriving = false;
-            _mapPlayedTrack = -1;
-            _mapTrackEnded = false;
-            _mapTrackRunning = false;
+            ForgetMapTrack();
+        }
+
+        /// <summary>
+        /// Everything the music system remembers, dropped. Called when leaving the
+        /// world, because none of it means anything in the next session - the track
+        /// index outliving the track is what used to bring the login music back.
+        /// </summary>
+        public void ForgetMusicState()
+        {
+            _currentMusicIndices[0] = -1;
+            _currentMusicIndices[1] = -1;
+
+            ForgetMapTrack();
         }
 
         // What to do at the seams, matching Settings.MusicMapMode.
@@ -533,31 +532,25 @@ namespace ClassicUO.Game.Managers
         private const int MAP_SEAMLESS = 2;   // let the track finish, then silence
         private const int MAP_CONTINUOUS = 3; // let the track finish, then pick again
 
-        // True while the server has told us the current area has no music of its own.
-        // Cleared the moment it names a real track again - the server always wins.
-        private bool _musicMapDriving;
-        private int _lastMusicBlock = int.MinValue;
-
-        // The track the map started. Anything else in slot 0 came from the server -
-        // the season packet plays music without going through the music packet, so it
-        // never reaches NotifyServerTrack - and the map stands down rather than
-        // talking over it. This was Zento, Umbra and Lakeshire going silent.
+        // The track the map started, or adopted. Anything else in slot 0 belongs to
+        // the server, and the map stays out of its way while it is sounding.
         private int _mapPlayedTrack = -1;
+        private bool _mapTrackLoops;
+
+        // The block the map last gave an answer for, and whether that answer was
+        // silence. Without the second one, standing still in an area the map has
+        // nothing for would re-ask - and re-log - every frame.
+        private int _lastMusicBlock = int.MinValue;
+        private bool _mapChoseSilence;
 
         // Set from the decoder, which is not always the main thread, so it is only
         // ever a flag; what to do about it is decided in Update.
         private volatile bool _mapTrackEnded;
         private int _endedTrack = -1;
 
-        // Whether one of ours is still going, and whether it is the kind that ever
-        // stops. Town tracks repeat for ever, so waiting for one to finish before
-        // changing area would mean never changing area - those cut over regardless.
-        private bool _mapTrackRunning;
-        private bool _mapTrackLoops;
-
         /// <summary>
-        /// A track has run out. Only of interest when it was one the map started -
-        /// the server's tracks are the server's business.
+        /// A track has run out. Only of interest when it was one the map owns - the
+        /// server's tracks are the server's business.
         /// </summary>
         private void OnMusicTrackEnded(UOMusic music)
         {
@@ -568,36 +561,38 @@ namespace ClassicUO.Game.Managers
             }
         }
 
-        /// <summary>
-        /// Looks up where the player is and plays whatever the music map says belongs
-        /// there. Nothing covering the spot means silence, which is the same answer
-        /// the 1998 server gave for an unpainted block.
-        /// </summary>
-        private void ApplyMusicMap()
+        private void AdoptAsMapTrack(int track)
         {
-            if (Settings.GlobalSettings.MusicMapMode <= MAP_OFF || World.Player == null || !MapCoversHere())
-            {
-                return;
-            }
-
-            _lastMusicBlock = MusicMapManager.BlockOf(World.Player.X, World.Player.Y);
+            _mapPlayedTrack = track;
+            _mapTrackLoops = _currentMusic[0] != null && _currentMusic[0].IsLooping;
             _mapTrackEnded = false;
+            _mapChoseSilence = false;
+            _lastMusicBlock = World.Player == null ? int.MinValue : MusicMapManager.BlockOf(World.Player.X, World.Player.Y);
+        }
 
-            if (TryResolve(out int track, out string areaName))
-            {
-                PlayFromMap(track, areaName);
-            }
-            else
-            {
-                MusicDiagnostics.MapMiss();
-            }
+        private void ForgetMapTrack()
+        {
+            _mapPlayedTrack = -1;
+            _mapTrackLoops = false;
+            _mapTrackEnded = false;
+            _mapChoseSilence = false;
+            _lastMusicBlock = int.MinValue;
+        }
+
+        private static bool MapIsOn()
+        {
+            return Settings.GlobalSettings.MusicMapMode > MAP_OFF && World.Player != null && MapCoversHere();
         }
 
         /// <summary>
-        /// Re-checks the map when the player crosses into a different 8x8 block, and
-        /// only acts when the answer has actually changed - the rule the 1998 server
-        /// used. What happens at that moment, and when a track runs out where the
-        /// player is stood, is what the transition mode decides.
+        /// The whole of the map's behaviour, and it is one rule: the server wins while
+        /// its track is actually sounding, and the map fills the silence otherwise.
+        ///
+        /// This replaces a permission flag that was set only by a stop packet and
+        /// cleared by any server track. Every way the music got stuck was that flag in
+        /// the wrong position - ignoring stop packets meant it never got set at all, a
+        /// server track that ran out left it clear with nothing able to help, and it
+        /// carried over stale across facet changes and relogs.
         /// </summary>
         private void UpdateMusicMap()
         {
@@ -608,17 +603,14 @@ namespace ClassicUO.Game.Managers
                 return;
             }
 
-            // Something in slot 0 that the map did not put there is the server's, and
-            // the server always wins.
-            if (_currentMusicIndices[0] >= 0 && _currentMusicIndices[0] != _mapPlayedTrack)
-            {
-                _musicMapDriving = false;
-                _mapTrackEnded = false;
-                _mapTrackRunning = false;
-            }
+            bool sounding = StillGoing();
+            bool ours = _mapPlayedTrack >= 0 && _currentMusicIndices[0] == _mapPlayedTrack;
 
-            if (!_musicMapDriving)
+            // Somebody else is playing. Not our business until it stops.
+            if (sounding && !ours)
             {
+                ForgetMapTrack();
+
                 return;
             }
 
@@ -627,7 +619,13 @@ namespace ClassicUO.Game.Managers
             if (ended)
             {
                 _mapTrackEnded = false;
-                _mapTrackRunning = false;
+            }
+
+            if (ours && !sounding)
+            {
+                // Ran out without the hook firing - a stop from elsewhere, or a file
+                // that failed to open. Same thing as far as the next decision goes.
+                ended = true;
             }
 
             int block = MusicMapManager.BlockOf(World.Player.X, World.Player.Y);
@@ -636,87 +634,89 @@ namespace ClassicUO.Game.Managers
             if (moved)
             {
                 _lastMusicBlock = block;
+                _mapChoseSilence = false;
             }
 
-            if (!moved && !ended)
+            if (sounding)
             {
-                return;
-            }
-
-            if (moved)
-            {
-                // Crossed into a new block. Authentic cuts over there and then; the
-                // other two let the current track finish and pick the new area up when
-                // it does. Nothing of ours playing means there is nothing to wait for.
-                if (mode != MAP_AUTHENTIC && _mapTrackRunning && !_mapTrackLoops)
+                // Ours, and still going. Only an area change is worth acting on.
+                if (!moved)
                 {
                     return;
                 }
 
-                if (TryResolve(out int track, out string areaName))
+                // Seamless and continuous let a track finish before changing area.
+                // A track that repeats never finishes, so those cut over regardless -
+                // waiting for a town track to end would mean never leaving town.
+                if (mode != MAP_AUTHENTIC && !_mapTrackLoops)
                 {
-                    // Comparing against the last answer, not against what is audible,
-                    // so re-entering a block inside the same area after the track has
-                    // run out does not start it over.
-                    if (track != _currentMusicIndices[0])
-                    {
-                        PlayFromMap(track, areaName);
-                    }
-                }
-                else
-                {
-                    NothingHere(mode, false);
+                    return;
                 }
 
+                if (!TryResolve(out int next, out string nextArea))
+                {
+                    NothingHere(mode);
+
+                    return;
+                }
+
+                if (next != _mapPlayedTrack)
+                {
+                    PlayFromMap(next, nextArea);
+                }
+
                 return;
             }
 
-            // A track of ours has run out and the player has not gone anywhere.
-            if (mode == MAP_AUTHENTIC)
+            // Silence. Fill it, unless the silence is the answer we already gave for
+            // this spot, or the mode wants it.
+            if (_mapChoseSilence)
             {
-                // Silence until the area changes. This is what 1998 did.
                 return;
             }
 
-            if (!TryResolve(out int nextTrack, out string nextArea))
+            if (!TryResolve(out int track, out string areaName))
             {
-                NothingHere(mode, true);
+                NothingHere(mode);
 
                 return;
             }
 
-            if (mode == MAP_SEAMLESS && nextTrack == _endedTrack)
+            if (ended && mode != MAP_CONTINUOUS && track == _endedTrack)
             {
-                // Seamless is about not being cut off mid-track, not about music
-                // without end. Same area, same track: leave it quiet.
+                // The track that just ran out here is the same one this area asks for.
+                // Authentic and seamless both go quiet rather than loop it round; only
+                // continuous plays it again.
+                _mapChoseSilence = true;
+
                 return;
             }
 
-            PlayFromMap(nextTrack, nextArea);
+            PlayFromMap(track, areaName);
         }
 
         /// <summary>
-        /// Nothing in the map covers where the player is standing. Whether that means
-        /// silence is the mode's decision, not the data's: the 1998 data leaves about
-        /// one block in six unpainted, and treating every one of those as an order to
-        /// stop punched a hole in the music every time the player clipped a corner -
-        /// audible around the west edge of Britain, which the city rectangle misses by
-        /// a few tiles.
-        ///
-        /// Authentic goes quiet, because that is what 1998 did. The other two carry on
-        /// until the track finishes by itself, and the option to ignore stop packets
-        /// means nothing at all is allowed to cut the music.
+        /// Nothing in the map covers where the player is. Whether that means silence is
+        /// the mode's decision, not the data's: the 1998 data leaves about one block in
+        /// six unpainted, and treating every one of those as an order to stop punched a
+        /// hole in the music whenever the player clipped a corner - audible along the
+        /// west edge of Britain, which the city rectangle misses by a few tiles.
         /// </summary>
-        private void NothingHere(int mode, bool ended)
+        private void NothingHere(int mode)
         {
             MusicDiagnostics.MapMiss();
 
+            _mapChoseSilence = true;
+
+            // The option says nothing may cut the music, and that includes the map.
             if (Settings.GlobalSettings.IgnoreServerStopMusic)
             {
                 return;
             }
 
-            if (mode == MAP_AUTHENTIC || ended || !_mapTrackRunning)
+            // Authentic goes quiet the moment the area runs out, which is what 1998
+            // did. The other two leave a track alone until it finishes by itself.
+            if (mode == MAP_AUTHENTIC || !StillGoing())
             {
                 StopFromMap();
             }
@@ -748,8 +748,7 @@ namespace ClassicUO.Game.Managers
 
             // The area's tracks are in order of preference. An era's Config.txt need
             // not go all the way up - the 1997 one stops around 48 - so a modern index
-            // like Zento's 49 may have no file under it, and asking for it anyway
-            // would produce silence. Take the first the era can actually play.
+            // may have no file under it, and asking for it anyway would be silence.
             for (int i = 0; i < tracks.Length; i++)
             {
                 if (HasTrack(tracks[i]))
@@ -782,14 +781,21 @@ namespace ClassicUO.Game.Managers
                 StopMusic();
             }
 
-            _mapPlayedTrack = track;
-
             PlayMusic(track);
 
-            // Music turned off, or the file is missing: nothing started, so nothing is
-            // going to report that it finished either.
-            _mapTrackRunning = _currentMusic[0] != null;
-            _mapTrackLoops = _mapTrackRunning && _currentMusic[0].IsLooping;
+            // Music turned off, or the file missing: nothing started, so nothing will
+            // report that it finished either. Do not claim it as ours in that case.
+            if (StillGoing())
+            {
+                AdoptAsMapTrack(track);
+            }
+            else
+            {
+                ForgetMapTrack();
+
+                _mapChoseSilence = true;
+                _lastMusicBlock = MusicMapManager.BlockOf(World.Player.X, World.Player.Y);
+            }
         }
 
         private void StopFromMap()
@@ -802,8 +808,11 @@ namespace ClassicUO.Game.Managers
             StopMusic();
 
             _currentMusicIndices[0] = -1;
-            _mapPlayedTrack = -1;
-            _mapTrackRunning = false;
+
+            ForgetMapTrack();
+
+            _mapChoseSilence = true;
+            _lastMusicBlock = World.Player == null ? int.MinValue : MusicMapManager.BlockOf(World.Player.X, World.Player.Y);
         }
 
         /// <summary>
@@ -815,19 +824,26 @@ namespace ClassicUO.Game.Managers
         /// </summary>
         public void StopWarMusic()
         {
-            if (_currentMusic[1] != null)
+            // Nothing to leave. OpenStatusBar calls this every time the status bar is
+            // opened, and without this guard that restarted the region track from the
+            // beginning each time.
+            if (_currentMusic[1] == null)
             {
-                MusicDiagnostics.Stopped(_currentMusic[1].Index);
-
-                _currentMusic[1].Stop();
-                _currentMusic[1].Dispose();
-                _currentMusic[1] = null;
+                return;
             }
 
-            // Only bring the region track back if there is one. -1 means the server
-            // told us this region has none, and restarting the last town track out in
-            // the open was the other half of the same bug.
-            if (_currentMusicIndices[0] >= 0)
+            MusicDiagnostics.Stopped(_currentMusic[1].Index);
+
+            _currentMusic[1].Stop();
+            _currentMusic[1].Dispose();
+            _currentMusic[1] = null;
+
+            // Only bring the region track back if there is one, and only if it is not
+            // still going underneath - the region slot keeps playing at zero volume
+            // while war music is up, so usually there is nothing to restart. -1 means
+            // the server said this region has none, and restarting the last town track
+            // out in the open was the other half of the same bug.
+            if (_currentMusicIndices[0] >= 0 && !StillGoing())
             {
                 PlayMusic(_currentMusicIndices[0]);
             }

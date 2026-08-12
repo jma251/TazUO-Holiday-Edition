@@ -439,6 +439,10 @@ namespace ClassicUO.Game.Scenes
             Client.Game.Audio?.StopMusic();
             Client.Game.Audio?.StopSounds();
 
+            // The remembered track index outlives the track, so without this the next
+            // session inherits it - which is how the login music came back.
+            Client.Game.Audio?.ForgetMusicState();
+
             Client.Game.SetWindowTitle(string.Empty);
             Client.Game.GameCursor.ItemHold.Clear();
 
