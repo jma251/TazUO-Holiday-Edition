@@ -96,6 +96,13 @@ namespace ClassicUO.Game.Managers
         public static void StopIgnored() => Write("STOP_IGNORED");
 
         /// <summary>
+        /// A stop packet arrived and the track was left playing anyway - either because
+        /// the option says the server may not cut it, or because the map wanted that
+        /// track regardless. Either way the map owns it now.
+        /// </summary>
+        public static void Kept(int track, string why) => Write("MAP_KEEP", track, null, why);
+
+        /// <summary>
         /// Called from the play/update path rather than hooked into World, so a map
         /// change is noticed wherever it happens.
         /// </summary>

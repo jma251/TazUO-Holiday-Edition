@@ -2379,16 +2379,17 @@ namespace ClassicUO.Network
             {
                 // Shards paint small regions - the blessed area at the Britain bank is
                 // one - whose only effect on music is a stop packet on the way in and
-                // another on the way out. Ignoring the packet outright is left as an
-                // option so that can be heard both ways.
-                if (Configuration.Settings.GlobalSettings.IgnoreServerStopMusic)
+                // another on the way out. The option says the server may not cut a
+                // track short; it still hands over to the music map, which is what
+                // starts the next region's music.
+                bool keepPlaying = Configuration.Settings.GlobalSettings.IgnoreServerStopMusic;
+
+                if (keepPlaying)
                 {
                     Game.Managers.MusicDiagnostics.StopIgnored();
-
-                    return;
                 }
 
-                Client.Game.Audio.StopMusicFromServer();
+                Client.Game.Audio.StopMusicFromServer(keepPlaying);
 
                 return;
             }
