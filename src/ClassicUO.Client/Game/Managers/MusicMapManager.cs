@@ -43,8 +43,6 @@ namespace ClassicUO.Game.Managers
         private static Area[] _areas = new Area[0];
         private static bool _loaded;
 
-        private static readonly Random _random = new Random();
-
         public static int AreaCount => _areas.Length;
 
         /// <summary>
@@ -142,13 +140,17 @@ namespace ClassicUO.Game.Managers
         }
 
         /// <summary>
-        /// The music index for a position, or false when nothing covers it - which
-        /// means silence, the same answer the 1998 server gave.
+        /// The area's tracks in order of preference, or false when nothing covers the
+        /// spot - which means silence, the same answer the 1998 server gave.
+        ///
+        /// A list rather than one track because an era's Config.txt need not define
+        /// every index - the 1997 one stops around 48 - so a modern index like Zento's
+        /// 49 may have no file under it. The caller takes the first the era can play.
         /// </summary>
-        public static bool TryGetTrack(int map, int x, int y, int z, out int track, out string areaName)
+        public static bool TryGetTrack(int map, int x, int y, int z, out int[] tracks, out string areaName)
         {
-            track = -1;
             areaName = null;
+            tracks = null;
 
             Area found = null;
 
@@ -165,10 +167,7 @@ namespace ClassicUO.Game.Managers
                 return false;
             }
 
-            // A single-entry list is the 1998 data as authored. Longer lists are a
-            // local addition, and picking from them at random is how every era of the
-            // game did it.
-            track = found.Tracks.Length == 1 ? found.Tracks[0] : found.Tracks[_random.Next(found.Tracks.Length)];
+            tracks = found.Tracks;
             areaName = found.Name;
 
             return true;
