@@ -89,7 +89,10 @@ namespace ClassicUO.Game
         public static Season Season { get; private set; } = Season.Summer;
         public static Season OldSeason { get; set; } = Season.Summer;
 
-        public static int OldMusicIndex { get; set; }
+        // The last track the server actually named, kept so coming back from the death
+        // screen restores it. -1 until the server has named one, which means the death
+        // screen leaves the music alone rather than starting track 0 out of nowhere.
+        public static int OldMusicIndex { get; set; } = -1;
 
         public static WorldTextManager WorldTextManager { get; } = new WorldTextManager();
 
@@ -192,7 +195,13 @@ namespace ClassicUO.Game
             Log.Trace($"Player [0x{serial:X8}] created");
         }
 
-        public static void ChangeSeason(Season season, int music)
+        /// <summary>
+        /// Changes the season, and optionally the music with it. A negative index
+        /// means the caller has no track to offer and the music is left alone - which
+        /// is the case for the season packet, whose second byte is a flag and not an
+        /// index at all.
+        /// </summary>
+        public static void ChangeSeason(Season season, int music = -1)
         {
             Season = season;
 
@@ -210,12 +219,13 @@ namespace ClassicUO.Game
                 }
             }
 
+            if (music < 0)
+            {
+                return;
+            }
+
             //TODO(deccer): refactor this out into _audioPlayer.PlayMusic(...)
-            bool play = Client.Game.Audio.CanSeasonMusicTakeOver();
-
-            Managers.MusicDiagnostics.SeasonPacket((int)season, music, play);
-
-            if (play)
+            if (Client.Game.Audio.CanSeasonMusicTakeOver())
             {
                 Client.Game.Audio.PlayMusic(music, false);
             }

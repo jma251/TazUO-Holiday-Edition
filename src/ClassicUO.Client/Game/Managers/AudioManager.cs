@@ -417,14 +417,19 @@ namespace ClassicUO.Game.Managers
         }
 
         /// <summary>
-        /// The server has told us the current region has no music. The map gets its
-        /// turn, and whatever was playing stops - unless the map was going to ask for
-        /// that very track anyway, in which case stopping it only to start it again
-        /// from the beginning is a cut for no reason. Standing at the Britain bank,
-        /// where stepping in and out of the blessed area produces a stop packet every
-        /// few seconds, that restart was the whole of the problem.
+        /// The server has told us the current region has no music, so the map gets its
+        /// turn. Whatever was playing stops - unless the map was going to ask for that
+        /// very track anyway, in which case stopping it only to start it again from the
+        /// beginning is a cut for no reason. Stepping in and out of the blessed area at
+        /// the Britain bank produces a stop packet every few seconds, and that restart
+        /// was the whole of the problem.
+        ///
+        /// keepPlaying is the "ignore the stop packet" option, and means exactly that:
+        /// the server does not get to cut the track short. It does not mean the map
+        /// stops working - the map still takes over, and still changes the track at the
+        /// next area boundary or when it runs out, whichever the mode calls for.
         /// </summary>
-        public void StopMusicFromServer()
+        public void StopMusicFromServer(bool keepPlaying = false)
         {
             int playing = _currentMusicIndices[0];
 
@@ -445,20 +450,36 @@ namespace ClassicUO.Game.Managers
             {
                 _lastMusicBlock = MusicMapManager.BlockOf(World.Player.X, World.Player.Y);
 
-                if (stillGoing && TryResolve(out int track, out string areaName) && track == playing)
-                {
-                    // Already the right track. Adopt it rather than cutting it off:
-                    // from here on the map owns it and will change it at the next
-                    // area boundary, which is where a change belongs.
-                    MusicDiagnostics.MapHit(track, areaName);
+                // Two reasons to let the track carry on: the option says the server
+                // may not cut it, or the map was about to ask for it anyway.
+                bool keep = stillGoing;
 
-                    _mapPlayedTrack = track;
+                if (keep && !keepPlaying)
+                {
+                    keep = TryResolve(out int wanted, out _) && wanted == playing;
+                }
+
+                if (keep)
+                {
+                    // The map takes ownership of it from here, so it still changes at
+                    // the next area boundary - it just is not cut short to get there.
+                    MusicDiagnostics.Kept(playing, keepPlaying ? "stop_ignored" : "same_track");
+
+                    _mapPlayedTrack = playing;
                     _mapTrackEnded = false;
                     _mapTrackRunning = true;
                     _mapTrackLoops = _currentMusic[0].IsLooping;
 
                     return;
                 }
+            }
+            else if (keepPlaying && stillGoing)
+            {
+                // No map to hand over to - with it off, or on a facet it has no data
+                // for, ignoring the stop just means the track carries on.
+                MusicDiagnostics.Kept(playing, "stop_ignored");
+
+                return;
             }
 
             StopMusic();
