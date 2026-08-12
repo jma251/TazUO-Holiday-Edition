@@ -519,7 +519,11 @@ namespace ClassicUO.Game.GameObjects
 
             UIManager.GetGump<MiniMapGump>()?.RequestUpdateContents();
 
-            if (World.HouseManager.EntityIntoHouse(Serial, World.Player))
+            // Same as the two in PacketHandlers: the multi has just finished building,
+            // so what is overhead may have changed. Testing whether the player is inside
+            // this particular one, at the instant its geometry changed, is what let a
+            // stale draw ceiling survive until the player moved.
+            if (World.InGame)
             {
                 Client.Game.GetScene<GameScene>()?.UpdateMaxDrawZ(true);
             }

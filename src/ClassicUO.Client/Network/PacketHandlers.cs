@@ -389,6 +389,32 @@ namespace ClassicUO.Network
             }
         }
 
+        /// <summary>
+        /// A house has finished building, so what the player is allowed to see through
+        /// may have changed. This used to be done only when the client believed the
+        /// player was inside that house - a test taken at the one moment the geometry
+        /// had just changed underneath it, and the reason house interiors sometimes
+        /// stayed hidden until you stepped out and back in: the rebuild reported
+        /// playerinside=False, nothing forced the ceiling to recompute, and nothing
+        /// else would until the player moved.
+        ///
+        /// The house being stood in is not the only one that can change what is
+        /// overhead, and recomputing is cheap - it walks two tiles, and the draw loop
+        /// calls it every frame anyway. It is simply done unconditionally now.
+        ///
+        /// The old test was also the only thing keeping this away from a null player,
+        /// because EntityIntoHouse answers false for one. Hence InGame.
+        /// </summary>
+        private static void RecomputeDrawCeiling()
+        {
+            if (!World.InGame)
+            {
+                return;
+            }
+
+            Client.Game.GetScene<GameScene>()?.UpdateMaxDrawZ(true);
+        }
+
         public static void AddMegaClilocRequest(uint serial)
         {
             foreach (uint s in Handler._clilocRequests)
@@ -4812,7 +4838,14 @@ namespace ClassicUO.Network
                         || house.Revision != revision
                     )
                     {
-                        Handler._customHouseRequests.Add(serial);
+                        // The queue is flushed and cleared every tick, so this only
+                        // collapses copies inside one flush - which is where they come
+                        // from. One login produced ten requests in a millisecond and
+                        // rebuilt a 3,283 component house five times.
+                        if (!Handler._customHouseRequests.Contains(serial))
+                        {
+                            Handler._customHouseRequests.Add(serial);
+                        }
                     }
                     else
                     {
@@ -4827,10 +4860,7 @@ namespace ClassicUO.Network
                             house.Components.Count
                         );
 
-                        if (World.HouseManager.EntityIntoHouse(serial, World.Player))
-                        {
-                            Client.Game.GetScene<GameScene>()?.UpdateMaxDrawZ(true);
-                        }
+                        RecomputeDrawCeiling();
                     }
 
                     break;
@@ -5602,10 +5632,7 @@ namespace ClassicUO.Network
                 house.Components.Count
             );
 
-            if (World.HouseManager.EntityIntoHouse(serial, World.Player))
-            {
-                Client.Game.GetScene<GameScene>()?.UpdateMaxDrawZ(true);
-            }
+            RecomputeDrawCeiling();
 
             BoatMovingManager.ClearSteps(serial);
         }

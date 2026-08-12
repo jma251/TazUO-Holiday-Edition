@@ -189,7 +189,13 @@ namespace ClassicUO.Game.Managers
                 return;
             }
 
-            Write($"generate\thouse=0x{serial:X8}\tplayerinside={playerInside}\tcomponents={components}");
+            // The player's position too, so a playerinside=False can be told apart from
+            // a player who was genuinely outside at that instant.
+            string at = World.Player == null
+                ? "-"
+                : $"({World.Player.X},{World.Player.Y},{World.Player.Z})";
+
+            Write($"generate\thouse=0x{serial:X8}\tplayerinside={playerInside}\tplayer={at}\tcomponents={components}");
         }
 
         private static void Write(string line)
