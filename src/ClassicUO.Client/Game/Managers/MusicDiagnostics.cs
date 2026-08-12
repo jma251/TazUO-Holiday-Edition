@@ -85,12 +85,12 @@ namespace ClassicUO.Game.Managers
             Write("RAW6D", -1, null, $"6D {(index >> 8) & 0xFF:X2} {index & 0xFF:X2}");
 
         /// <summary>
-        /// The season packet carries a music index of its own, and is the only thing
-        /// that plays music on a facet change. It never showed up in the log, which
-        /// made the facets look like the server was sending nothing at all.
+        /// The season packet, whose second byte is a play-sound flag and not a music
+        /// index. Logged raw so the wire can be read directly, since it was being
+        /// mistaken for a track number.
         /// </summary>
-        public static void SeasonPacket(int season, int music, bool played) =>
-            Write("SEASON", music, null, $"BC {season:X2} {music:X2} {(played ? "played" : "suppressed")}");
+        public static void SeasonPacket(int season, int playSound) =>
+            Write("SEASON", -1, null, $"BC {season:X2} {playSound:X2}");
 
         /// <summary>The server's stop packet arrived and was thrown away on request.</summary>
         public static void StopIgnored() => Write("STOP_IGNORED");

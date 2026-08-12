@@ -2393,7 +2393,11 @@ namespace ClassicUO.Network
                 return;
             }
 
-            // A real track: the server is back in charge of the music.
+            // A real track: the server is back in charge of the music. Remembered as
+            // the region's music so that coming back from the death screen restores
+            // this rather than whatever the season packet last left behind.
+            World.OldMusicIndex = index;
+
             Client.Game.Audio.NotifyServerTrack();
             Client.Game.Audio.PlayMusic(index);
         }
@@ -4321,7 +4325,14 @@ namespace ClassicUO.Network
             }
 
             byte season = p.ReadUInt8();
-            byte music = p.ReadUInt8();
+
+            // Not a music index. Both ServUO and ModernUO write a bool here - it is
+            // the season's "play sound" flag - and reading it as a track number meant
+            // every season change played track 1, which is the character creation
+            // music. That is the CREATE1 heard on login and on arriving in Tokuno.
+            byte playSound = p.ReadUInt8();
+
+            Game.Managers.MusicDiagnostics.SeasonPacket(season, playSound);
 
             if (season > 4)
             {
@@ -4334,14 +4345,14 @@ namespace ClassicUO.Network
             }
 
             World.OldSeason = (Season)season;
-            World.OldMusicIndex = music;
 
             if (World.Season == Game.Managers.Season.Desolation)
             {
                 World.OldMusicIndex = 42;
             }
 
-            World.ChangeSeason((Season)season, music);
+            // Season only. What plays where is the music packet's business.
+            World.ChangeSeason((Season)season);
         }
 
         private static void ClientVersion(ref StackDataReader p)
