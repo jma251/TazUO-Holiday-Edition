@@ -61,6 +61,13 @@ namespace ClassicUO.IO.Audio
         /// <summary>True when this track is configured to repeat.</summary>
         public bool IsLooping => m_Repeat;
 
+        /// <summary>
+        /// True while the decoder is still feeding this track. Cleared when it is
+        /// stopped or runs out, so unlike Sound.IsPlaying - which only knows about the
+        /// last buffer submitted, about a second of audio - this is the real answer.
+        /// </summary>
+        public bool IsStreaming => m_Playing;
+
         // Fired when a track restarts or runs out. This assembly cannot see the
         // client's settings or world, so the diagnostic subscribes from there.
         public static Action<UOMusic> Looped;
