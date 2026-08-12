@@ -470,7 +470,9 @@ namespace ClassicUO.Configuration
             public string MusicEraDefault { get; set; } = "Default";
             public string MusicMapMode { get; set; } = "Region music (when the server has none)";
             public string MusicMapOff { get; set; } = "Off - server only";
-            public string MusicMapAuthentic { get; set; } = "Authentic (1998)";
+            public string MusicMapAuthentic { get; set; } = "Authentic (1998) - cut over, silence after";
+            public string MusicMapSeamless { get; set; } = "Seamless - let tracks finish, silence after";
+            public string MusicMapContinuous { get; set; } = "Continuous (1996) - let tracks finish, always playing";
         }
 
         public class NamePlates
