@@ -264,11 +264,20 @@ namespace ClassicUO.Game.Managers
             int index = _currentMusicIndices[0];
             bool warMode = _currentMusic[1] != null;
 
+            // Only what is actually loaded gets restarted. The index outlives the
+            // track - nothing clears it when playback stops - so on a change of era in
+            // silence this used to resurrect whatever played last, which after walking
+            // in from the login screen is the login music.
+            bool wasPlaying = _currentMusic[0] != null || _currentMusic[1] != null;
+
             StopMusic();
 
             EnsureMusicEraApplied();
 
-            PlayMusic(index, warMode);
+            if (wasPlaying && index >= 0)
+            {
+                PlayMusic(index, warMode);
+            }
         }
 
         public void PlayMusic(int music, bool iswarmode = false, bool is_login = false)
