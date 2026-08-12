@@ -22,6 +22,7 @@ namespace ClassicUO.Game.Managers
         private static bool IsEnabled => Settings.GlobalSettings.LogHouseDiagnostics;
 
         private static int _lastLoggedViewRange = -1;
+        private static bool _bannerWritten;
 
         /// <summary>
         /// The server sets the client's view range, unclamped. If it is smaller than the
@@ -57,6 +58,10 @@ namespace ClassicUO.Game.Managers
                 return;
             }
 
+            // Which house the item itself belongs to, which is not necessarily the
+            // one the player is standing in - the old line could not tell those apart.
+            TryGetHouseContaining(item, out uint itemHouse);
+
             Write(
                 $"cull\tserial=0x{item.Serial:X8}\tgraphic=0x{item.Graphic:X4}"
                 + $"\titem=({item.X},{item.Y},{item.Z})"
@@ -64,6 +69,8 @@ namespace ClassicUO.Game.Managers
                 + $"\tdistance={item.Distance}\tviewrange={World.ClientViewRange}"
                 + $"\tinhouse=0x{houseSerial:X8}"
                 + $"\titeminhouse={World.HouseManager.EntityIntoHouse(houseSerial, item)}"
+                + $"\titemhouse=0x{itemHouse:X8}"
+                + $"\tismulti={item.IsMulti}\tbonus={item.MultiDistanceBonus}"
             );
         }
 
@@ -89,19 +96,100 @@ namespace ClassicUO.Game.Managers
 
         private static bool TryGetHouseContainingPlayer(out uint houseSerial)
         {
+            return TryGetHouseContaining(World.Player, out houseSerial);
+        }
+
+        /// <summary>
+        /// The first house whose bounds contain the object. Beware: HouseManager answers
+        /// "yes" for a house whose multi item has gone, so a house left behind claims
+        /// everything in the world - which is how a serial-zero house came to own
+        /// ninety-seven items in one second. Those are reported as phantom.
+        /// </summary>
+        private static bool TryGetHouseContaining(GameObject obj, out uint houseSerial)
+        {
             houseSerial = 0;
+
+            if (obj == null)
+            {
+                return false;
+            }
 
             foreach (House house in World.HouseManager.Houses)
             {
-                if (World.HouseManager.EntityIntoHouse(house.Serial, World.Player))
+                if (!World.HouseManager.EntityIntoHouse(house.Serial, obj))
                 {
-                    houseSerial = house.Serial;
-
-                    return true;
+                    continue;
                 }
+
+                houseSerial = house.Serial;
+
+                if (World.Items.Get(house.Serial) == null)
+                {
+                    LogPhantom(house.Serial);
+                }
+
+                return true;
             }
 
             return false;
+        }
+
+        private static uint _lastPhantom = uint.MaxValue;
+
+        private static void LogPhantom(uint serial)
+        {
+            if (serial == _lastPhantom)
+            {
+                return;
+            }
+
+            _lastPhantom = serial;
+
+            Write($"phantom\thouse=0x{serial:X8}\tnote=house has no multi item, so it claims every object");
+        }
+
+        /// <summary>
+        /// The draw ceiling, which is what decides whether the inside of a house is
+        /// visible. It is cached on the player's position, so a house that finishes
+        /// building while the player stands still can leave it stale - which is what
+        /// stepping outside and back in resets.
+        /// </summary>
+        public static void LogDrawZ(bool forced, bool chunkMissing, int maxZ, int maxGroundZ)
+        {
+            if (!IsEnabled || World.Player == null)
+            {
+                return;
+            }
+
+            if (!forced && maxZ == _lastMaxZ && maxGroundZ == _lastMaxGroundZ)
+            {
+                return;
+            }
+
+            _lastMaxZ = maxZ;
+            _lastMaxGroundZ = maxGroundZ;
+
+            Write(
+                $"drawz\tmaxz={maxZ}\tmaxgroundz={maxGroundZ}\tforced={forced}"
+                + $"\tchunkmissing={chunkMissing}\tplayerz={World.Player.Z}"
+            );
+        }
+
+        private static int _lastMaxZ = int.MinValue;
+        private static int _lastMaxGroundZ = int.MinValue;
+
+        /// <summary>
+        /// A house finished building, and whether the client thinks the player is inside
+        /// it - which is the condition for recomputing the draw ceiling.
+        /// </summary>
+        public static void LogHouseGenerated(uint serial, bool playerInside, int components)
+        {
+            if (!IsEnabled)
+            {
+                return;
+            }
+
+            Write($"generate\thouse=0x{serial:X8}\tplayerinside={playerInside}\tcomponents={components}");
         }
 
         private static void Write(string line)
@@ -113,18 +201,41 @@ namespace ClassicUO.Game.Managers
 
                 string path = Path.Combine(directory, "houselog.txt");
 
+                // Who and where. Without these the log could not say which character it
+                // belonged to, and the facet had to be inferred from coordinates.
+                string who = World.Player == null
+                    ? "char=-\tmap=-"
+                    : $"char={World.Player.Name}\tmap={World.MapIndex}";
+
                 if (!File.Exists(path))
                 {
                     File.AppendAllText(
                         path,
-                        "# timestamp\tevent\tdetails" + Environment.NewLine
+                        "# timestamp\tevent\tchar\tmap\tdetails" + Environment.NewLine
                     );
                 }
+
+                if (!_bannerWritten)
+                {
+                    _bannerWritten = true;
+
+                    File.AppendAllText(
+                        path,
+                        "#" + Environment.NewLine
+                        + "# ==== session " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture) + " ====" + Environment.NewLine
+                        + "#   client   " + CUOEnviroment.Version + Environment.NewLine
+                        + "#" + Environment.NewLine
+                    );
+                }
+
+                int tab = line.IndexOf('\t');
+                string ev = tab < 0 ? line : line.Substring(0, tab);
+                string rest = tab < 0 ? "" : line.Substring(tab);
 
                 File.AppendAllText(
                     path,
                     DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture)
-                        + "\t" + line + Environment.NewLine
+                        + "\t" + ev + "\t" + who + rest + Environment.NewLine
                 );
             }
             catch

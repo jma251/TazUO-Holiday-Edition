@@ -122,6 +122,11 @@ namespace ClassicUO.Game.Scenes
             int by = playerY;
             Chunk chunk = World.Map.GetChunk(bx, by, false);
 
+            // Recorded because this is what decides whether the inside of a house is
+            // visible, and it is cached on the player's position - a house that finishes
+            // building while the player stands still can leave it stale.
+            bool chunkMissing = chunk == null;
+
             if (chunk != null)
             {
                 int x = playerX % 8;
@@ -253,6 +258,8 @@ namespace ClassicUO.Game.Scenes
 
                 _maxGroundZ = maxGroundZ;
             }
+
+            Managers.HouseDiagnostics.LogDrawZ(force, chunkMissing, _maxZ, _maxGroundZ);
         }
 
         private void IsFoliageUnion(ushort graphic, int x, int y, int z)
