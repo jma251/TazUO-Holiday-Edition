@@ -2417,6 +2417,23 @@ namespace ClassicUO.Game.UI.Gumps
             );
 
             PositionHelper.PositionControl(s.FullControl);
+            PositionHelper.BlankLine();
+
+            // Works with or without the music map: on its own it means music only ever
+            // changes when the server names a real track.
+            options.Add
+            (
+                s = new SettingsOption
+                (
+                    "", new CheckboxWithLabel
+                    (
+                        lang.GetExperimental.IgnoreServerStopMusic, 0, Settings.GlobalSettings.IgnoreServerStopMusic,
+                        (b) => { Settings.GlobalSettings.IgnoreServerStopMusic = b; }
+                    ), MainContent.RightWidth, (int)PAGE.Experimental
+                )
+            );
+
+            PositionHelper.PositionControl(s.FullControl);
         }
 
         private void BuildNameplates()

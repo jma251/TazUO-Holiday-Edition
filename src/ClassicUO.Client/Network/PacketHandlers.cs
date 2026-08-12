@@ -2377,6 +2377,17 @@ namespace ClassicUO.Network
             // rather than loosening that bounds check for every stray value.
             if (index == Game.Constants.MUSIC_STOP_INDEX)
             {
+                // Shards paint small regions - the blessed area at the Britain bank is
+                // one - whose only effect on music is a stop packet on the way in and
+                // another on the way out. Ignoring the packet outright is left as an
+                // option so that can be heard both ways.
+                if (Configuration.Settings.GlobalSettings.IgnoreServerStopMusic)
+                {
+                    Game.Managers.MusicDiagnostics.StopIgnored();
+
+                    return;
+                }
+
                 Client.Game.Audio.StopMusicFromServer();
 
                 return;

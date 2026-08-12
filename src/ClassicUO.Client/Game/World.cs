@@ -211,8 +211,11 @@ namespace ClassicUO.Game
             }
 
             //TODO(deccer): refactor this out into _audioPlayer.PlayMusic(...)
-            UOMusic currentMusic = Client.Game.Audio.GetCurrentMusic();
-            if (currentMusic == null || currentMusic.Index == Client.Game.Audio.LoginMusicIndex)
+            bool play = Client.Game.Audio.CanSeasonMusicTakeOver();
+
+            Managers.MusicDiagnostics.SeasonPacket((int)season, music, play);
+
+            if (play)
             {
                 Client.Game.Audio.PlayMusic(music, false);
             }

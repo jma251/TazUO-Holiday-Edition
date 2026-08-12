@@ -47,6 +47,25 @@ namespace ClassicUO.Game.Managers
 
         public static int AreaCount => _areas.Length;
 
+        /// <summary>
+        /// Whether the map has anything to say about a facet at all. Nothing covering
+        /// a spot on Felucca means silence, because that data is authored and complete.
+        /// Nothing covering a spot on Tokuno only means the facet was never mapped, and
+        /// answering "silence" there stopped music the server had correctly started.
+        /// </summary>
+        public static bool CoversMap(int map)
+        {
+            for (int i = 0; i < _areas.Length; i++)
+            {
+                if (_areas[i].Map == map)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         public static void Load()
         {
             if (_loaded)

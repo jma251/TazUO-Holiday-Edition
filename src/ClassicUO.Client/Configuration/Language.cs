@@ -473,6 +473,7 @@ namespace ClassicUO.Configuration
             public string MusicMapAuthentic { get; set; } = "Authentic (1998) - cut over, silence after";
             public string MusicMapSeamless { get; set; } = "Seamless - let tracks finish, silence after";
             public string MusicMapContinuous { get; set; } = "Continuous (1996) - let tracks finish, always playing";
+            public string IgnoreServerStopMusic { get; set; } = "Ignore the server's stop-music packet";
         }
 
         public class NamePlates
