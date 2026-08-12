@@ -9,12 +9,16 @@
 # Rectangles are applied largest first, so the SMALLEST area covering a spot
 # wins. That is the rule the 1998 server used (CBlockManager, 0x0042FD01).
 #
-# tracks : one or more music indices, comma separated. Indices are the
-#          canonical 0-48 set; which FILE each one plays is decided by the
-#          Config.txt of whichever music era is selected. To mute or swap a
-#          track, edit that Config.txt - not this file.
+# tracks : one or more music indices, in order of preference. The first one
+#          the selected music era can actually play is used - an era's
+#          Config.txt need not define every index, and the 1997 one stops
+#          around 48, so a modern track like Zento's 49 needs a classic
+#          stand-in behind it. Which FILE each index plays is decided by that
+#          Config.txt. To mute or swap a track, edit the Config.txt - not this
+#          file.
 #
 # map    : 0 = Felucca, 1 = Trammel (a copy of Felucca, so it shares the data)
+#          2 = Ilshenar, 3 = Malas, 4 = Tokuno, 5 = Ter Mur
 #
 # map	x	y	width	height	zmin	zmax	tracks	name
 0	5120	0	1024	2304	-127	127	26	DUNGEONS
@@ -489,3 +493,54 @@
 1	568	2168	8	8	-127	127	34	TAVERN_SKARA_BRAE
 0	2908	904	8	8	-127	127	34	TAVERN_VESPER_1
 1	2908	904	8	8	-127	127	34	TAVERN_VESPER_1
+
+# ---------------------------------------------------------------------------
+# Facets 2 to 5. None of these existed in 1998, so there is no Origin data to
+# convert. The rectangles and tracks are ServUO's own region data, which is the
+# nearest thing to authored: Data/Regions.xml and the MusicName enum.
+#
+# Two departures from it, both because the server has nothing to send and the
+# alternative is silence:
+#
+#   - one backstop per facet, covering the whole map. It is the largest area
+#     there is, so every real region beats it; it only answers where nothing
+#     else does.
+#   - Umbra. ServUO defines the town but gives it no music at all. Dungeon9 is
+#     a guess, and a guess is what the Config.txt is for.
+# ---------------------------------------------------------------------------
+2	0	0	2304	1600	-127	127	29,30	ILSHENAR
+2	736	480	32	24	-127	127	8	PORMIR_HARM
+2	2107	1145	147	135	-127	127	52,29	TWISTED_WEALD
+3	0	0	129	129	-127	127	50,26	YOMOTSU_MINES
+3	0	0	2560	2048	-127	127	30,25	MALAS
+3	40	320	170	400	-127	127	50,26	FAN_DANCER_S_DOJO
+3	65	1865	130	125	-127	127	26	THECITADEL
+3	80	1590	130	100	-127	127	54,26	BEDLAM
+3	255	1791	256	256	-127	127	26	LABYRINTH
+3	256	0	256	304	-127	127	26	DOOM
+3	256	304	256	256	-127	127	26	DOOM_GAUNTLET
+3	320	690	115	100	-127	127	49,28	SAMURAI_START_LOCATION
+3	360	795	80	40	-127	127	49,28	NINJA_START_LOCATION
+3	945	490	91	61	-127	127	37	LUNA
+3	1960	1278	146	135	-127	127	26,25	CITY_UMBRA
+3	2004	1413	36	6	-127	127	26,25	CITY_UMBRA
+3	2042	1265	48	13	-127	127	26,25	CITY_UMBRA
+4	0	0	1448	1448	-127	127	27,29	TOKUNO
+4	656	1192	160	128	-127	127	49,28	ZENTO
+5	0	0	1280	4096	-127	127	30,25	TERMUR
+5	0	286	137	159	-127	127	84,26	ABYSS
+5	0	485	134	162	-127	127	84,26	ABYSS
+5	0	684	134	176	-127	127	84,26	ABYSS
+5	254	70	246	183	-127	127	84,26	ABYSS
+5	258	90	231	155	-127	127	85,26	STYGIANDRAGONLAIR
+5	301	328	775	474	-127	127	84,26	ABYSS
+5	436	802	304	178	-127	127	84,26	ABYSS
+5	624	3296	303	287	-127	127	82,28	ROYAL_CITY
+5	717	3339	68	73	-127	127	81,28	QUEEN_S_PALACE
+5	754	881	108	93	-127	127	84,26	ABYSS
+5	756	1049	104	93	-127	127	84,26	ABYSS
+5	756	1214	105	99	-127	127	84,26	ABYSS
+5	780	32	296	296	-127	127	84,26	ABYSS
+5	898	808	382	423	-127	127	77,26	UNDERWORLD
+5	922	3838	149	127	-127	127	76,28	HOLY_CITY
+5	978	3786	40	52	-127	127	87,23	SHRINE_OF_SINGULARITY

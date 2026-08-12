@@ -665,7 +665,7 @@ namespace ClassicUO.Game.Managers
                 }
                 else
                 {
-                    StopFromMap();
+                    NothingHere(mode, false);
                 }
 
                 return;
@@ -680,7 +680,7 @@ namespace ClassicUO.Game.Managers
 
             if (!TryResolve(out int nextTrack, out string nextArea))
             {
-                StopFromMap();
+                NothingHere(mode, true);
 
                 return;
             }
@@ -693,6 +693,33 @@ namespace ClassicUO.Game.Managers
             }
 
             PlayFromMap(nextTrack, nextArea);
+        }
+
+        /// <summary>
+        /// Nothing in the map covers where the player is standing. Whether that means
+        /// silence is the mode's decision, not the data's: the 1998 data leaves about
+        /// one block in six unpainted, and treating every one of those as an order to
+        /// stop punched a hole in the music every time the player clipped a corner -
+        /// audible around the west edge of Britain, which the city rectangle misses by
+        /// a few tiles.
+        ///
+        /// Authentic goes quiet, because that is what 1998 did. The other two carry on
+        /// until the track finishes by itself, and the option to ignore stop packets
+        /// means nothing at all is allowed to cut the music.
+        /// </summary>
+        private void NothingHere(int mode, bool ended)
+        {
+            MusicDiagnostics.MapMiss();
+
+            if (Settings.GlobalSettings.IgnoreServerStopMusic)
+            {
+                return;
+            }
+
+            if (mode == MAP_AUTHENTIC || ended || !_mapTrackRunning)
+            {
+                StopFromMap();
+            }
         }
 
         /// <summary>
@@ -712,7 +739,35 @@ namespace ClassicUO.Game.Managers
         {
             MusicMapManager.Load();
 
-            return MusicMapManager.TryGetTrack(World.MapIndex, World.Player.X, World.Player.Y, World.Player.Z, out track, out areaName);
+            track = -1;
+
+            if (!MusicMapManager.TryGetTrack(World.MapIndex, World.Player.X, World.Player.Y, World.Player.Z, out int[] tracks, out areaName))
+            {
+                return false;
+            }
+
+            // The area's tracks are in order of preference. An era's Config.txt need
+            // not go all the way up - the 1997 one stops around 48 - so a modern index
+            // like Zento's 49 may have no file under it, and asking for it anyway
+            // would produce silence. Take the first the era can actually play.
+            for (int i = 0; i < tracks.Length; i++)
+            {
+                if (HasTrack(tracks[i]))
+                {
+                    track = tracks[i];
+
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool HasTrack(int track)
+        {
+            EnsureMusicEraApplied();
+
+            return Client.Game.Sounds.GetMusic(track) != null;
         }
 
         private void PlayFromMap(int track, string areaName)
@@ -743,8 +798,6 @@ namespace ClassicUO.Game.Managers
             {
                 return;
             }
-
-            MusicDiagnostics.MapMiss();
 
             StopMusic();
 
