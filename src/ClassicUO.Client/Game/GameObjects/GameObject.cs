@@ -183,8 +183,52 @@ namespace ClassicUO.Game.GameObjects
             }
         }
 
+        /// <summary>
+        /// The chunk cell this object is currently linked into, and where in it. Set by
+        /// Chunk.AddGameObject, cleared by RemoveFromTile. Without it an object cannot
+        /// tell whether the chunk is using it as that cell's way in, and so cannot hand
+        /// that over before unlinking itself. See RemoveFromTile.
+        /// </summary>
+        internal Chunk TileChunk;
+        internal int TileCellX;
+        internal int TileCellY;
+
+        /// <summary>
+        /// Unlink from the tile's list of objects.
+        ///
+        /// A chunk holds one object per cell as its way into that cell's list, and
+        /// GetHeadObject walks backwards from it to find the real head. That object is
+        /// whichever one was added to the cell first, and it is never reassigned - so
+        /// when it is the one being removed, the chunk is left pointing at an object
+        /// that has just had both its links nulled. GetHeadObject then returns that
+        /// detached object, walking forward from it finds nothing, and every other
+        /// object still standing on that tile becomes unreachable: alive in World.Items,
+        /// owned by nothing, drawn by nobody.
+        ///
+        /// That is the "the house is here and the things inside it are not" failure. It
+        /// needs no packet to go missing and no distance check to fire; anything that
+        /// destroys or moves the wrong object does it. Custom houses hit it hardest
+        /// because rebuilding one destroys every component it has.
+        ///
+        /// Chunk.RemoveGameObject has always done this correctly and has never been
+        /// called from anywhere. The repair is the same thing: hand the cell to a
+        /// neighbour before unlinking.
+        /// </summary>
         public void RemoveFromTile()
         {
+            Chunk chunk = TileChunk;
+
+            TileChunk = null;
+
+            if (chunk != null && ReferenceEquals(chunk.Tiles[TileCellX, TileCellY], this))
+            {
+                GameObject successor = TNext ?? TPrevious;
+
+                HouseDiagnostics.LogTileHeadHandover(this, successor);
+
+                chunk.Tiles[TileCellX, TileCellY] = successor;
+            }
+
             if (TPrevious != null)
             {
                 TPrevious.TNext = TNext;

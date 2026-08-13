@@ -173,6 +173,12 @@ namespace ClassicUO.Game.Map
         {
             obj.RemoveFromTile();
 
+            // Remembered so the object can hand this cell over if it is the one the
+            // chunk is using as its way in. See GameObject.RemoveFromTile.
+            obj.TileChunk = this;
+            obj.TileCellX = x;
+            obj.TileCellY = y;
+
             short priorityZ = obj.Z;
             sbyte state = -1;
 
@@ -358,8 +364,12 @@ namespace ClassicUO.Game.Map
 
             if (firstNode == obj)
             {
-                firstNode = obj.TNext;
+                // TPrevious as well as TNext: an object at the end of the list still has
+                // a list behind it, and emptying the cell would lose all of it.
+                firstNode = obj.TNext ?? obj.TPrevious;
             }
+
+            obj.TileChunk = null;
 
             if (obj.TNext != null)
             {

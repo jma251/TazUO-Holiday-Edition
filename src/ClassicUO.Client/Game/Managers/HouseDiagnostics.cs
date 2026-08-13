@@ -589,6 +589,72 @@ namespace ClassicUO.Game.Managers
             return n;
         }
 
+        /// <summary>
+        /// A chunk cell's way in was being removed, and had to be handed to a neighbour.
+        /// Logged only when something was actually standing behind it, because that is
+        /// the count of objects that would have been orphaned - present in the world,
+        /// linked to nothing, and invisible - before this was repaired.
+        /// </summary>
+        public static void LogTileHeadHandover(GameObject leaving, GameObject successor)
+        {
+            if (!IsEnabled || successor == null)
+            {
+                return;
+            }
+
+            _handovers++;
+
+            try
+            {
+                // The leaving object is still linked in at this point, so it has to be
+                // skipped or it counts itself.
+                int behind = 0;
+
+                for (GameObject o = successor; o != null; o = o.TNext)
+                {
+                    if (!ReferenceEquals(o, leaving))
+                    {
+                        behind++;
+                    }
+                }
+
+                for (GameObject o = successor.TPrevious; o != null; o = o.TPrevious)
+                {
+                    if (!ReferenceEquals(o, leaving))
+                    {
+                        behind++;
+                    }
+                }
+
+                Write($"tilehead\tat=({leaving.X},{leaving.Y},{leaving.Z})"
+                      + $"\tleaving={leaving.GetType().Name}\tgraphic=0x{leaving.Graphic:X4}"
+                      + $"\tbehind={behind}\ttotal={_handovers}");
+            }
+            catch
+            {
+            }
+        }
+
+        private static long _handovers;
+
+        /// <summary>
+        /// An item that was in the world but linked to nothing, and has been put back.
+        /// This is the thing that was invisible, named.
+        /// </summary>
+        public static void LogOrphanRepaired(Item item)
+        {
+            if (!IsEnabled || item == null)
+            {
+                return;
+            }
+
+            TryGetHouseContaining(item, out uint itemHouse);
+
+            Write($"orphan\tserial=0x{item.Serial:X8}\tgraphic=0x{item.Graphic:X4}"
+                  + $"\tat=({item.X},{item.Y},{item.Z})\tdistance={item.Distance}"
+                  + $"\titemhouse=0x{itemHouse:X8}");
+        }
+
         /// <summary>A free-form line, for anything that does not deserve its own event.</summary>
         public static void Note(string what)
         {

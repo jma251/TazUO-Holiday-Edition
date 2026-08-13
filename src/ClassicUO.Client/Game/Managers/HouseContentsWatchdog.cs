@@ -1,6 +1,7 @@
 using ClassicUO.Configuration;
 using ClassicUO.Game.Data;
 using ClassicUO.Game.GameObjects;
+using ClassicUO.Game.Map;
 using ClassicUO.Network;
 
 namespace ClassicUO.Game.Managers
@@ -68,6 +69,22 @@ namespace ClassicUO.Game.Managers
             }
 
             _nextWatch = Time.Ticks + 1000;
+
+            if (Settings.GlobalSettings.AutoRecoverHouseContents)
+            {
+                int repaired = Sweep();
+
+                if (repaired > 0)
+                {
+                    HouseDiagnostics.Note($"sweep repaired={repaired}");
+
+                    GameActions.Print(
+                        $"Put back {repaired} item{(repaired == 1 ? "" : "s")} the client had lost track of.",
+                        68,
+                        MessageType.System
+                    );
+                }
+            }
 
             Watch();
         }
@@ -139,32 +156,11 @@ namespace ClassicUO.Game.Managers
                 return;
             }
 
-            // Nothing in the house. Two flavours: it had contents a moment ago and they
-            // went away, which is the bug outright; or it has never had any since the
-            // player walked in, which is either the bug at load time or an empty house.
-            bool lost = _best > 0;
-
-            if (!lost && Time.Ticks - _enteredAt < GraceMs)
+            // Nothing in the house at all, and nothing ever was since the player walked
+            // in. That is not evidence of anything: empty houses exist. Only contents
+            // that were there and then left the world are worth a packet.
+            if (_best == 0 || components == 0 || Time.Ticks - _enteredAt < GraceMs)
             {
-                return;
-            }
-
-            // A structure that never arrived is a different failure and is asked for
-            // separately - a resync will not rebuild a design the client never got.
-            if (components == 0)
-            {
-                if (Time.Ticks - _lastAttempt >= CooldownMs && _attempts < MaxAttempts)
-                {
-                    _attempts++;
-                    _lastAttempt = Time.Ticks;
-
-                    NetClient.Socket.Send_CustomHouseDataRequest(_house);
-
-                    HouseDiagnostics.Note(
-                        $"retry house=0x{_house:X8} kind=design attempt={_attempts} components=0"
-                    );
-                }
-
                 return;
             }
 
@@ -185,25 +181,96 @@ namespace ClassicUO.Game.Managers
 
             HouseDiagnostics.Note(
                 $"retry house=0x{_house:X8} kind=resync attempt={_attempts}"
-                + $" components={components} best={_best} lost={lost}"
+                + $" components={components} best={_best}"
             );
 
             if (_attempts == 1)
             {
                 GameActions.Print(
-                    "House contents missing, asking the server again...",
+                    "House contents went missing, asking the server again...",
                     32,
                     MessageType.System
                 );
             }
-            else if (_attempts == MaxAttempts)
+        }
+
+        /// <summary>
+        /// Put back anything that is in the world but not linked into the tile it is
+        /// standing on.
+        ///
+        /// This is the repair for the failure in GameObject.RemoveFromTile: an object
+        /// still in World.Items, at real coordinates, which nothing can reach and so
+        /// nothing draws. It cannot be found by counting contents - the count includes
+        /// it - and no packet brings it back, because as far as the server is concerned
+        /// it was delivered. Walking out and back in worked because that tore the chunk
+        /// down and relinked everything from scratch.
+        ///
+        /// Costs one short walk of a tile's list per nearby item, once a second, and is
+        /// worth keeping even with the cause fixed: it is cheap, it says in the log
+        /// exactly what it put back, and there is more than one way to unlink an object.
+        /// </summary>
+        private static int Sweep()
+        {
+            if (World.Map == null)
             {
-                GameActions.Print(
-                    "House contents still missing after several tries.",
-                    32,
-                    MessageType.System
-                );
+                return 0;
             }
+
+            int repaired = 0;
+
+            uint held = Client.Game.GameCursor.ItemHold.Enabled
+                ? Client.Game.GameCursor.ItemHold.Serial
+                : 0;
+
+            foreach (Item item in World.Items.Values)
+            {
+                if (item == null || item.IsDestroyed || !item.OnGround || item.Serial == held)
+                {
+                    continue;
+                }
+
+                // Beyond the view range it is on its way out anyway, and the tile it
+                // claims to stand on may not be loaded.
+                if (item.Distance > World.ClientViewRange + (item.IsMulti ? item.MultiDistanceBonus : 0))
+                {
+                    continue;
+                }
+
+                if (LinkedToItsTile(item))
+                {
+                    continue;
+                }
+
+                HouseDiagnostics.LogOrphanRepaired(item);
+
+                item.AddToTile();
+
+                repaired++;
+            }
+
+            return repaired;
+        }
+
+        private static bool LinkedToItsTile(Item item)
+        {
+            Chunk chunk = World.Map.GetChunk(item.X, item.Y, false);
+
+            if (chunk == null)
+            {
+                // No chunk loaded here, so there is nothing to be linked into and
+                // nothing to repair. Not the same thing as being orphaned.
+                return true;
+            }
+
+            for (GameObject o = chunk.GetHeadObject(item.X % 8, item.Y % 8); o != null; o = o.TNext)
+            {
+                if (ReferenceEquals(o, item))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         /// <summary>
