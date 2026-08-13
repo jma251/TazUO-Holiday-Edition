@@ -7,6 +7,10 @@
     <Platforms>x64</Platforms>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <!-- The SDK otherwise appends "+<commit sha>" to InformationalVersion, which is
+         where the Holiday tag lives. That turned a login label reading
+         "4.5.23-h28" into "4.5.23-h28+b1944b5c5390f6a1854695f1d8650cfeb0fd2fd6". -->
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>

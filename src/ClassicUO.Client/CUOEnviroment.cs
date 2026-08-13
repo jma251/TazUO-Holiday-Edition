@@ -90,7 +90,11 @@ namespace ClassicUO
                     return "local build";
                 }
 
-                return informational;
+                // Belt and braces: the SDK appends "+<commit sha>" unless told not to,
+                // and a stale build or a different SDK may still do it.
+                int plus = informational.IndexOf('+');
+
+                return plus < 0 ? informational : informational.Substring(0, plus);
             }
             catch
             {
