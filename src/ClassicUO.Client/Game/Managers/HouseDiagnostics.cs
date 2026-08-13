@@ -229,7 +229,7 @@ namespace ClassicUO.Game.Managers
                         path,
                         "#" + Environment.NewLine
                         + "# ==== session " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture) + " ====" + Environment.NewLine
-                        + "#   client   " + CUOEnviroment.Version + Environment.NewLine
+                        + "#   client   " + CUOEnviroment.Version + "  (" + CUOEnviroment.BuildTag + ")" + Environment.NewLine
                         + "#" + Environment.NewLine
                     );
                 }
