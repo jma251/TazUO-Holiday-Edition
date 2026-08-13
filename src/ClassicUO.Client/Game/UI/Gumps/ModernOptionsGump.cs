@@ -2345,7 +2345,7 @@ namespace ClassicUO.Game.UI.Gumps
             (
                 s = new SettingsOption
                 (
-                    "", new CheckboxWithLabel(lang.GetExperimental.LogHouseDiagnostics, 0, Settings.GlobalSettings.LogHouseDiagnostics, (b) => { Settings.GlobalSettings.LogHouseDiagnostics = b; }),
+                    "", new CheckboxWithLabel(lang.GetExperimental.LogHouseDiagnostics, 0, Settings.GlobalSettings.LogHouseDiagnostics, (b) => { Settings.GlobalSettings.LogHouseDiagnostics = b; HouseDiagnostics.Announce(); }),
                     MainContent.RightWidth, (int)PAGE.Experimental
                 )
             );
