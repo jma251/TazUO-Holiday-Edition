@@ -137,7 +137,10 @@ jobs:
       # Publish the client. IS_DEV_BUILD=true produces a windowed (WinExe) build.
       # The csproj's post-publish targets copy the native libs into bin/dist/x64.
       - name: Publish client
-        run: dotnet publish ${{ env.CUO_PROJECT_PATH }} -c Release -o ${{ env.CUO_OUTPUT_PATH }} -p:IS_DEV_BUILD=true
+        # InformationalVersion carries the Holiday tag into the binary. The assembly
+        # version is TazUO's and is identical in every Holiday build, so without this
+        # a log or a screenshot cannot say which build produced it.
+        run: dotnet publish ${{ env.CUO_PROJECT_PATH }} -c Release -o ${{ env.CUO_OUTPUT_PATH }} -p:IS_DEV_BUILD=true -p:InformationalVersion=${{ env.HOLIDAY_TAG }}
 
       # The client can load natives from the x64 subfolder, but to be safe we
       # also place SDL2/FNA3D/FAudio (and the rest) right next to ClassicUO.exe,

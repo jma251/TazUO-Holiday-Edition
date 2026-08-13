@@ -173,7 +173,7 @@ namespace ClassicUO.Game.Managers
                 path,
                 "#" + Environment.NewLine +
                 "# ==== session " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture) + " ====" + Environment.NewLine +
-                "#   client            " + CUOEnviroment.Version + Environment.NewLine +
+                "#   client            " + CUOEnviroment.Version + "  (" + CUOEnviroment.BuildTag + ")" + Environment.NewLine +
                 "#   music era         " + era + Environment.NewLine +
                 "#   region music      " + mode + Environment.NewLine +
                 "#   ignore stop       " + (s.IgnoreServerStopMusic ? "yes" : "no") + Environment.NewLine +

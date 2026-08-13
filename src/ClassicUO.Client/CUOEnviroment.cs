@@ -55,6 +55,38 @@ namespace ClassicUO
         public static readonly bool IsUnix = Environment.OSVersion.Platform != PlatformID.Win32NT && Environment.OSVersion.Platform != PlatformID.Win32Windows && Environment.OSVersion.Platform != PlatformID.Win32S && Environment.OSVersion.Platform != PlatformID.WinCE;
 
         public static readonly Version Version = Assembly.GetExecutingAssembly().GetName().Version;
+
+        /// <summary>
+        /// The Holiday build this binary came from, e.g. "v4.5.23-h26". The assembly
+        /// version is TazUO's and is the same in every Holiday build, so it cannot tell
+        /// one from another - which makes a log or a bug report ambiguous about which
+        /// build produced it. The release workflow stamps the tag in as the
+        /// informational version; a local build has none and says so.
+        /// </summary>
+        public static readonly string BuildTag = ReadBuildTag();
+
+        private static string ReadBuildTag()
+        {
+            try
+            {
+                string informational = Assembly.GetExecutingAssembly()
+                    .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+                    ?.InformationalVersion;
+
+                // The SDK falls back to the plain version when nothing is stamped, which
+                // is no more use than the assembly version itself.
+                if (string.IsNullOrWhiteSpace(informational) || informational.IndexOf("-h", StringComparison.Ordinal) < 0)
+                {
+                    return "local build";
+                }
+
+                return informational;
+            }
+            catch
+            {
+                return "unknown";
+            }
+        }
         public static readonly string ExecutablePath = 
 #if NETFRAMEWORK
            Path.GetDirectoryName(Assembly.GetEntryAssembly()?.Location);
