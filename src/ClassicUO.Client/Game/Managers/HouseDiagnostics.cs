@@ -673,14 +673,20 @@ namespace ClassicUO.Game.Managers
         // one second of tail is at risk if the client is killed outright.
         private static StreamWriter _writer;
         private static uint _lastFlush;
-        private static bool _writerFailed;
+        /// <summary>Earliest tick at which opening the log may be attempted again.</summary>
+        private static uint _retryWriterAt;
 
         // Packets are read on the network path and everything else on the game loop, so
         // two threads can reach this at once. One lock, held only for the write itself.
         private static readonly object _sync = new object();
 
-        /// <summary>Size at which the log is rolled, so a long session cannot grow past uploading.</summary>
-        private const long MaxBytes = 128L * 1024L * 1024L;
+        /// <summary>
+        /// Size at which the log is rolled. 25 MB because that is what can actually be
+        /// sent for reading - a 32 MB log was over the limit and had to be zipped by
+        /// hand. Two files are kept, so the useful window is 50 MB, and the newest is
+        /// always houselog.txt.
+        /// </summary>
+        private const long MaxBytes = 25L * 1024L * 1024L;
 
         private static void Write(string line)
         {
