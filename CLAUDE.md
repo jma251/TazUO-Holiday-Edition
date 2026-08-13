@@ -199,6 +199,12 @@ They used to chain off `Build-Test` completing:
   the legacy release.
 - `tuo-dev-deploy.yml` fired on `dev`, which is not a release path here.
 
+`features-bot.yml` and its `FeaturesBot.py` were **deleted** rather than reduced.
+That one was not a deploy path at all — it posted feature advertisements to
+upstream's Discord on a twice-daily cron, so in this fork it woke up at 07:00 and
+19:00 to fail on a `DISCORD_WEBHOOK` secret that will never exist here. There is
+no Discord to announce to, so there is nothing to keep.
+
 `Build-Test` still runs on every push and PR. That is intentional: it only
 compiles and uploads artifacts, and never publishes a release.
 
