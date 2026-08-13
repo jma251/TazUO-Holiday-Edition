@@ -1048,6 +1048,9 @@ namespace ClassicUO
         {
             Scene?.Dispose();
 
+            // The log is buffered, so a clean exit has to push the tail out.
+            Game.Managers.HouseDiagnostics.Flush();
+
             base.OnExiting(sender, args);
         }
 

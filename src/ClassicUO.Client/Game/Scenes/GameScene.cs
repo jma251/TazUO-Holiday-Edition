@@ -448,6 +448,8 @@ namespace ClassicUO.Game.Scenes
             // session inherits it - which is how the login music came back.
             Client.Game.Audio?.ForgetMusicState();
 
+            HouseContentsWatchdog.Reset();
+
             Client.Game.SetWindowTitle(string.Empty);
             Client.Game.GameCursor.ItemHold.Clear();
 
@@ -911,6 +913,7 @@ namespace ClassicUO.Game.Scenes
             }
 
             World.Update();
+            HouseContentsWatchdog.Update();
             _animatedStaticsManager.Process();
             BoatMovingManager.Update();
             Pathfinder.ProcessAutoWalk();

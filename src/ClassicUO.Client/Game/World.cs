@@ -567,6 +567,8 @@ namespace ClassicUO.Game
                 return false;
             }
 
+            HouseDiagnostics.LogItemRemoved(item, forceRemove ? "removed_forced" : "removed");
+
             LinkedObject first = item.Items;
             RemoveItemFromContainer(item);
 
