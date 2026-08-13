@@ -53,14 +53,11 @@ namespace ClassicUO.Game.Managers
                 return;
             }
 
-            // The filter exists so walking past ordinary ground clutter does not drown
-            // the file. Multis are rare and are the thing being investigated, so they
-            // are always recorded - a house multi culled while the player was outdoors
-            // used to leave no trace at all.
-            if (!TryGetHouseContainingPlayer(out uint houseSerial) && !item.IsMulti)
-            {
-                return;
-            }
+            // No filter. Every cull is recorded, wherever the player is standing. The
+            // old gate only logged culls while indoors, which hid the exact event under
+            // investigation: a house's contents being dropped while the player was on
+            // their way home. Disk is cheaper than another round of guessing.
+            TryGetHouseContainingPlayer(out uint houseSerial);
 
             // Which house the item itself belongs to, which is not necessarily the
             // one the player is standing in - the old line could not tell those apart.
@@ -89,6 +86,56 @@ namespace ClassicUO.Game.Managers
         /// house used while positioning a deed - the one that claims every object in
         /// the world when it is left behind.
         /// </summary>
+        /// <summary>
+        /// How many items are actually standing inside a house's footprint right now.
+        /// Components are the walls and floor, which are never the thing that goes
+        /// missing; this counts the contents, so "the house is here and the stuff in it
+        /// is not" becomes a number that can be compared before and after.
+        /// </summary>
+        public static int CountContents(uint houseSerial)
+        {
+            int n = 0;
+
+            try
+            {
+                foreach (Item item in World.Items.Values)
+                {
+                    if (item != null && !item.IsDestroyed && item.OnGround && item.Serial != houseSerial
+                        && World.HouseManager.EntityIntoHouse(houseSerial, item))
+                    {
+                        n++;
+                    }
+                }
+            }
+            catch
+            {
+                return -1;
+            }
+
+            return n;
+        }
+
+        /// <summary>The contents count for every house the client currently holds.</summary>
+        public static void LogContentsCensus(string why)
+        {
+            if (!IsEnabled)
+            {
+                return;
+            }
+
+            try
+            {
+                foreach (House house in World.HouseManager.Houses)
+                {
+                    Write($"census\thouse=0x{house.Serial:X8}\treason={why}"
+                          + $"\tcomponents={house.Components.Count}\tcontents={CountContents(house.Serial)}");
+                }
+            }
+            catch
+            {
+            }
+        }
+
         public static void LogHouseRemoved(uint serial, string reason, int components)
         {
             if (!IsEnabled)
@@ -97,6 +144,30 @@ namespace ClassicUO.Game.Managers
             }
 
             Write($"removed\thouse=0x{serial:X8}\treason={reason}\tcomponents={components}");
+        }
+
+        /// <summary>
+        /// An item left the world by any route, not only the distance cull. If a
+        /// house's contents vanish without a single cull line, they were removed by
+        /// something else, and this is what says so.
+        /// </summary>
+        public static void LogItemRemoved(Item item, string reason)
+        {
+            if (!IsEnabled || item == null)
+            {
+                return;
+            }
+
+            TryGetHouseContaining(item, out uint itemHouse);
+
+            if (itemHouse == 0)
+            {
+                return;
+            }
+
+            Write($"item_gone\tserial=0x{item.Serial:X8}\tgraphic=0x{item.Graphic:X4}"
+                  + $"\titem=({item.X},{item.Y},{item.Z})\treason={reason}"
+                  + $"\titemhouse=0x{itemHouse:X8}");
         }
 
         public static void LogHouseRequest(uint serial)
@@ -116,7 +187,7 @@ namespace ClassicUO.Game.Managers
                 return;
             }
 
-            Write($"response\thouse=0x{serial:X8}");
+            Write($"response\thouse=0x{serial:X8}\tcontents={CountContents(serial)}");
         }
 
         private static bool TryGetHouseContainingPlayer(out uint houseSerial)
@@ -220,7 +291,8 @@ namespace ClassicUO.Game.Managers
                 ? "-"
                 : $"({World.Player.X},{World.Player.Y},{World.Player.Z})";
 
-            Write($"generate\thouse=0x{serial:X8}\tplayerinside={playerInside}\tplayer={at}\tcomponents={components}");
+            Write($"generate\thouse=0x{serial:X8}\tplayerinside={playerInside}\tplayer={at}"
+                  + $"\tcomponents={components}\tcontents={CountContents(serial)}");
         }
 
         private static void Write(string line)
