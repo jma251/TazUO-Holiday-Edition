@@ -58,6 +58,8 @@ namespace ClassicUO.Game.Managers
             {
                 if (_houses.TryGetValue(serial, out House house))
                 {
+                    HouseDiagnostics.LogHouseRemoved(serial, "out_of_range", house.Components.Count);
+
                     house.ClearComponents();
                     _houses.Remove(serial);
                 }
@@ -130,15 +132,22 @@ namespace ClassicUO.Game.Managers
         {
             if (TryGetHouse(serial, out House house))
             {
+                HouseDiagnostics.LogHouseRemoved(serial, "no_multi_item", house.Components.Count);
+
                 house.ClearComponents();
                 _houses.Remove(serial);
             }
         }
 
+        // The house being positioned from a deed is kept under serial zero. Left behind,
+        // it is the phantom that answers "yes, that is inside me" for every object in
+        // the world, because EntityIntoHouse says so for a house with no multi item.
         public void RemoveMultiTargetHouse()
         {
             if (_houses.TryGetValue(0, out House house))
             {
+                HouseDiagnostics.LogHouseRemoved(0, "placement_preview", house.Components.Count);
+
                 house.ClearComponents();
                 _houses.Remove(0);
             }

@@ -53,7 +53,11 @@ namespace ClassicUO.Game.Managers
                 return;
             }
 
-            if (!TryGetHouseContainingPlayer(out uint houseSerial))
+            // The filter exists so walking past ordinary ground clutter does not drown
+            // the file. Multis are rare and are the thing being investigated, so they
+            // are always recorded - a house multi culled while the player was outdoors
+            // used to leave no trace at all.
+            if (!TryGetHouseContainingPlayer(out uint houseSerial) && !item.IsMulti)
             {
                 return;
             }
@@ -72,6 +76,27 @@ namespace ClassicUO.Game.Managers
                 + $"\titemhouse=0x{itemHouse:X8}"
                 + $"\tismulti={item.IsMulti}\tbonus={item.MultiDistanceBonus}"
             );
+        }
+
+        /// <summary>
+        /// A house was thrown away, and why. The client only asks the server for a
+        /// house it does not have, so a request implies a removal - but the removal
+        /// itself was invisible, which left "something drops the house" unanswerable.
+        ///
+        /// The reasons are separate code paths and worth telling apart: out_of_range is
+        /// the distance cull, no_multi_item is a revision packet arriving for a house
+        /// whose multi is not in the world, and placement_preview is the serial-zero
+        /// house used while positioning a deed - the one that claims every object in
+        /// the world when it is left behind.
+        /// </summary>
+        public static void LogHouseRemoved(uint serial, string reason, int components)
+        {
+            if (!IsEnabled)
+            {
+                return;
+            }
+
+            Write($"removed\thouse=0x{serial:X8}\treason={reason}\tcomponents={components}");
         }
 
         public static void LogHouseRequest(uint serial)
