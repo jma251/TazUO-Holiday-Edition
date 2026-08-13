@@ -2719,6 +2719,7 @@ namespace ClassicUO.Network
             World.ClientViewRange = p.ReadUInt8();
 
             HouseDiagnostics.LogViewRange(World.ClientViewRange);
+            HouseDiagnostics.LogContentsCensus("viewrange_packet");
         }
 
         private static void BulletinBoardData(ref StackDataReader p)
