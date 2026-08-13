@@ -293,8 +293,6 @@ namespace ClassicUO.Game.GameObjects
 
         private unsafe void LoadMulti()
         {
-            WantUpdateMulti = false;
-
             short minX = 0;
             short minY = 0;
             short maxX = 0;
@@ -309,6 +307,13 @@ namespace ClassicUO.Game.GameObjects
             {
                 house.ClearComponents();
             }
+
+            // After ClearComponents, not before it. ClearComponents asks the house's item
+            // to reload its multi - which is right when something else calls it, and is
+            // this very method when it does not. Clearing the flag first meant the flag
+            // was set again on the way out, so a custom house tore itself down and built
+            // itself back up on every single frame, destroying every component each time.
+            WantUpdateMulti = false;
 
             ref UOFileIndex entry = ref MultiLoader.Instance.GetValidRefEntry(Graphic);
             MultiLoader.Instance.File.SetData(entry.Address, entry.FileSize);
