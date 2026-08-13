@@ -140,6 +140,7 @@ namespace ClassicUO.Network
                     _ = stream.Dequeue(packetBuffer, 0, packetlength);
 
                     PacketLogger.Default?.Log(packetBuffer.AsSpan(0, packetlength), false);
+                    HouseDiagnostics.LogPacket(packetBuffer.AsSpan(0, packetlength), false);
 
                     // TODO: the pluging function should allow Span<byte> or unsafe type only.
                     // The current one is a bad style decision.
@@ -6534,6 +6535,18 @@ namespace ClassicUO.Network
             Mobile mobile = null;
             Item item = null;
             Entity obj = World.Get(serial);
+
+            HouseDiagnostics.LogWorldObject(
+                serial,
+                (ushort)(graphic + graphic_inc),
+                x,
+                y,
+                z,
+                hue,
+                count,
+                type,
+                obj == null || obj.IsDestroyed
+            );
 
             if (
                 Client.Game.GameCursor.ItemHold.Enabled

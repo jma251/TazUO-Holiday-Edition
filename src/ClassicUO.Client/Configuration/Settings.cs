@@ -130,6 +130,11 @@ namespace ClassicUO.Configuration
         // character. Remove with HouseDiagnostics once the cause is known.
         [JsonPropertyName("log_house_diagnostics")] public bool LogHouseDiagnostics { get; set; } = false;
 
+        // Ask the server again when the player is standing inside a house that has been
+        // built but holds nothing - the failure that otherwise needs walking out and
+        // back in. Global rather than per-profile so it applies to every character.
+        [JsonPropertyName("auto_recover_house_contents")] public bool AutoRecoverHouseContents { get; set; } = true;
+
         [JsonPropertyName("shard_type")] public int ShardType { get; set; } // 0 = normal (no customization), 1 = old, 2 = outlands??
 
         [JsonPropertyName("fixed_time_step")] public bool FixedTimeStep { get; set; } = true;
