@@ -65,6 +65,16 @@ namespace ClassicUO
         /// </summary>
         public static readonly string BuildTag = ReadBuildTag();
 
+        /// <summary>
+        /// One short string for the login screen, where the label sits next to the
+        /// ClassicUO links and has little room. The Holiday tag already carries the base
+        /// version, so printing both ran the label underneath those links; this prints
+        /// the tag alone when there is one, and the assembly version when there is not.
+        /// </summary>
+        public static string DisplayVersion => BuildTag.StartsWith("v", StringComparison.Ordinal)
+            ? BuildTag.Substring(1)
+            : Version.ToString();
+
         private static string ReadBuildTag()
         {
             try
