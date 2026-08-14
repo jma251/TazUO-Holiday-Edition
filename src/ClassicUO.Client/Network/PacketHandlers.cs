@@ -392,23 +392,26 @@ namespace ClassicUO.Network
 
         /// <summary>
         /// A house has finished building, so what the player is allowed to see through
-        /// may have changed. This used to be done only when the client believed the
-        /// player was inside that house - a test taken at the one moment the geometry
-        /// had just changed underneath it, and the reason house interiors sometimes
-        /// stayed hidden until you stepped out and back in: the rebuild reported
-        /// playerinside=False, nothing forced the ceiling to recompute, and nothing
-        /// else would until the player moved.
+        /// may have changed - but only if the player is standing in that house.
         ///
-        /// The house being stood in is not the only one that can change what is
-        /// overhead, and recomputing is cheap - it walks two tiles, and the draw loop
-        /// calls it every frame anyway. It is simply done unconditionally now.
+        /// This ran unconditionally for a while, on the idea that any house finishing
+        /// could change what is overhead and that recomputing is cheap. Recomputing is
+        /// cheap; recomputing at the wrong moment is not, because UpdateMaxDrawZ(true)
+        /// does two things. It works out the ceiling, and it stamps the player position
+        /// it worked it out at - and the once-a-frame call that would normally correct
+        /// it returns early while that position is unchanged.
         ///
-        /// The old test was also the only thing keeping this away from a null player,
-        /// because EntityIntoHouse answers false for one. Hence InGame.
+        /// So a house built next to a player who has just recalled in got a ceiling
+        /// computed from the instant its geometry appeared, and that ceiling then stuck
+        /// until the player moved: roof gone, the whole inside of the house on show from
+        /// outside it.
+        ///
+        /// Inside the house a low ceiling is what is wanted, which is what the test was
+        /// always for.
         /// </summary>
-        private static void RecomputeDrawCeiling()
+        private static void RecomputeDrawCeiling(uint houseSerial)
         {
-            if (!World.InGame)
+            if (!World.InGame || !World.HouseManager.EntityIntoHouse(houseSerial, World.Player))
             {
                 return;
             }
@@ -4869,7 +4872,7 @@ namespace ClassicUO.Network
                             house.Components.Count
                         );
 
-                        RecomputeDrawCeiling();
+                        RecomputeDrawCeiling(serial);
                     }
 
                     break;
@@ -5641,7 +5644,7 @@ namespace ClassicUO.Network
                 house.Components.Count
             );
 
-            RecomputeDrawCeiling();
+            RecomputeDrawCeiling(serial);
 
             BoatMovingManager.ClearSteps(serial);
         }
