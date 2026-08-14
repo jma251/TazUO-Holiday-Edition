@@ -449,6 +449,7 @@ namespace ClassicUO.Game.Scenes
             Client.Game.Audio?.ForgetMusicState();
 
             HouseContentsWatchdog.Reset();
+            DistantMobileRefresh.Reset();
 
             Client.Game.SetWindowTitle(string.Empty);
             Client.Game.GameCursor.ItemHold.Clear();
@@ -914,6 +915,7 @@ namespace ClassicUO.Game.Scenes
 
             World.Update();
             HouseContentsWatchdog.Update();
+            DistantMobileRefresh.Update();
             _animatedStaticsManager.Process();
             BoatMovingManager.Update();
             Pathfinder.ProcessAutoWalk();

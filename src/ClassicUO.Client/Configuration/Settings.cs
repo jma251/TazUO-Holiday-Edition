@@ -150,6 +150,10 @@ namespace ClassicUO.Configuration
 
         [JsonPropertyName("mobile_draw_range")] public int MobileDrawRange { get; set; } = 24;
 
+        // Index into DistantMobileRefresh.Intervals. Zero is off, which is the default:
+        // each tick costs a full resend of everything in range.
+        [JsonPropertyName("distant_mobile_refresh")] public int DistantMobileRefresh { get; set; }
+
         [JsonPropertyName("shard_type")] public int ShardType { get; set; } // 0 = normal (no customization), 1 = old, 2 = outlands??
 
         [JsonPropertyName("fixed_time_step")] public bool FixedTimeStep { get; set; } = true;
