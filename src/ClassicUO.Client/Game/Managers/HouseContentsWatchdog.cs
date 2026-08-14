@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using ClassicUO.Configuration;
 using ClassicUO.Game.Data;
 using ClassicUO.Game.GameObjects;
@@ -97,6 +98,9 @@ namespace ClassicUO.Game.Managers
             _best = 0;
             _attempts = 0;
             _lastAttempt = 0;
+
+            // What a house was seen holding belongs to the session that saw it.
+            _mostSeen.Clear();
         }
 
         private static void Watch()
@@ -151,20 +155,38 @@ namespace ClassicUO.Game.Managers
                 return;
             }
 
-            if (contents > 0)
+            // How much this house has ever been seen holding, which is the only thing
+            // that can tell a house that failed to load from a house that is empty.
+            //
+            // Watching for contents falling to nothing inside a single visit was not
+            // enough, and the log says exactly why: the player rode home, the server
+            // sent sixteen of two hundred and thirty-eight items and stopped, and the
+            // player walked in on sixteen. Nothing dropped, so nothing looked wrong -
+            // and moving around inside did not help, because the two item packets that
+            // arrived over the next ten minutes were all the server was going to send.
+            // What it took was stepping off the foundation and back on.
+            //
+            // Held per house, so an empty house is still known to be empty and is never
+            // asked about, and a house that has held two hundred items and is showing
+            // sixteen is not mistaken for one.
+            if (!_mostSeen.TryGetValue(_house, out int mostSeen) || contents > mostSeen)
+            {
+                _mostSeen[_house] = contents;
+
+                return;
+            }
+
+            if (components == 0 || Time.Ticks - _enteredAt < GraceMs)
             {
                 return;
             }
 
-            // Nothing in the house at all, and nothing ever was since the player walked
-            // in. That is not evidence of anything: empty houses exist. Only contents
-            // that were there and then left the world are worth a packet.
-            if (_best == 0 || components == 0 || Time.Ticks - _enteredAt < GraceMs)
-            {
-                return;
-            }
+            // Well short of what this house is known to hold. Half is deliberately
+            // coarse: a few things moved or taken since last time is normal, most of the
+            // room missing is not.
+            bool wellShort = mostSeen > 0 && (contents == 0 || contents * 2 < mostSeen);
 
-            if (!Settings.GlobalSettings.AutoRecoverHouseContents)
+            if (!wellShort || !Settings.GlobalSettings.AutoRecoverHouseContents)
             {
                 return;
             }
@@ -177,22 +199,28 @@ namespace ClassicUO.Game.Managers
             _attempts++;
             _lastAttempt = Time.Ticks;
 
+            // Ask for everything in range again. Walking out of the door and back in is
+            // what fixes this by hand; the server answers this packet with the same
+            // thing, without needing the player to do it.
             NetClient.Socket.Send_Resync();
 
             HouseDiagnostics.Note(
                 $"retry house=0x{_house:X8} kind=resync attempt={_attempts}"
-                + $" components={components} best={_best}"
+                + $" components={components} contents={contents} mostseen={mostSeen}"
             );
 
             if (_attempts == 1)
             {
                 GameActions.Print(
-                    "House contents went missing, asking the server again...",
+                    $"House is showing {contents} of {mostSeen} items, asking the server again...",
                     32,
                     MessageType.System
                 );
             }
         }
+
+        /// <summary>The most this house has ever been seen holding, by serial.</summary>
+        private static readonly Dictionary<uint, int> _mostSeen = new Dictionary<uint, int>();
 
         /// <summary>
         /// Put back anything that is in the world but not linked into the tile it is
