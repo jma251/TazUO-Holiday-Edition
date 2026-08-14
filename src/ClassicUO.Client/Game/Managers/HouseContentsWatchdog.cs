@@ -252,6 +252,28 @@ namespace ClassicUO.Game.Managers
                 return;
             }
 
+            int contents = HouseDiagnostics.CountContents(serial);
+
+            // Nothing to ask for if the house is already holding as much as it has ever
+            // been seen holding. Asking anyway is not free: the answer re-sends every
+            // item in the room, and putting an item back on a tile that is already full
+            // means walking that tile's list to find where it sorts, which is far more
+            // work than dropping it onto a bare one. A whole furnished room re-seated in
+            // a frame is the stutter, and half the asks in a captured session were this
+            // - a full house being sent a full house.
+            //
+            // With no record of the house at all this cannot tell a house that failed to
+            // load from one that is genuinely empty, so it asks. That is the case the
+            // entry ask exists for.
+            if (_mostSeen.TryGetValue(serial, out int mostSeen) && mostSeen > 0 && contents >= mostSeen)
+            {
+                HouseDiagnostics.Note(
+                    $"entryskip house=0x{serial:X8} contents={contents} mostseen={mostSeen}"
+                );
+
+                return;
+            }
+
             // Counts as an ask, so the shortfall test waits its cooldown rather than
             // sending a second one on top. Without this the entry ask left the cooldown
             // at zero and a second resync went out three seconds later, while the first
@@ -262,7 +284,7 @@ namespace ClassicUO.Game.Managers
             NetClient.Socket.Send_Resync();
 
             HouseDiagnostics.Note(
-                $"entryask house=0x{serial:X8} kind=resync contents={HouseDiagnostics.CountContents(serial)}"
+                $"entryask house=0x{serial:X8} kind=resync contents={contents} mostseen={mostSeen}"
             );
         }
 
