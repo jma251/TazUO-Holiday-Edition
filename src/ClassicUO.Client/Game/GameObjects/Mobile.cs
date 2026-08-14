@@ -49,6 +49,7 @@ namespace ClassicUO.Game.GameObjects
             Constants.PREDICTABLE_CHUNKS,
             mobile =>
             {
+                mobile._inPool = false;
                 mobile.IsDestroyed = false;
                 mobile.Graphic = 0;
                 mobile.Steps.Clear();
@@ -1126,11 +1127,15 @@ namespace ClassicUO.Game.GameObjects
         /// </summary>
         internal void ReturnToPool()
         {
-            if (IsDestroyed && !(this is PlayerMobile))
+            // Once only. See the note on Item.ReturnToPool.
+            if (IsDestroyed && !_inPool && !(this is PlayerMobile))
             {
+                _inPool = true;
                 _pool.ReturnOne(this);
             }
         }
+
+        private bool _inPool;
 
         public struct Step
         {

@@ -53,6 +53,7 @@ namespace ClassicUO.Game.GameObjects
             Constants.PREDICTABLE_CHUNKS * 3,
             i =>
             {
+                i._inPool = false;
                 i.IsDestroyed = false;
                 i.Graphic = 0;
                 i.Amount = 0;
@@ -315,11 +316,17 @@ namespace ClassicUO.Game.GameObjects
         /// </summary>
         internal void ReturnToPool()
         {
-            if (IsDestroyed)
+            // Once only. Handing the same object over twice would put it on the pile
+            // twice and then give it out to two different serials at once, which is the
+            // very thing this is here to stop.
+            if (IsDestroyed && !_inPool)
             {
+                _inPool = true;
                 _pool.ReturnOne(this);
             }
         }
+
+        private bool _inPool;
 
         private unsafe void LoadMulti()
         {

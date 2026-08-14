@@ -407,7 +407,9 @@ namespace ClassicUO.Game
                 {
                     for (int i = 0; i < _toRemove.Count; i++)
                     {
-                        if (Mobiles.TryGetValue(_toRemove[i], out Mobile gone))
+                        // Still destroyed, and still the one that was condemned - never
+                        // take an entry out on the strength of a serial alone.
+                        if (Mobiles.TryGetValue(_toRemove[i], out Mobile gone) && gone.IsDestroyed)
                         {
                             Mobiles.Remove(_toRemove[i]);
 
@@ -478,7 +480,9 @@ namespace ClassicUO.Game
                 {
                     for (int i = 0; i < _toRemove.Count; i++)
                     {
-                        if (Items.TryGetValue(_toRemove[i], out Item gone))
+                        // Still destroyed, and still the one that was condemned. See the
+                        // matching note in the mobile sweep.
+                        if (Items.TryGetValue(_toRemove[i], out Item gone) && gone.IsDestroyed)
                         {
                             Items.Remove(_toRemove[i]);
 
@@ -577,6 +581,11 @@ namespace ClassicUO.Game
             if (item != null && item.IsDestroyed)
             {
                 Items.Remove(serial);
+
+                // The entry is out, so this one may be reused now rather than waiting
+                // for the sweep to come round. See Item.ReturnToPool.
+                item.ReturnToPool();
+
                 item = null;
             }
 
@@ -596,6 +605,11 @@ namespace ClassicUO.Game
             if (mob != null && mob.IsDestroyed)
             {
                 Mobiles.Remove(serial);
+
+                // The entry is out, so this one may be reused now rather than waiting
+                // for the sweep to come round. See Item.ReturnToPool.
+                mob.ReturnToPool();
+
                 mob = null;
             }
 
