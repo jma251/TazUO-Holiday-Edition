@@ -2529,6 +2529,30 @@ namespace ClassicUO.Game.UI.Gumps
             PositionHelper.PositionControl(s.FullControl);
             PositionHelper.BlankLine();
 
+            // How far mobiles are drawn, which is a different question from how far the
+            // server is asked to send things. Takes effect immediately - nothing is
+            // thrown away, so there is nothing to ask for again.
+            scroll.Add
+            (
+                (s = new SettingsOption
+                (
+                    "", new SliderWithLabel
+                    (
+                        lang.GetExperimental.MobileDrawRange, 260, ThemeSettings.SLIDER_WIDTH,
+                        Constants.MIN_VIEW_RANGE, Constants.MAX_VIEW_RANGE,
+                        Settings.GlobalSettings.MobileDrawRange,
+                        (i) =>
+                        {
+                            Settings.GlobalSettings.MobileDrawRange = i;
+                            World.MobileDrawRangeSetting = i;
+                        }
+                    ), MainContent.RightWidth, (int)PAGE.Experimental
+                )
+            ).FullControl);
+
+            PositionHelper.PositionControl(s.FullControl);
+            PositionHelper.BlankLine();
+
             // Room past the last option. The scroll extent is measured from where the
             // children end, so without something below it the final row sits right on
             // the edge and reads as cut off.

@@ -2459,6 +2459,13 @@ namespace ClassicUO.Network
                     NetClient.Socket.Send_ClientViewRange(World.ClientViewRange);
                 }
 
+                // Not sent anywhere - the server has no say in how far the client draws
+                // what it has already been given.
+                World.MobileDrawRangeSetting = Math.Max(
+                    Constants.MIN_VIEW_RANGE,
+                    Math.Min(Constants.MAX_VIEW_RANGE, Settings.GlobalSettings.MobileDrawRange)
+                );
+
                 // Reset the global action cooldown here because, for some reason, immediately
                 // sending multiple actions (e.g. reopening paperdoll and reopening containers)
                 // results in the server telling the client it must wait to perform actions.

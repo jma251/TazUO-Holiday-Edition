@@ -148,6 +148,8 @@ namespace ClassicUO.Configuration
         // and says so. Global rather than per-profile so it applies to every character.
         [JsonPropertyName("client_view_range")] public int ClientViewRange { get; set; } = 24;
 
+        [JsonPropertyName("mobile_draw_range")] public int MobileDrawRange { get; set; } = 24;
+
         [JsonPropertyName("shard_type")] public int ShardType { get; set; } // 0 = normal (no customization), 1 = old, 2 = outlands??
 
         [JsonPropertyName("fixed_time_step")] public bool FixedTimeStep { get; set; } = true;
