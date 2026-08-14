@@ -833,9 +833,9 @@ namespace ClassicUO.Game.Managers
             }
             catch
             {
-                // Somewhere unwritable, or the file is held open elsewhere. Give up
-                // quietly and permanently rather than retrying on every packet.
-                _writerFailed = true;
+                // Somewhere unwritable, or the file is held open elsewhere. The retry
+                // clock set above keeps this from being attempted on every packet, and
+                // the next attempt is thirty seconds away rather than never.
                 _writer = null;
             }
 
