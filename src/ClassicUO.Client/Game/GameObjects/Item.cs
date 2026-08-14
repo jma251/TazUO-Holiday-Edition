@@ -306,6 +306,18 @@ namespace ClassicUO.Game.GameObjects
             else
             {
                 house.ClearComponents();
+
+                // What follows replaces the design with the plain multi out of the file,
+                // so the house is no longer the custom one it still claims to be.
+                //
+                // Leaving those alone left the client believing it held the design it
+                // had just thrown away: the next revision packet matched, took the
+                // "already have this one" branch, and never asked for it again. The
+                // house stood as a bare shell of a few hundred generic pieces - no
+                // walls, no floor, the contents sitting on open ground - until it went
+                // out of range entirely and was fetched from scratch.
+                house.Revision = 0;
+                house.IsCustom = false;
             }
 
             // After ClearComponents, not before it. ClearComponents asks the house's item

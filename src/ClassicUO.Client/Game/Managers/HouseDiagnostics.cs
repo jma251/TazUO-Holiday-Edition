@@ -645,24 +645,6 @@ namespace ClassicUO.Game.Managers
         /// </summary>
         public static int KeptByHouse;
 
-        /// <summary>
-        /// An item that was in the world but linked to nothing, and has been put back.
-        /// This is the thing that was invisible, named.
-        /// </summary>
-        public static void LogOrphanRepaired(Item item)
-        {
-            if (!IsEnabled || item == null)
-            {
-                return;
-            }
-
-            TryGetHouseContaining(item, out uint itemHouse);
-
-            Write($"orphan\tserial=0x{item.Serial:X8}\tgraphic=0x{item.Graphic:X4}"
-                  + $"\tat=({item.X},{item.Y},{item.Z})\tdistance={item.Distance}"
-                  + $"\titemhouse=0x{itemHouse:X8}");
-        }
-
         /// <summary>A free-form line, for anything that does not deserve its own event.</summary>
         public static void Note(string what)
         {
@@ -728,6 +710,16 @@ namespace ClassicUO.Game.Managers
                     {
                         _lastFlush = Time.Ticks;
                         FlushHard(writer);
+
+                        // The size was only ever checked when the file was opened, and
+                        // that happens once a session - so the limit applied across
+                        // restarts and did nothing at all while playing. One session
+                        // reached five hundred megabytes against a twenty-five megabyte
+                        // limit. Closing here is what rolls it: the next line reopens.
+                        if (writer.BaseStream.Length > MaxBytes)
+                        {
+                            Close();
+                        }
                     }
                 }
             }
@@ -807,7 +799,10 @@ namespace ClassicUO.Game.Managers
                 bool fresh = !File.Exists(path);
 
                 _writer = new StreamWriter(
-                    new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.ReadWrite, 1 << 16),
+                    // Delete as well as ReadWrite: without it the file can be read while
+                    // the client holds it but not moved, renamed or deleted, so it has
+                    // to be copied before it can be sent anywhere.
+                    new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete, 1 << 16),
                     Encoding.UTF8,
                     1 << 16
                 );
@@ -854,7 +849,13 @@ namespace ClassicUO.Game.Managers
         {
             if (!Settings.GlobalSettings.LogHouseDiagnostics)
             {
-                GameActions.Print("House logging is OFF.", 32, Data.MessageType.System);
+                Close();
+
+                GameActions.Print(
+                    "House logging is OFF. Data/houselog.txt is released.",
+                    32,
+                    Data.MessageType.System
+                );
 
                 return;
             }
@@ -886,6 +887,32 @@ namespace ClassicUO.Game.Managers
                 size < 0 ? (ushort)32 : (ushort)68,
                 Data.MessageType.System
             );
+        }
+
+        /// <summary>
+        /// Let go of the file.
+        ///
+        /// Unticking the option stopped the writing but not the holding: the handle
+        /// stayed open for the life of the client, so the log could not be moved or
+        /// deleted until the game was closed. Called when the option is turned off, and
+        /// when the file has grown past its limit and wants rolling.
+        /// </summary>
+        public static void Close()
+        {
+            lock (_sync)
+            {
+                try
+                {
+                    _writer?.Flush();
+                    _writer?.Dispose();
+                }
+                catch
+                {
+                }
+
+                _writer = null;
+                _retryWriterAt = 0;
+            }
         }
 
         /// <summary>Push whatever is buffered to disk. Called when the client shuts down cleanly.</summary>

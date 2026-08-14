@@ -340,8 +340,19 @@ namespace ClassicUO.Game
                     _timeToDelete = Time.Ticks + 50;
                 }
 
-                foreach (Mobile mob in Mobiles.Values)
+                // Walked by key, and taken out by key below.
+                //
+                // The key an entity is filed under and the serial the entity itself
+                // carries can drift apart. A destroyed entity goes back to a pool, and
+                // the pool can hand it out again under a different serial before this
+                // sweep runs - so the old key is left pointing at a live object whose
+                // serial is now something else. Taking the entry out by the object's
+                // serial then removes the wrong one and leaves the stale key behind for
+                // the rest of the session, where nothing can ever look it up again.
+                foreach (KeyValuePair<uint, Mobile> pair in Mobiles)
                 {
+                    Mobile mob = pair.Value;
+
                     mob.Update();
 
                     if (do_delete && mob.Distance > ClientViewRange /*CheckToRemove(mob, ClientViewRange)*/)
@@ -351,7 +362,7 @@ namespace ClassicUO.Game
 
                     if (mob.IsDestroyed)
                     {
-                        _toRemove.Add(mob.Serial);
+                        _toRemove.Add(pair.Key);
                     }
                     else
                     {
@@ -402,8 +413,20 @@ namespace ClassicUO.Game
                     HouseDiagnostics.KeptByHouse = 0;
                 }
 
-                foreach (Item item in Items.Values)
+                // By key, for the reason given over the mobile sweep above. This is the
+                // one that was caught doing it: an item left under a stale key cannot be
+                // found by RemoveItem, so it is never destroyed and never swept out, and
+                // the distance cull condemns it twenty times a second for the rest of
+                // the session. One log had a single item condemned 8,963 times and
+                // actually removed 3, and 458 MB of the 563 MB file was that.
+                //
+                // It is also how a house comes to have no multi item while still being
+                // held, which makes it claim every object on the map and makes the
+                // client rebuild it as a plain shell it then never asks to replace.
+                foreach (KeyValuePair<uint, Item> pair in Items)
                 {
+                    Item item = pair.Value;
+
                     item.Update();
 
                     // A multi is kept while any part of it is in range, not only its
@@ -433,7 +456,7 @@ namespace ClassicUO.Game
 
                     if (item.IsDestroyed)
                     {
-                        _toRemove.Add(item.Serial);
+                        _toRemove.Add(pair.Key);
                     }
                 }
 
