@@ -224,7 +224,6 @@ namespace ClassicUO.Game.GameObjects
             {
                 GameObject successor = TNext ?? TPrevious;
 
-                HouseDiagnostics.LogTileHeadHandover(this, successor);
 
                 chunk.Tiles[TileCellX, TileCellY] = successor;
             }

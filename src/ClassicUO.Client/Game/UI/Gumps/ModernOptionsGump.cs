@@ -2348,23 +2348,14 @@ namespace ClassicUO.Game.UI.Gumps
             PositionHelper.BlankLine();
 
             // Temporary diagnostic, global like the one above.
+
+
+            // Temporary diagnostic, global like the one above.
             scroll.Add
             (
                 (s = new SettingsOption
                 (
-                    "", new CheckboxWithLabel(lang.GetExperimental.LogHouseDiagnostics, 0, Settings.GlobalSettings.LogHouseDiagnostics, (b) => { Settings.GlobalSettings.LogHouseDiagnostics = b; HouseDiagnostics.Announce(); }),
-                    MainContent.RightWidth, (int)PAGE.Experimental
-                )
-            ).FullControl);
-
-            PositionHelper.PositionControl(s.FullControl);
-            PositionHelper.BlankLine();
-
-            scroll.Add
-            (
-                (s = new SettingsOption
-                (
-                    "", new CheckboxWithLabel(lang.GetExperimental.AutoRecoverHouseContents, 0, Settings.GlobalSettings.AutoRecoverHouseContents, (b) => { Settings.GlobalSettings.AutoRecoverHouseContents = b; }),
+                    "", new CheckboxWithLabel(lang.GetExperimental.LogHouseDiagnostics, 0, Settings.GlobalSettings.LogHouseDiagnostics, (b) => { Settings.GlobalSettings.LogHouseDiagnostics = b; }),
                     MainContent.RightWidth, (int)PAGE.Experimental
                 )
             ).FullControl);
@@ -2488,94 +2479,6 @@ namespace ClassicUO.Game.UI.Gumps
                             Settings.GlobalSettings.MusicOverlay = b;
 
                             MusicInfoGump.Toggle(b);
-                        }
-                    ), MainContent.RightWidth, (int)PAGE.Experimental
-                )
-            ).FullControl);
-
-            PositionHelper.PositionControl(s.FullControl);
-            PositionHelper.BlankLine();
-
-            // How far to ask the server to send things. Sent immediately so the effect
-            // can be seen without relogging; the server answers with what it granted,
-            // which is what actually takes effect.
-            scroll.Add
-            (
-                (s = new SettingsOption
-                (
-                    "", new SliderWithLabel
-                    (
-                        // A width for the label rather than zero. The other sliders pass
-                        // zero because their labels are two words; an unconstrained long
-                        // one runs on in a single line and pushes the slider off the
-                        // right-hand edge, and leaves the control reporting a width that
-                        // does not include the label it is sitting next to.
-                        lang.GetExperimental.ClientViewRange, 260, ThemeSettings.SLIDER_WIDTH,
-                        Constants.MIN_VIEW_RANGE, Constants.MAX_VIEW_RANGE,
-                        Settings.GlobalSettings.ClientViewRange,
-                        (i) =>
-                        {
-                            Settings.GlobalSettings.ClientViewRange = i;
-
-                            if (World.InGame)
-                            {
-                                NetClient.Socket.Send_ClientViewRange((byte)i);
-                            }
-                        }
-                    ), MainContent.RightWidth, (int)PAGE.Experimental
-                )
-            ).FullControl);
-
-            PositionHelper.PositionControl(s.FullControl);
-            PositionHelper.BlankLine();
-
-            // How far mobiles are drawn, which is a different question from how far the
-            // server is asked to send things. Takes effect immediately - nothing is
-            // thrown away, so there is nothing to ask for again.
-            scroll.Add
-            (
-                (s = new SettingsOption
-                (
-                    "", new SliderWithLabel
-                    (
-                        lang.GetExperimental.MobileDrawRange, 260, ThemeSettings.SLIDER_WIDTH,
-                        Constants.MIN_VIEW_RANGE, Constants.MAX_VIEW_RANGE,
-                        Settings.GlobalSettings.MobileDrawRange,
-                        (i) =>
-                        {
-                            Settings.GlobalSettings.MobileDrawRange = i;
-                            World.MobileDrawRangeSetting = i;
-                        }
-                    ), MainContent.RightWidth, (int)PAGE.Experimental
-                )
-            ).FullControl);
-
-            PositionHelper.PositionControl(s.FullControl);
-            PositionHelper.BlankLine();
-
-            // A test rig, not a feature - see DistantMobileRefresh. Each tick makes the
-            // server resend everything in range, so it stays off unless it is being
-            // measured.
-            scroll.Add
-            (
-                (s = new SettingsOption
-                (
-                    "", new ComboBoxWithLabel
-                    (
-                        lang.GetExperimental.DistantMobileRefresh, 0, ThemeSettings.COMBO_BOX_WIDTH,
-                        new string[]
-                        {
-                            lang.GetExperimental.DistantMobileRefreshOff,
-                            lang.GetExperimental.DistantMobileRefresh500,
-                            lang.GetExperimental.DistantMobileRefresh1000,
-                            lang.GetExperimental.DistantMobileRefresh2000,
-                            lang.GetExperimental.DistantMobileRefresh5000
-                        },
-                        Settings.GlobalSettings.DistantMobileRefresh,
-                        (i, n) =>
-                        {
-                            Settings.GlobalSettings.DistantMobileRefresh = i;
-                            DistantMobileRefresh.Reset();
                         }
                     ), MainContent.RightWidth, (int)PAGE.Experimental
                 )

@@ -114,50 +114,7 @@ namespace ClassicUO.Game
         public const int MIN_PICKUP_DRAG_DISTANCE_PIXELS = 5;
 
         public const int MIN_VIEW_RANGE = 5;
-
-        /// <summary>
-        /// What the client asks the server for, and what it draws out to, unless it is
-        /// asked for something else.
-        ///
-        /// Twenty-four is not a protocol limit. It is the largest useful value for a
-        /// 1024x768 game window, off a table of old client resolutions, and it has been
-        /// hard-coded here ever since. The server decides what it grants and tells the
-        /// client so, which is why this is a starting point rather than a rule.
-        /// </summary>
-        public const int DEFAULT_VIEW_RANGE = 24;
-
-        /// <summary>
-        /// How far mobiles are drawn, as opposed to how far they are kept.
-        ///
-        /// A RunUO-derived server sends a mobile out to whatever range the client asks
-        /// for, but it gathers the clients to tell about that mobile's *movement* with
-        /// GetObjectsInRange(location, Core.GlobalMaxUpdateRange), and that is a fixed
-        /// number of its own rather than the client's. Past it a mobile moves without
-        /// anyone being told, so a client holding one draws it standing where it used to
-        /// be until the two are close enough to be spoken about again, and then it jumps.
-        ///
-        /// Drawing is the right place to answer that, and culling is not: the server
-        /// counts a mobile it has sent as delivered and will not send it a second time,
-        /// so a client that throws one away past some distance has lost it until
-        /// something forces a fresh send. Held but not drawn keeps the server's
-        /// bookkeeping true and still spares the player the stale picture.
-        ///
-        /// Twenty-four is stock ServUO. A shard may have changed it, which is why this
-        /// is the default of a setting rather than a rule - the distance at which a
-        /// mobile stops jumping when approached is the real number for a given server.
-        /// </summary>
-        public const int DEFAULT_MOBILE_DRAW_RANGE = 24;
-
-        /// <summary>
-        /// The largest the view range may be asked for.
-        ///
-        /// Forty, because that is where asking stops buying anything on a RunUO-derived
-        /// server: both the per-step item send and SendEverything gather their
-        /// candidates with GetObjectsInRange(location, GlobalRadarRange), and
-        /// GlobalRadarRange is forty. Nothing further out is ever considered, whatever
-        /// range is asked for.
-        /// </summary>
-        public const int MAX_VIEW_RANGE = 40;
+        public const int MAX_VIEW_RANGE = 24;
         public const int MAX_CONTAINER_OPENED_ON_GROUND_RANGE = 3;
 
         public const int OUT_RANGE_COLOR = 0x038B;

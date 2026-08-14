@@ -465,16 +465,7 @@ namespace ClassicUO.Configuration
             public string DisableCtrlQWMessageHistory { get; set; } = "Disable Ctrl + Q/W (message history)";
             public string DisableRightLeftClickAutoMove { get; set; } = "Disable right + left click auto move";
             public string LogHouseDiagnostics { get; set; } = "Log house loading diagnostics to Data/houselog.txt";
-            public string AutoRecoverHouseContents { get; set; } = "Ask the server again when a house you are standing in loads empty";
             public string KeepHouseContentsLoaded { get; set; } = "Keep the contents of a house loaded for as long as the house itself is";
-            public string ClientViewRange { get; set; } = "Server view range (24 standard)";
-            public string MobileDrawRange { get; set; } = "Draw mobiles within (24 standard)";
-            public string DistantMobileRefresh { get; set; } = "Refresh distant mobiles (costs a full resend)";
-            public string DistantMobileRefreshOff { get; set; } = "Off";
-            public string DistantMobileRefresh500 { get; set; } = "Every 500ms";
-            public string DistantMobileRefresh1000 { get; set; } = "Every 1s";
-            public string DistantMobileRefresh2000 { get; set; } = "Every 2s";
-            public string DistantMobileRefresh5000 { get; set; } = "Every 5s";
             public string LogMusicIndices { get; set; } = "Log music indices to Data/musiclog.txt";
             public string MusicEra { get; set; } = "Music era";
             public string MusicEraDefault { get; set; } = "Default";

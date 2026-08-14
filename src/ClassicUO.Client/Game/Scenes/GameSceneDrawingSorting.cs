@@ -122,11 +122,6 @@ namespace ClassicUO.Game.Scenes
             int by = playerY;
             Chunk chunk = World.Map.GetChunk(bx, by, false);
 
-            // Recorded because this is what decides whether the inside of a house is
-            // visible, and it is cached on the player's position - a house that finishes
-            // building while the player stands still can leave it stale.
-            bool chunkMissing = chunk == null;
-
             if (chunk != null)
             {
                 int x = playerX % 8;
@@ -258,8 +253,6 @@ namespace ClassicUO.Game.Scenes
 
                 _maxGroundZ = maxGroundZ;
             }
-
-            Managers.HouseDiagnostics.LogDrawZ(force, chunkMissing, _maxZ, _maxGroundZ);
         }
 
         private void IsFoliageUnion(ushort graphic, int x, int y, int z)
@@ -958,16 +951,6 @@ namespace ClassicUO.Game.Scenes
                 }
                 else if (obj is Mobile mobile)
                 {
-                    // Past here the server has stopped saying where this one is going,
-                    // so what is held is where it used to be. Skipped rather than thrown
-                    // away: the server counts it as delivered and will not send it
-                    // again, so it has to be kept to be there when it comes back within
-                    // range. See Constants.DEFAULT_MOBILE_DRAW_RANGE.
-                    if (!ReferenceEquals(mobile, World.Player) && mobile.Distance > World.MobileDrawRange)
-                    {
-                        continue;
-                    }
-
                     UpdateObjectHandles(mobile, useObjectHandles);
 
                     maxObjectZ += Constants.DEFAULT_CHARACTER_HEIGHT;
