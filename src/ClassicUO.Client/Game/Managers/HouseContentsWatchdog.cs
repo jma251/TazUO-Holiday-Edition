@@ -71,6 +71,8 @@ namespace ClassicUO.Game.Managers
 
             _nextWatch = Time.Ticks + 1000;
 
+            ForgetUnloadedHouses();
+
             if (Settings.GlobalSettings.AutoRecoverHouseContents)
             {
                 int repaired = Sweep();
@@ -223,6 +225,45 @@ namespace ClassicUO.Game.Managers
 
         /// <summary>The most this house has ever been seen holding, by serial.</summary>
         private static readonly Dictionary<uint, int> _mostSeen = new Dictionary<uint, int>();
+
+        private static readonly List<uint> _forget = new List<uint>();
+
+        /// <summary>
+        /// Forget what a house was holding once the client has let go of the house.
+        ///
+        /// This is what keeps the entry ask honest. Skipping the ask for a house that is
+        /// already as full as it has ever been is safe for stepping out of the door and
+        /// back in - the count is seconds old and the house never left. It is not safe
+        /// across a house unloading and coming back, because that is precisely when it
+        /// arrives short: a house that only ever loaded sixteen items would have sixteen
+        /// recorded as its truth, and would be skipped ever after.
+        ///
+        /// Dropping the record with the house means a house that has been away always
+        /// gets asked about on the way back in, which is the case the ask exists for,
+        /// and only the cheap in-and-out hops are skipped.
+        /// </summary>
+        private static void ForgetUnloadedHouses()
+        {
+            if (_mostSeen.Count == 0)
+            {
+                return;
+            }
+
+            _forget.Clear();
+
+            foreach (KeyValuePair<uint, int> pair in _mostSeen)
+            {
+                if (!World.HouseManager.Exists(pair.Key) || World.Items.Get(pair.Key) == null)
+                {
+                    _forget.Add(pair.Key);
+                }
+            }
+
+            for (int i = 0; i < _forget.Count; i++)
+            {
+                _mostSeen.Remove(_forget[i]);
+            }
+        }
 
         /// <summary>
         /// One resync on stepping into a house, whatever it appears to be holding.
