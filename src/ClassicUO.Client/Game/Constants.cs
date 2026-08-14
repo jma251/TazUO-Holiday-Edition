@@ -127,6 +127,22 @@ namespace ClassicUO.Game
         public const int DEFAULT_VIEW_RANGE = 24;
 
         /// <summary>
+        /// How far a mobile may be kept, whatever the view range is set to.
+        ///
+        /// A RunUO-derived server sends items out to whatever range the client asks for,
+        /// but it gathers the clients to tell about a mobile's movement with
+        /// GetObjectsInRange(location, Core.GlobalMaxUpdateRange) - and that is a fixed
+        /// twenty-four, not the client's number. So a mobile further off than this moves
+        /// without anyone being told, and a client holding it draws it standing where it
+        /// was until the two are close enough to be spoken about again.
+        ///
+        /// Keeping mobiles to this while items keep the full view range is the pairing
+        /// the server actually supports: as far out as things are still described, and
+        /// no further.
+        /// </summary>
+        public const int MAX_MOBILE_VIEW_RANGE = 24;
+
+        /// <summary>
         /// The largest the view range may be asked for.
         ///
         /// Forty, because that is where asking stops buying anything on a RunUO-derived
