@@ -128,6 +128,49 @@ namespace ClassicUO.Game.Managers
             return false;
         }
 
+        /// <summary>
+        /// Is this object standing inside a house the client currently holds?
+        ///
+        /// Only a house whose multi item is still in the world counts. EntityIntoHouse
+        /// answers "yes" for every object once the multi is gone, so a house left behind -
+        /// the serial-zero placement preview above all - would otherwise claim the whole
+        /// map and nothing anywhere would ever be let go of.
+        /// </summary>
+        public bool IsInsideLoadedHouse(GameObject obj)
+        {
+            if (obj == null)
+            {
+                return false;
+            }
+
+            foreach (KeyValuePair<uint, House> pair in _houses)
+            {
+                if (pair.Key == 0)
+                {
+                    continue;
+                }
+
+                Item multi = World.Items.Get(pair.Key);
+
+                if (multi == null || multi.IsDestroyed || !multi.MultiInfo.HasValue)
+                {
+                    continue;
+                }
+
+                int minX = multi.X + multi.MultiInfo.Value.X;
+                int maxX = multi.X + multi.MultiInfo.Value.Width;
+                int minY = multi.Y + multi.MultiInfo.Value.Y;
+                int maxY = multi.Y + multi.MultiInfo.Value.Height;
+
+                if (obj.X >= minX && obj.X <= maxX && obj.Y >= minY && obj.Y <= maxY)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         public void Remove(uint serial)
         {
             if (TryGetHouse(serial, out House house))

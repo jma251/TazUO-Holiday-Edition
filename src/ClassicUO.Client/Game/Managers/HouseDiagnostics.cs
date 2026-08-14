@@ -558,7 +558,7 @@ namespace ClassicUO.Game.Managers
                       + $"\tcentre=({World.RangeSize.X},{World.RangeSize.Y})"
                       + $"\tviewrange={World.ClientViewRange}"
                       + $"\titems={World.Items.Count}\tmobiles={World.Mobiles.Count}"
-                      + $"\thouses={CountHouses()}");
+                      + $"\thouses={CountHouses()}\tkeptbyhouse={KeptByHouse}");
 
                 foreach (House house in World.HouseManager.Houses)
                 {
@@ -636,6 +636,14 @@ namespace ClassicUO.Game.Managers
         }
 
         private static long _handovers;
+
+        /// <summary>
+        /// How many items were spared the distance cull this frame because they were
+        /// standing inside a house the client still holds. Reset by World.Update each
+        /// pass and reported once a second, so the log says what the rule is doing
+        /// without a line per item per frame.
+        /// </summary>
+        public static int KeptByHouse;
 
         /// <summary>
         /// An item that was in the world but linked to nothing, and has been put back.

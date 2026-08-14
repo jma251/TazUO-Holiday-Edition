@@ -242,6 +242,51 @@ namespace ClassicUO.Game
         }
         */
 
+        /// <summary>
+        /// Is this item standing inside a house the client still holds, and therefore
+        /// not to be thrown away for distance?
+        ///
+        /// A multi already gets its own size added to how far away it may be before the
+        /// client lets go of it - a big house is not dropped the moment its centre tile
+        /// passes the view range, because you may still be standing on its porch. What
+        /// is inside it never got that allowance, and was let go of at the plain view
+        /// range like a rock on the road.
+        ///
+        /// That is what emptied a large house. Stepping a few tiles out of the south
+        /// door puts the far end past twenty-four tiles, so its contents were deleted
+        /// while the house itself, kept out to thirty-six, stood there complete. The
+        /// server was never told and had no reason to send them again, so the house
+        /// stayed furnished with nothing until something made it reload. In one
+        /// captured session that was seventy items at a single instant, and two hundred
+        /// and twenty-four distinct items deleted and re-sent over one play session.
+        ///
+        /// So nothing standing inside a house the client holds is dropped for distance
+        /// at all. There is no radius here on purpose: what the client already has costs
+        /// only memory to keep, and the house being let go of is the one moment its
+        /// contents should go with it - which is also what makes the server send the
+        /// whole lot again on the way back, so this cannot quietly rot into a stale
+        /// picture of a room.
+        ///
+        /// The view range itself is untouched. Twenty-four is the protocol maximum, the
+        /// client already asks for exactly that, and it is the server's to decide.
+        /// </summary>
+        private static bool KeptByItsHouse(Item item)
+        {
+            if (item.IsMulti || !Settings.GlobalSettings.KeepHouseContentsLoaded)
+            {
+                return false;
+            }
+
+            if (!HouseManager.IsInsideLoadedHouse(item))
+            {
+                return false;
+            }
+
+            HouseDiagnostics.KeptByHouse++;
+
+            return true;
+        }
+
         public static void Update()
         {
             if (Player != null)
@@ -347,6 +392,14 @@ namespace ClassicUO.Game
                     _toRemove.Clear();
                 }
 
+                // Only on a pass that actually culls. Zeroing it every pass would leave
+                // the once-a-second report reading zero almost always, since culling
+                // runs on its own timer rather than every frame.
+                if (do_delete)
+                {
+                    HouseDiagnostics.KeptByHouse = 0;
+                }
+
                 foreach (Item item in Items.Values)
                 {
                     item.Update();
@@ -359,7 +412,7 @@ namespace ClassicUO.Game
                     // there. In one log 97.6% of all cull work was that loop.
                     int keepWithin = ClientViewRange + (item.IsMulti ? item.MultiDistanceBonus : 0);
 
-                    if (do_delete && item.OnGround && item.Distance > keepWithin)
+                    if (do_delete && item.OnGround && item.Distance > keepWithin && !KeptByItsHouse(item))
                     {
                         HouseDiagnostics.LogItemCulled(item);
 
