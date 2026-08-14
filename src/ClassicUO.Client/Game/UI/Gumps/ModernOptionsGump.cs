@@ -2505,7 +2505,12 @@ namespace ClassicUO.Game.UI.Gumps
                 (
                     "", new SliderWithLabel
                     (
-                        lang.GetExperimental.ClientViewRange, 0, ThemeSettings.SLIDER_WIDTH,
+                        // A width for the label rather than zero. The other sliders pass
+                        // zero because their labels are two words; an unconstrained long
+                        // one runs on in a single line and pushes the slider off the
+                        // right-hand edge, and leaves the control reporting a width that
+                        // does not include the label it is sitting next to.
+                        lang.GetExperimental.ClientViewRange, 260, ThemeSettings.SLIDER_WIDTH,
                         Constants.MIN_VIEW_RANGE, Constants.MAX_VIEW_RANGE,
                         Settings.GlobalSettings.ClientViewRange,
                         (i) =>
@@ -2518,6 +2523,21 @@ namespace ClassicUO.Game.UI.Gumps
                             }
                         }
                     ), MainContent.RightWidth, (int)PAGE.Experimental
+                )
+            ).FullControl);
+
+            PositionHelper.PositionControl(s.FullControl);
+            PositionHelper.BlankLine();
+
+            // Room past the last option. The scroll extent is measured from where the
+            // children end, so without something below it the final row sits right on
+            // the edge and reads as cut off.
+            scroll.Add
+            (
+                (s = new SettingsOption
+                (
+                    "", new Area(false) { Width = 1, Height = 60 },
+                    MainContent.RightWidth, (int)PAGE.Experimental
                 )
             ).FullControl);
 
