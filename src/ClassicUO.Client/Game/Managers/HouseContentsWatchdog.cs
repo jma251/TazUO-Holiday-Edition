@@ -123,6 +123,8 @@ namespace ClassicUO.Game.Managers
                 if (serial != 0)
                 {
                     HouseDiagnostics.Note($"entered house=0x{serial:X8}");
+
+                    AskOnEntry(serial);
                 }
             }
 
@@ -221,6 +223,41 @@ namespace ClassicUO.Game.Managers
 
         /// <summary>The most this house has ever been seen holding, by serial.</summary>
         private static readonly Dictionary<uint, int> _mostSeen = new Dictionary<uint, int>();
+
+        /// <summary>
+        /// One resync on stepping into a house, whatever it appears to be holding.
+        ///
+        /// The server already tries to do this. HouseRegion.OnEnter ends in
+        /// SendEverything, which is precisely the right idea - but it fires on crossing
+        /// into the house *region*, and the region is the house's whole bounding
+        /// rectangle. Its CanSee refuses every item in the house unless IsInside is
+        /// true, and IsInside is a stricter test needing real floor at your height. Land
+        /// on the steps or the porch and OnEnter has fired, sent nothing, and will not
+        /// fire again - so walking the rest of the way in brings nothing with it.
+        ///
+        /// Watching for a shortfall does not cover this on its own. What a house is
+        /// holding is only known from having seen it holding more, in this session, so
+        /// arriving already short - or logging in inside a house that is already short -
+        /// records the wrong number as the truth and nothing ever looks amiss.
+        ///
+        /// So the client asks once, at the moment the server's own attempt should have
+        /// worked and did not: when the player is genuinely inside. One packet per
+        /// entry, which is nothing next to what the server does for a footstep, and it
+        /// needs no history to be right.
+        /// </summary>
+        private static void AskOnEntry(uint serial)
+        {
+            if (!Settings.GlobalSettings.AutoRecoverHouseContents)
+            {
+                return;
+            }
+
+            NetClient.Socket.Send_Resync();
+
+            HouseDiagnostics.Note(
+                $"entryask house=0x{serial:X8} kind=resync contents={HouseDiagnostics.CountContents(serial)}"
+            );
+        }
 
         /// <summary>
         /// Put back anything that is in the world but not linked into the tile it is
