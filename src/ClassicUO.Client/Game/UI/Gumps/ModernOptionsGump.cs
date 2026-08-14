@@ -2267,112 +2267,118 @@ namespace ClassicUO.Game.UI.Gumps
             SettingsOption s;
             PositionHelper.Reset();
 
-            options.Add
+            // The page had no scroll area at all, so anything past the bottom of the
+            // window simply could not be reached. Every option now lives inside one,
+            // the way Combat & Spells already does it, so the page can keep growing.
+            ScrollArea scroll = new ScrollArea(0, 0, MainContent.RightWidth, MainContent.Height);
+            options.Add(new SettingsOption("", scroll, MainContent.RightWidth, (int)PAGE.Experimental));
+
+            scroll.Add
             (
-                s = new SettingsOption
+                (s = new SettingsOption
                 (
                     "", new CheckboxWithLabel(lang.GetExperimental.DisableDefaultUoHotkeys, 0, profile.DisableDefaultHotkeys, (b) => { profile.DisableDefaultHotkeys = b; }),
                     MainContent.RightWidth, (int)PAGE.Experimental
                 )
-            );
+            ).FullControl);
 
             PositionHelper.PositionControl(s.FullControl);
             PositionHelper.BlankLine();
 
-            options.Add
+            scroll.Add
             (
-                s = new SettingsOption
+                (s = new SettingsOption
                 (
                     "", new CheckboxWithLabel(lang.GetExperimental.DisableArrowsNumlockArrowsPlayerMovement, 0, profile.DisableArrowBtn, (b) => { profile.DisableArrowBtn = b; }),
                     MainContent.RightWidth, (int)PAGE.Experimental
                 )
-            );
+            ).FullControl);
 
             PositionHelper.PositionControl(s.FullControl);
             PositionHelper.BlankLine();
 
-            options.Add
+            scroll.Add
             (
-                s = new SettingsOption
+                (s = new SettingsOption
                 (
                     "", new CheckboxWithLabel(lang.GetExperimental.DisableTabToggleWarmode, 0, profile.DisableTabBtn, (b) => { profile.DisableTabBtn = b; }),
                     MainContent.RightWidth, (int)PAGE.Experimental
                 )
-            );
+            ).FullControl);
 
             PositionHelper.PositionControl(s.FullControl);
             PositionHelper.BlankLine();
 
-            options.Add
+            scroll.Add
             (
-                s = new SettingsOption
+                (s = new SettingsOption
                 (
                     "", new CheckboxWithLabel(lang.GetExperimental.DisableCtrlQWMessageHistory, 0, profile.DisableCtrlQWBtn, (b) => { profile.DisableCtrlQWBtn = b; }),
                     MainContent.RightWidth, (int)PAGE.Experimental
                 )
-            );
+            ).FullControl);
 
             PositionHelper.PositionControl(s.FullControl);
             PositionHelper.BlankLine();
 
-            options.Add
+            scroll.Add
             (
-                s = new SettingsOption
+                (s = new SettingsOption
                 (
                     "", new CheckboxWithLabel(lang.GetExperimental.DisableRightLeftClickAutoMove, 0, profile.DisableAutoMove, (b) => { profile.DisableAutoMove = b; }),
                     MainContent.RightWidth, (int)PAGE.Experimental
                 )
-            );
+            ).FullControl);
 
             PositionHelper.PositionControl(s.FullControl);
             PositionHelper.BlankLine();
 
             // Global rather than per-profile, so it applies to every character.
-            options.Add
+            scroll.Add
             (
-                s = new SettingsOption
+                (s = new SettingsOption
                 (
                     "", new CheckboxWithLabel(lang.GetExperimental.LogMusicIndices, 0, Settings.GlobalSettings.LogMusicIndices, (b) => { Settings.GlobalSettings.LogMusicIndices = b; }),
                     MainContent.RightWidth, (int)PAGE.Experimental
                 )
-            );
+            ).FullControl);
 
             PositionHelper.PositionControl(s.FullControl);
             PositionHelper.BlankLine();
 
             // Temporary diagnostic, global like the one above.
-            options.Add
+            scroll.Add
             (
-                s = new SettingsOption
+                (s = new SettingsOption
                 (
                     "", new CheckboxWithLabel(lang.GetExperimental.LogHouseDiagnostics, 0, Settings.GlobalSettings.LogHouseDiagnostics, (b) => { Settings.GlobalSettings.LogHouseDiagnostics = b; HouseDiagnostics.Announce(); }),
                     MainContent.RightWidth, (int)PAGE.Experimental
                 )
-            );
+            ).FullControl);
 
             PositionHelper.PositionControl(s.FullControl);
             PositionHelper.BlankLine();
 
-            options.Add
+            scroll.Add
             (
-                s = new SettingsOption
+                (s = new SettingsOption
                 (
                     "", new CheckboxWithLabel(lang.GetExperimental.AutoRecoverHouseContents, 0, Settings.GlobalSettings.AutoRecoverHouseContents, (b) => { Settings.GlobalSettings.AutoRecoverHouseContents = b; }),
                     MainContent.RightWidth, (int)PAGE.Experimental
                 )
-            );
+            ).FullControl);
 
             PositionHelper.PositionControl(s.FullControl);
             PositionHelper.BlankLine();
 
-            options.Add
+            scroll.Add
             (
-                s = new SettingsOption
+                (s = new SettingsOption
                 (
                     "", new CheckboxWithLabel(lang.GetExperimental.KeepHouseContentsLoaded, 0, Settings.GlobalSettings.KeepHouseContentsLoaded, (b) => { Settings.GlobalSettings.KeepHouseContentsLoaded = b; }),
                     MainContent.RightWidth, (int)PAGE.Experimental
                 )
-            );
+            ).FullControl);
 
             PositionHelper.PositionControl(s.FullControl);
             PositionHelper.BlankLine();
@@ -2391,9 +2397,9 @@ namespace ClassicUO.Game.UI.Gumps
                 selectedEra = 0;
             }
 
-            options.Add
+            scroll.Add
             (
-                s = new SettingsOption
+                (s = new SettingsOption
                 (
                     "", new ComboBoxWithLabel
                     (
@@ -2415,7 +2421,7 @@ namespace ClassicUO.Game.UI.Gumps
                         }
                     ), MainContent.RightWidth, (int)PAGE.Experimental
                 )
-            );
+            ).FullControl);
 
             PositionHelper.PositionControl(s.FullControl);
             PositionHelper.BlankLine();
@@ -2437,9 +2443,9 @@ namespace ClassicUO.Game.UI.Gumps
                 mapMode = 0;
             }
 
-            options.Add
+            scroll.Add
             (
-                s = new SettingsOption
+                (s = new SettingsOption
                 (
                     "", new ComboBoxWithLabel
                     (
@@ -2447,16 +2453,16 @@ namespace ClassicUO.Game.UI.Gumps
                         (i, o) => { Settings.GlobalSettings.MusicMapMode = i < 0 ? 0 : i; }
                     ), MainContent.RightWidth, (int)PAGE.Experimental
                 )
-            );
+            ).FullControl);
 
             PositionHelper.PositionControl(s.FullControl);
             PositionHelper.BlankLine();
 
             // Works with or without the music map: on its own it means music only ever
             // changes when the server names a real track.
-            options.Add
+            scroll.Add
             (
-                s = new SettingsOption
+                (s = new SettingsOption
                 (
                     "", new CheckboxWithLabel
                     (
@@ -2464,14 +2470,14 @@ namespace ClassicUO.Game.UI.Gumps
                         (b) => { Settings.GlobalSettings.IgnoreServerStopMusic = b; }
                     ), MainContent.RightWidth, (int)PAGE.Experimental
                 )
-            );
+            ).FullControl);
 
             PositionHelper.PositionControl(s.FullControl);
             PositionHelper.BlankLine();
 
-            options.Add
+            scroll.Add
             (
-                s = new SettingsOption
+                (s = new SettingsOption
                 (
                     "", new CheckboxWithLabel
                     (
@@ -2484,7 +2490,35 @@ namespace ClassicUO.Game.UI.Gumps
                         }
                     ), MainContent.RightWidth, (int)PAGE.Experimental
                 )
-            );
+            ).FullControl);
+
+            PositionHelper.PositionControl(s.FullControl);
+            PositionHelper.BlankLine();
+
+            // How far to ask the server to send things. Sent immediately so the effect
+            // can be seen without relogging; the server answers with what it granted,
+            // which is what actually takes effect.
+            scroll.Add
+            (
+                (s = new SettingsOption
+                (
+                    "", new SliderWithLabel
+                    (
+                        lang.GetExperimental.ClientViewRange, 0, ThemeSettings.SLIDER_WIDTH,
+                        Constants.MIN_VIEW_RANGE, Constants.MAX_VIEW_RANGE,
+                        Settings.GlobalSettings.ClientViewRange,
+                        (i) =>
+                        {
+                            Settings.GlobalSettings.ClientViewRange = i;
+
+                            if (World.InGame)
+                            {
+                                ClassicUO.Network.NetClient.Socket.Send_ClientViewRange((byte)i);
+                            }
+                        }
+                    ), MainContent.RightWidth, (int)PAGE.Experimental
+                )
+            ).FullControl);
 
             PositionHelper.PositionControl(s.FullControl);
         }

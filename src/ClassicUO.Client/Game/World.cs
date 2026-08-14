@@ -82,7 +82,9 @@ namespace ClassicUO.Game
 
         public static Map.Map Map { get; private set; }
 
-        public static byte ClientViewRange { get; set; } = Constants.MAX_VIEW_RANGE;
+        // What the server has granted. Starts at the standard twenty-four and is
+        // overwritten by the server's answer to the range the client asks for.
+        public static byte ClientViewRange { get; set; } = Constants.DEFAULT_VIEW_RANGE;
 
         public static bool SkillsRequested { get; set; }
 
