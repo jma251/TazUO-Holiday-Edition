@@ -2571,7 +2571,7 @@ namespace ClassicUO.Game.UI.Gumps
                     }
                     else
                     {
-                        if (mob != null && mob.Distance <= World.MobileKeepRange)
+                        if (mob != null && mob.Distance <= World.ClientViewRange)
                         {
                             WMapEntity wme = World.WMapManager.GetEntity(mob);
 
@@ -2649,7 +2649,7 @@ namespace ClassicUO.Game.UI.Gumps
                     {
                         Mobile mob = World.Mobiles.Get(partyMember.Serial);
 
-                        if (mob != null && mob.Distance <= World.MobileKeepRange)
+                        if (mob != null && mob.Distance <= World.ClientViewRange)
                         {
                             WMapEntity wme = World.WMapManager.GetEntity(mob);
 

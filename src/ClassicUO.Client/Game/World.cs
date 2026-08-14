@@ -363,13 +363,7 @@ namespace ClassicUO.Game
 
                     mob.Update();
 
-                    // Not the view range. The server stops telling anyone about a mobile's
-                    // movement past a fixed twenty-four, whatever range the client asked
-                    // for, so anything kept beyond that is a picture of where it used to
-                    // be - standing still, in the wrong place, until it is close enough
-                    // to be described again and jumps. Items are different and keep the
-                    // full range, because those the server does send that far.
-                    if (do_delete && mob.Distance > MobileKeepRange)
+                    if (do_delete && mob.Distance > ClientViewRange)
                     {
                         RemoveMobile(mob);
                     }
