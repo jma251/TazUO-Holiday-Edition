@@ -407,7 +407,15 @@ namespace ClassicUO.Game
                 {
                     for (int i = 0; i < _toRemove.Count; i++)
                     {
-                        Mobiles.Remove(_toRemove[i]);
+                        // Still destroyed, and still the one that was condemned - never
+                        // take an entry out on the strength of a serial alone.
+                        if (Mobiles.TryGetValue(_toRemove[i], out Mobile gone) && gone.IsDestroyed)
+                        {
+                            Mobiles.Remove(_toRemove[i]);
+
+                            // Only now, with the entry out. See Item.ReturnToPool.
+                            gone.ReturnToPool();
+                        }
                     }
 
                     _toRemove.Clear();
@@ -472,7 +480,15 @@ namespace ClassicUO.Game
                 {
                     for (int i = 0; i < _toRemove.Count; i++)
                     {
-                        Items.Remove(_toRemove[i]);
+                        // Still destroyed, and still the one that was condemned. See the
+                        // matching note in the mobile sweep.
+                        if (Items.TryGetValue(_toRemove[i], out Item gone) && gone.IsDestroyed)
+                        {
+                            Items.Remove(_toRemove[i]);
+
+                            // Only now, with the entry out. See Item.ReturnToPool.
+                            gone.ReturnToPool();
+                        }
                     }
 
                     _toRemove.Clear();
@@ -565,6 +581,11 @@ namespace ClassicUO.Game
             if (item != null && item.IsDestroyed)
             {
                 Items.Remove(serial);
+
+                // The entry is out, so this one may be reused now rather than waiting
+                // for the sweep to come round. See Item.ReturnToPool.
+                item.ReturnToPool();
+
                 item = null;
             }
 
@@ -584,6 +605,11 @@ namespace ClassicUO.Game
             if (mob != null && mob.IsDestroyed)
             {
                 Mobiles.Remove(serial);
+
+                // The entry is out, so this one may be reused now rather than waiting
+                // for the sweep to come round. See Item.ReturnToPool.
+                mob.ReturnToPool();
+
                 mob = null;
             }
 
@@ -673,6 +699,8 @@ namespace ClassicUO.Game
             if (forceRemove)
             {
                 Items.Remove(serial);
+
+                item.ReturnToPool();
             }
 
             return true;
@@ -704,6 +732,8 @@ namespace ClassicUO.Game
             if (forceRemove)
             {
                 Mobiles.Remove(serial);
+
+                mobile.ReturnToPool();
             }
 
             return true;

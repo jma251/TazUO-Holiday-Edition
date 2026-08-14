@@ -49,6 +49,7 @@ namespace ClassicUO.Game.GameObjects
             Constants.PREDICTABLE_CHUNKS,
             mobile =>
             {
+                mobile._inPool = false;
                 mobile.IsDestroyed = false;
                 mobile.Graphic = 0;
                 mobile.Steps.Clear();
@@ -1116,9 +1117,25 @@ namespace ClassicUO.Game.GameObjects
                 UIManager.GetGump<PaperDollGump>(serial)?.Dispose();
                 UIManager.GetGump<ModernPaperdoll>(serial)?.Dispose();
 
+                // Deliberately not handed back to the pool here. See ReturnToPool.
+            }
+        }
+
+        /// <summary>
+        /// Hand this back for reuse, once the world has taken its entry out. See the
+        /// long note on Item.ReturnToPool for why this cannot be done from Destroy.
+        /// </summary>
+        internal void ReturnToPool()
+        {
+            // Once only. See the note on Item.ReturnToPool.
+            if (IsDestroyed && !_inPool && !(this is PlayerMobile))
+            {
+                _inPool = true;
                 _pool.ReturnOne(this);
             }
         }
+
+        private bool _inPool;
 
         public struct Step
         {
