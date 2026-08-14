@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using ClassicUO.Configuration;
 using ClassicUO.Game.Data;
 using ClassicUO.Game.GameObjects;
-using ClassicUO.Game.Map;
 using ClassicUO.Network;
 
 namespace ClassicUO.Game.Managers
@@ -72,22 +71,6 @@ namespace ClassicUO.Game.Managers
             _nextWatch = Time.Ticks + 1000;
 
             ForgetUnloadedHouses();
-
-            if (Settings.GlobalSettings.AutoRecoverHouseContents)
-            {
-                int repaired = Sweep();
-
-                if (repaired > 0)
-                {
-                    HouseDiagnostics.Note($"sweep repaired={repaired}");
-
-                    GameActions.Print(
-                        $"Put back {repaired} item{(repaired == 1 ? "" : "s")} the client had lost track of.",
-                        68,
-                        MessageType.System
-                    );
-                }
-            }
 
             Watch();
         }
@@ -327,85 +310,6 @@ namespace ClassicUO.Game.Managers
             HouseDiagnostics.Note(
                 $"entryask house=0x{serial:X8} kind=resync contents={contents} mostseen={mostSeen}"
             );
-        }
-
-        /// <summary>
-        /// Put back anything that is in the world but not linked into the tile it is
-        /// standing on.
-        ///
-        /// This is the repair for the failure in GameObject.RemoveFromTile: an object
-        /// still in World.Items, at real coordinates, which nothing can reach and so
-        /// nothing draws. It cannot be found by counting contents - the count includes
-        /// it - and no packet brings it back, because as far as the server is concerned
-        /// it was delivered. Walking out and back in worked because that tore the chunk
-        /// down and relinked everything from scratch.
-        ///
-        /// Costs one short walk of a tile's list per nearby item, once a second, and is
-        /// worth keeping even with the cause fixed: it is cheap, it says in the log
-        /// exactly what it put back, and there is more than one way to unlink an object.
-        /// </summary>
-        private static int Sweep()
-        {
-            if (World.Map == null)
-            {
-                return 0;
-            }
-
-            int repaired = 0;
-
-            uint held = Client.Game.GameCursor.ItemHold.Enabled
-                ? Client.Game.GameCursor.ItemHold.Serial
-                : 0;
-
-            foreach (Item item in World.Items.Values)
-            {
-                if (item == null || item.IsDestroyed || !item.OnGround || item.Serial == held)
-                {
-                    continue;
-                }
-
-                // Beyond the view range it is on its way out anyway, and the tile it
-                // claims to stand on may not be loaded.
-                if (item.Distance > World.ClientViewRange + (item.IsMulti ? item.MultiDistanceBonus : 0))
-                {
-                    continue;
-                }
-
-                if (LinkedToItsTile(item))
-                {
-                    continue;
-                }
-
-                HouseDiagnostics.LogOrphanRepaired(item);
-
-                item.AddToTile();
-
-                repaired++;
-            }
-
-            return repaired;
-        }
-
-        private static bool LinkedToItsTile(Item item)
-        {
-            Chunk chunk = World.Map.GetChunk(item.X, item.Y, false);
-
-            if (chunk == null)
-            {
-                // No chunk loaded here, so there is nothing to be linked into and
-                // nothing to repair. Not the same thing as being orphaned.
-                return true;
-            }
-
-            for (GameObject o = chunk.GetHeadObject(item.X % 8, item.Y % 8); o != null; o = o.TNext)
-            {
-                if (ReferenceEquals(o, item))
-                {
-                    return true;
-                }
-            }
-
-            return false;
         }
 
         /// <summary>
