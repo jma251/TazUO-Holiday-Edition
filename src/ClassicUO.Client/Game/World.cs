@@ -92,7 +92,7 @@ namespace ClassicUO.Game
         /// server still describes their movement - see Constants.MAX_MOBILE_VIEW_RANGE.
         /// </summary>
         public static int MobileKeepRange =>
-            Math.Min(ClientViewRange, Constants.MAX_MOBILE_VIEW_RANGE);
+            Math.Min((int)ClientViewRange, Constants.MAX_MOBILE_VIEW_RANGE);
 
         public static bool SkillsRequested { get; set; }
 
