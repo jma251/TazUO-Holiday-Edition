@@ -252,6 +252,13 @@ namespace ClassicUO.Game.Managers
                 return;
             }
 
+            // Counts as an ask, so the shortfall test waits its cooldown rather than
+            // sending a second one on top. Without this the entry ask left the cooldown
+            // at zero and a second resync went out three seconds later, while the first
+            // one's couple of hundred packets had only just arrived - two whole rooms
+            // delivered back to back, which is a frame's work in one go and is felt.
+            _lastAttempt = Time.Ticks;
+
             NetClient.Socket.Send_Resync();
 
             HouseDiagnostics.Note(
