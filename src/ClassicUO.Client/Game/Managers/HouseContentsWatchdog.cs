@@ -71,6 +71,8 @@ namespace ClassicUO.Game.Managers
 
             _nextWatch = Time.Ticks + 1000;
 
+            ForgetUnloadedHouses();
+
             if (Settings.GlobalSettings.AutoRecoverHouseContents)
             {
                 int repaired = Sweep();
@@ -224,6 +226,45 @@ namespace ClassicUO.Game.Managers
         /// <summary>The most this house has ever been seen holding, by serial.</summary>
         private static readonly Dictionary<uint, int> _mostSeen = new Dictionary<uint, int>();
 
+        private static readonly List<uint> _forget = new List<uint>();
+
+        /// <summary>
+        /// Forget what a house was holding once the client has let go of the house.
+        ///
+        /// This is what keeps the entry ask honest. Skipping the ask for a house that is
+        /// already as full as it has ever been is safe for stepping out of the door and
+        /// back in - the count is seconds old and the house never left. It is not safe
+        /// across a house unloading and coming back, because that is precisely when it
+        /// arrives short: a house that only ever loaded sixteen items would have sixteen
+        /// recorded as its truth, and would be skipped ever after.
+        ///
+        /// Dropping the record with the house means a house that has been away always
+        /// gets asked about on the way back in, which is the case the ask exists for,
+        /// and only the cheap in-and-out hops are skipped.
+        /// </summary>
+        private static void ForgetUnloadedHouses()
+        {
+            if (_mostSeen.Count == 0)
+            {
+                return;
+            }
+
+            _forget.Clear();
+
+            foreach (KeyValuePair<uint, int> pair in _mostSeen)
+            {
+                if (!World.HouseManager.Exists(pair.Key) || World.Items.Get(pair.Key) == null)
+                {
+                    _forget.Add(pair.Key);
+                }
+            }
+
+            for (int i = 0; i < _forget.Count; i++)
+            {
+                _mostSeen.Remove(_forget[i]);
+            }
+        }
+
         /// <summary>
         /// One resync on stepping into a house, whatever it appears to be holding.
         ///
@@ -252,6 +293,28 @@ namespace ClassicUO.Game.Managers
                 return;
             }
 
+            int contents = HouseDiagnostics.CountContents(serial);
+
+            // Nothing to ask for if the house is already holding as much as it has ever
+            // been seen holding. Asking anyway is not free: the answer re-sends every
+            // item in the room, and putting an item back on a tile that is already full
+            // means walking that tile's list to find where it sorts, which is far more
+            // work than dropping it onto a bare one. A whole furnished room re-seated in
+            // a frame is the stutter, and half the asks in a captured session were this
+            // - a full house being sent a full house.
+            //
+            // With no record of the house at all this cannot tell a house that failed to
+            // load from one that is genuinely empty, so it asks. That is the case the
+            // entry ask exists for.
+            if (_mostSeen.TryGetValue(serial, out int mostSeen) && mostSeen > 0 && contents >= mostSeen)
+            {
+                HouseDiagnostics.Note(
+                    $"entryskip house=0x{serial:X8} contents={contents} mostseen={mostSeen}"
+                );
+
+                return;
+            }
+
             // Counts as an ask, so the shortfall test waits its cooldown rather than
             // sending a second one on top. Without this the entry ask left the cooldown
             // at zero and a second resync went out three seconds later, while the first
@@ -262,7 +325,7 @@ namespace ClassicUO.Game.Managers
             NetClient.Socket.Send_Resync();
 
             HouseDiagnostics.Note(
-                $"entryask house=0x{serial:X8} kind=resync contents={HouseDiagnostics.CountContents(serial)}"
+                $"entryask house=0x{serial:X8} kind=resync contents={contents} mostseen={mostSeen}"
             );
         }
 
