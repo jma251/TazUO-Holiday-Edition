@@ -142,6 +142,12 @@ namespace ClassicUO.Configuration
         // every character.
         [JsonPropertyName("keep_house_contents_loaded")] public bool KeepHouseContentsLoaded { get; set; } = true;
 
+        // How far to ask the server to send things. Twenty-four is the standard and is
+        // what every client has always asked for; it comes from a table of old screen
+        // resolutions rather than from the protocol. The server decides what it grants,
+        // and says so. Global rather than per-profile so it applies to every character.
+        [JsonPropertyName("client_view_range")] public int ClientViewRange { get; set; } = 24;
+
         [JsonPropertyName("shard_type")] public int ShardType { get; set; } // 0 = normal (no customization), 1 = old, 2 = outlands??
 
         [JsonPropertyName("fixed_time_step")] public bool FixedTimeStep { get; set; } = true;

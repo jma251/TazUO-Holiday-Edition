@@ -114,7 +114,28 @@ namespace ClassicUO.Game
         public const int MIN_PICKUP_DRAG_DISTANCE_PIXELS = 5;
 
         public const int MIN_VIEW_RANGE = 5;
-        public const int MAX_VIEW_RANGE = 24;
+
+        /// <summary>
+        /// What the client asks the server for, and what it draws out to, unless it is
+        /// asked for something else.
+        ///
+        /// Twenty-four is not a protocol limit. It is the largest useful value for a
+        /// 1024x768 game window, off a table of old client resolutions, and it has been
+        /// hard-coded here ever since. The server decides what it grants and tells the
+        /// client so, which is why this is a starting point rather than a rule.
+        /// </summary>
+        public const int DEFAULT_VIEW_RANGE = 24;
+
+        /// <summary>
+        /// The largest the view range may be asked for.
+        ///
+        /// Forty, because that is where asking stops buying anything on a RunUO-derived
+        /// server: both the per-step item send and SendEverything gather their
+        /// candidates with GetObjectsInRange(location, GlobalRadarRange), and
+        /// GlobalRadarRange is forty. Nothing further out is ever considered, whatever
+        /// range is asked for.
+        /// </summary>
+        public const int MAX_VIEW_RANGE = 40;
         public const int MAX_CONTAINER_OPENED_ON_GROUND_RANGE = 3;
 
         public const int OUT_RANGE_COLOR = 0x038B;

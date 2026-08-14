@@ -2449,6 +2449,13 @@ namespace ClassicUO.Network
 
                 if (Client.Version >= Utility.ClientVersion.CV_305D)
                 {
+                    // Ask for what the player set rather than the hard-coded standard.
+                    // The server answers with what it granted, which overwrites this.
+                    World.ClientViewRange = (byte)Math.Max(
+                        Constants.MIN_VIEW_RANGE,
+                        Math.Min(Constants.MAX_VIEW_RANGE, Settings.GlobalSettings.ClientViewRange)
+                    );
+
                     NetClient.Socket.Send_ClientViewRange(World.ClientViewRange);
                 }
 
