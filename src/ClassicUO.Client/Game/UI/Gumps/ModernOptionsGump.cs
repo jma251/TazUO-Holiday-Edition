@@ -2553,6 +2553,37 @@ namespace ClassicUO.Game.UI.Gumps
             PositionHelper.PositionControl(s.FullControl);
             PositionHelper.BlankLine();
 
+            // A test rig, not a feature - see DistantMobileRefresh. Each tick makes the
+            // server resend everything in range, so it stays off unless it is being
+            // measured.
+            scroll.Add
+            (
+                (s = new SettingsOption
+                (
+                    "", new ComboBoxWithLabel
+                    (
+                        lang.GetExperimental.DistantMobileRefresh, 0, ThemeSettings.COMBO_BOX_WIDTH,
+                        new string[]
+                        {
+                            lang.GetExperimental.DistantMobileRefreshOff,
+                            lang.GetExperimental.DistantMobileRefresh500,
+                            lang.GetExperimental.DistantMobileRefresh1000,
+                            lang.GetExperimental.DistantMobileRefresh2000,
+                            lang.GetExperimental.DistantMobileRefresh5000
+                        },
+                        Settings.GlobalSettings.DistantMobileRefresh,
+                        (i, n) =>
+                        {
+                            Settings.GlobalSettings.DistantMobileRefresh = i;
+                            DistantMobileRefresh.Reset();
+                        }
+                    ), MainContent.RightWidth, (int)PAGE.Experimental
+                )
+            ).FullControl);
+
+            PositionHelper.PositionControl(s.FullControl);
+            PositionHelper.BlankLine();
+
             // Room past the last option. The scroll extent is measured from where the
             // children end, so without something below it the final row sits right on
             // the edge and reads as cut off.
