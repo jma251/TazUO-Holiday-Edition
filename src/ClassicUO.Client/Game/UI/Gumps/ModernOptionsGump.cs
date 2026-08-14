@@ -5,6 +5,7 @@ using ClassicUO.Game.Managers;
 using ClassicUO.Game.Scenes;
 using ClassicUO.Game.UI.Controls;
 using ClassicUO.Input;
+using ClassicUO.Network;
 using ClassicUO.Renderer;
 using ClassicUO.Resources;
 using ClassicUO.Utility;
@@ -2513,7 +2514,7 @@ namespace ClassicUO.Game.UI.Gumps
 
                             if (World.InGame)
                             {
-                                ClassicUO.Network.NetClient.Socket.Send_ClientViewRange((byte)i);
+                                NetClient.Socket.Send_ClientViewRange((byte)i);
                             }
                         }
                     ), MainContent.RightWidth, (int)PAGE.Experimental
