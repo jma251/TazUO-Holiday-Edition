@@ -407,7 +407,13 @@ namespace ClassicUO.Game
                 {
                     for (int i = 0; i < _toRemove.Count; i++)
                     {
-                        Mobiles.Remove(_toRemove[i]);
+                        if (Mobiles.TryGetValue(_toRemove[i], out Mobile gone))
+                        {
+                            Mobiles.Remove(_toRemove[i]);
+
+                            // Only now, with the entry out. See Item.ReturnToPool.
+                            gone.ReturnToPool();
+                        }
                     }
 
                     _toRemove.Clear();
@@ -472,7 +478,13 @@ namespace ClassicUO.Game
                 {
                     for (int i = 0; i < _toRemove.Count; i++)
                     {
-                        Items.Remove(_toRemove[i]);
+                        if (Items.TryGetValue(_toRemove[i], out Item gone))
+                        {
+                            Items.Remove(_toRemove[i]);
+
+                            // Only now, with the entry out. See Item.ReturnToPool.
+                            gone.ReturnToPool();
+                        }
                     }
 
                     _toRemove.Clear();
@@ -673,6 +685,8 @@ namespace ClassicUO.Game
             if (forceRemove)
             {
                 Items.Remove(serial);
+
+                item.ReturnToPool();
             }
 
             return true;
@@ -704,6 +718,8 @@ namespace ClassicUO.Game
             if (forceRemove)
             {
                 Mobiles.Remove(serial);
+
+                mobile.ReturnToPool();
             }
 
             return true;

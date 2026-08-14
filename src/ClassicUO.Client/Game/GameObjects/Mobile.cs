@@ -1116,6 +1116,18 @@ namespace ClassicUO.Game.GameObjects
                 UIManager.GetGump<PaperDollGump>(serial)?.Dispose();
                 UIManager.GetGump<ModernPaperdoll>(serial)?.Dispose();
 
+                // Deliberately not handed back to the pool here. See ReturnToPool.
+            }
+        }
+
+        /// <summary>
+        /// Hand this back for reuse, once the world has taken its entry out. See the
+        /// long note on Item.ReturnToPool for why this cannot be done from Destroy.
+        /// </summary>
+        internal void ReturnToPool()
+        {
+            if (IsDestroyed && !(this is PlayerMobile))
+            {
                 _pool.ReturnOne(this);
             }
         }

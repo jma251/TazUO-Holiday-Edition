@@ -288,7 +288,37 @@ namespace ClassicUO.Game.GameObjects
 
             base.Destroy();
 
-            _pool.ReturnOne(this);
+            // Deliberately not handed back to the pool here. See ReturnToPool.
+        }
+
+        /// <summary>
+        /// Hand this back for reuse. Only ever called once the world has taken its
+        /// entry out, never from Destroy.
+        ///
+        /// Destroy used to do it, and the entry is not taken out until the sweep at the
+        /// end of World.Update - so between the two the object was on the reuse pile and
+        /// still filed in the world under its serial. Anything created in that gap, and
+        /// a single batch of packets creates plenty, took this object, was given a new
+        /// serial, and was filed again. The first entry was then left pointing at an
+        /// object wearing somebody else's serial, and since that object is alive the
+        /// sweep never takes it out either.
+        ///
+        /// From then on the server can no longer reach the thing that entry stands for.
+        /// "That one moved", "that one died, remove it" - every message addressed by
+        /// serial finds nothing and is silently dropped, while the old picture stays on
+        /// screen. A creature killed in front of the player goes on standing there; a
+        /// person walks up and is drawn where they used to be; a house is held with no
+        /// multi item and claims every object on the map; an item is condemned by the
+        /// distance cull twenty times a second forever because it can never be found to
+        /// be removed. Only walking far enough away to have the whole area thrown out
+        /// and rebuilt clears any of it.
+        /// </summary>
+        internal void ReturnToPool()
+        {
+            if (IsDestroyed)
+            {
+                _pool.ReturnOne(this);
+            }
         }
 
         private unsafe void LoadMulti()
