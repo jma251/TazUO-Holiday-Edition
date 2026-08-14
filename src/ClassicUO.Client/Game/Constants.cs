@@ -127,20 +127,26 @@ namespace ClassicUO.Game
         public const int DEFAULT_VIEW_RANGE = 24;
 
         /// <summary>
-        /// How far a mobile may be kept, whatever the view range is set to.
+        /// How far mobiles are drawn, as opposed to how far they are kept.
         ///
-        /// A RunUO-derived server sends items out to whatever range the client asks for,
-        /// but it gathers the clients to tell about a mobile's movement with
-        /// GetObjectsInRange(location, Core.GlobalMaxUpdateRange) - and that is a fixed
-        /// twenty-four, not the client's number. So a mobile further off than this moves
-        /// without anyone being told, and a client holding it draws it standing where it
-        /// was until the two are close enough to be spoken about again.
+        /// A RunUO-derived server sends a mobile out to whatever range the client asks
+        /// for, but it gathers the clients to tell about that mobile's *movement* with
+        /// GetObjectsInRange(location, Core.GlobalMaxUpdateRange), and that is a fixed
+        /// number of its own rather than the client's. Past it a mobile moves without
+        /// anyone being told, so a client holding one draws it standing where it used to
+        /// be until the two are close enough to be spoken about again, and then it jumps.
         ///
-        /// Keeping mobiles to this while items keep the full view range is the pairing
-        /// the server actually supports: as far out as things are still described, and
-        /// no further.
+        /// Drawing is the right place to answer that, and culling is not: the server
+        /// counts a mobile it has sent as delivered and will not send it a second time,
+        /// so a client that throws one away past some distance has lost it until
+        /// something forces a fresh send. Held but not drawn keeps the server's
+        /// bookkeeping true and still spares the player the stale picture.
+        ///
+        /// Twenty-four is stock ServUO. A shard may have changed it, which is why this
+        /// is the default of a setting rather than a rule - the distance at which a
+        /// mobile stops jumping when approached is the real number for a given server.
         /// </summary>
-        public const int MAX_MOBILE_VIEW_RANGE = 24;
+        public const int DEFAULT_MOBILE_DRAW_RANGE = 24;
 
         /// <summary>
         /// The largest the view range may be asked for.
