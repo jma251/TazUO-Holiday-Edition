@@ -30,7 +30,6 @@
 
 #endregion
 
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using ClassicUO.IO.Audio;
@@ -83,24 +82,7 @@ namespace ClassicUO.Game
 
         public static Map.Map Map { get; private set; }
 
-        // What the server has granted. Starts at the standard twenty-four and is
-        // overwritten by the server's answer to the range the client asks for.
-        public static byte ClientViewRange { get; set; } = Constants.DEFAULT_VIEW_RANGE;
-
-        /// <summary>
-        /// How far mobiles are drawn. Never how far they are kept - see
-        /// Constants.DEFAULT_MOBILE_DRAW_RANGE for why those must not be the same thing.
-        ///
-        /// Held to the view range, since drawing one further off than the client is even
-        /// asking for buys nothing.
-        /// </summary>
-        public static int MobileDrawRange =>
-            Math.Min(MobileDrawRangeSetting, (int)ClientViewRange);
-
-        /// <summary>
-        /// What the player asked for, before the view range is taken into account.
-        /// </summary>
-        public static int MobileDrawRangeSetting { get; set; } = Constants.DEFAULT_MOBILE_DRAW_RANGE;
+        public static byte ClientViewRange { get; set; } = Constants.MAX_VIEW_RANGE;
 
         public static bool SkillsRequested { get; set; }
 
@@ -300,8 +282,6 @@ namespace ClassicUO.Game
                 return false;
             }
 
-            HouseDiagnostics.KeptByHouse++;
-
             return true;
         }
 
@@ -427,14 +407,6 @@ namespace ClassicUO.Game
                     }
 
                     _toRemove.Clear();
-                }
-
-                // Only on a pass that actually culls. Zeroing it every pass would leave
-                // the once-a-second report reading zero almost always, since culling
-                // runs on its own timer rather than every frame.
-                if (do_delete)
-                {
-                    HouseDiagnostics.KeptByHouse = 0;
                 }
 
                 // By key, for the reason given over the mobile sweep above. This is the
@@ -686,8 +658,6 @@ namespace ClassicUO.Game
             {
                 return false;
             }
-
-            HouseDiagnostics.LogItemRemoved(item, forceRemove ? "removed_forced" : "removed");
 
             LinkedObject first = item.Items;
             RemoveItemFromContainer(item);

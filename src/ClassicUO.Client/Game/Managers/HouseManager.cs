@@ -58,7 +58,6 @@ namespace ClassicUO.Game.Managers
             {
                 if (_houses.TryGetValue(serial, out House house))
                 {
-                    HouseDiagnostics.LogHouseRemoved(serial, "out_of_range", house.Components.Count);
 
                     house.ClearComponents();
                     _houses.Remove(serial);
@@ -175,7 +174,6 @@ namespace ClassicUO.Game.Managers
         {
             if (TryGetHouse(serial, out House house))
             {
-                HouseDiagnostics.LogHouseRemoved(serial, "no_multi_item", house.Components.Count);
 
                 house.ClearComponents();
                 _houses.Remove(serial);
@@ -189,7 +187,6 @@ namespace ClassicUO.Game.Managers
         {
             if (_houses.TryGetValue(0, out House house))
             {
-                HouseDiagnostics.LogHouseRemoved(0, "placement_preview", house.Components.Count);
 
                 house.ClearComponents();
                 _houses.Remove(0);

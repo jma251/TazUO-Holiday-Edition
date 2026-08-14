@@ -140,7 +140,6 @@ namespace ClassicUO.Network
                     _ = stream.Dequeue(packetBuffer, 0, packetlength);
 
                     PacketLogger.Default?.Log(packetBuffer.AsSpan(0, packetlength), false);
-                    HouseDiagnostics.LogPacket(packetBuffer.AsSpan(0, packetlength), false);
 
                     // TODO: the pluging function should allow Span<byte> or unsafe type only.
                     // The current one is a bad style decision.
@@ -2449,22 +2448,8 @@ namespace ClassicUO.Network
 
                 if (Client.Version >= Utility.ClientVersion.CV_305D)
                 {
-                    // Ask for what the player set rather than the hard-coded standard.
-                    // The server answers with what it granted, which overwrites this.
-                    World.ClientViewRange = (byte)Math.Max(
-                        Constants.MIN_VIEW_RANGE,
-                        Math.Min(Constants.MAX_VIEW_RANGE, Settings.GlobalSettings.ClientViewRange)
-                    );
-
                     NetClient.Socket.Send_ClientViewRange(World.ClientViewRange);
                 }
-
-                // Not sent anywhere - the server has no say in how far the client draws
-                // what it has already been given.
-                World.MobileDrawRangeSetting = Math.Max(
-                    Constants.MIN_VIEW_RANGE,
-                    Math.Min(Constants.MAX_VIEW_RANGE, Settings.GlobalSettings.MobileDrawRange)
-                );
 
                 // Reset the global action cooldown here because, for some reason, immediately
                 // sending multiple actions (e.g. reopening paperdoll and reopening containers)
@@ -2734,7 +2719,6 @@ namespace ClassicUO.Network
             World.ClientViewRange = p.ReadUInt8();
 
             HouseDiagnostics.LogViewRange(World.ClientViewRange);
-            HouseDiagnostics.LogContentsCensus("viewrange_packet");
         }
 
         private static void BulletinBoardData(ref StackDataReader p)
@@ -4870,12 +4854,6 @@ namespace ClassicUO.Network
 
                         UIManager.GetGump<MiniMapGump>()?.RequestUpdateContents();
 
-                        HouseDiagnostics.LogHouseGenerated(
-                            serial,
-                            World.HouseManager.EntityIntoHouse(serial, World.Player),
-                            house.Components.Count
-                        );
-
                         RecomputeDrawCeiling();
                     }
 
@@ -5641,12 +5619,6 @@ namespace ClassicUO.Network
             }
 
             UIManager.GetGump<MiniMapGump>()?.RequestUpdateContents();
-
-            HouseDiagnostics.LogHouseGenerated(
-                serial,
-                World.HouseManager.EntityIntoHouse(serial, World.Player),
-                house.Components.Count
-            );
 
             RecomputeDrawCeiling();
 
@@ -6549,18 +6521,6 @@ namespace ClassicUO.Network
             Mobile mobile = null;
             Item item = null;
             Entity obj = World.Get(serial);
-
-            HouseDiagnostics.LogWorldObject(
-                serial,
-                (ushort)(graphic + graphic_inc),
-                x,
-                y,
-                z,
-                hue,
-                count,
-                type,
-                obj == null || obj.IsDestroyed
-            );
 
             if (
                 Client.Game.GameCursor.ItemHold.Enabled

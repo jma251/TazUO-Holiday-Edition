@@ -130,11 +130,6 @@ namespace ClassicUO.Configuration
         // character. Remove with HouseDiagnostics once the cause is known.
         [JsonPropertyName("log_house_diagnostics")] public bool LogHouseDiagnostics { get; set; } = false;
 
-        // Ask the server again when the player is standing inside a house that has been
-        // built but holds nothing - the failure that otherwise needs walking out and
-        // back in. Global rather than per-profile so it applies to every character.
-        [JsonPropertyName("auto_recover_house_contents")] public bool AutoRecoverHouseContents { get; set; } = true;
-
         // Do not throw away the contents of a house the client still holds just because
         // they are further off than the view range. The house itself already gets that
         // allowance and its contents did not, which is what emptied large houses when
@@ -146,13 +141,8 @@ namespace ClassicUO.Configuration
         // what every client has always asked for; it comes from a table of old screen
         // resolutions rather than from the protocol. The server decides what it grants,
         // and says so. Global rather than per-profile so it applies to every character.
-        [JsonPropertyName("client_view_range")] public int ClientViewRange { get; set; } = 24;
 
-        [JsonPropertyName("mobile_draw_range")] public int MobileDrawRange { get; set; } = 24;
 
-        // Index into DistantMobileRefresh.Intervals. Zero is off, which is the default:
-        // each tick costs a full resend of everything in range.
-        [JsonPropertyName("distant_mobile_refresh")] public int DistantMobileRefresh { get; set; }
 
         [JsonPropertyName("shard_type")] public int ShardType { get; set; } // 0 = normal (no customization), 1 = old, 2 = outlands??
 
