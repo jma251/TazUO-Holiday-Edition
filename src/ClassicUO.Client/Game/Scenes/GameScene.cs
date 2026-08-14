@@ -958,7 +958,7 @@ namespace ClassicUO.Game.Scenes
                 {
                     int distance = follow.Distance;
 
-                    if (distance > World.ClientViewRange)
+                    if (distance > World.MobileKeepRange)
                     {
                         StopFollowing();
                     }

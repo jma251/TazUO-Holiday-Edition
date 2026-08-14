@@ -30,6 +30,7 @@
 
 #endregion
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using ClassicUO.IO.Audio;
@@ -85,6 +86,13 @@ namespace ClassicUO.Game
         // What the server has granted. Starts at the standard twenty-four and is
         // overwritten by the server's answer to the range the client asks for.
         public static byte ClientViewRange { get; set; } = Constants.DEFAULT_VIEW_RANGE;
+
+        /// <summary>
+        /// How far mobiles are kept. The view range, unless that is set beyond where the
+        /// server still describes their movement - see Constants.MAX_MOBILE_VIEW_RANGE.
+        /// </summary>
+        public static int MobileKeepRange =>
+            Math.Min(ClientViewRange, Constants.MAX_MOBILE_VIEW_RANGE);
 
         public static bool SkillsRequested { get; set; }
 
@@ -355,7 +363,13 @@ namespace ClassicUO.Game
 
                     mob.Update();
 
-                    if (do_delete && mob.Distance > ClientViewRange /*CheckToRemove(mob, ClientViewRange)*/)
+                    // Not the view range. The server stops telling anyone about a mobile's
+                    // movement past a fixed twenty-four, whatever range the client asked
+                    // for, so anything kept beyond that is a picture of where it used to
+                    // be - standing still, in the wrong place, until it is close enough
+                    // to be described again and jumps. Items are different and keep the
+                    // full range, because those the server does send that far.
+                    if (do_delete && mob.Distance > MobileKeepRange)
                     {
                         RemoveMobile(mob);
                     }
