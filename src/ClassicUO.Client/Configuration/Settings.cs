@@ -135,6 +135,13 @@ namespace ClassicUO.Configuration
         // back in. Global rather than per-profile so it applies to every character.
         [JsonPropertyName("auto_recover_house_contents")] public bool AutoRecoverHouseContents { get; set; } = true;
 
+        // Do not throw away the contents of a house the client still holds just because
+        // they are further off than the view range. The house itself already gets that
+        // allowance and its contents did not, which is what emptied large houses when
+        // you stepped out of the door. Global rather than per-profile so it applies to
+        // every character.
+        [JsonPropertyName("keep_house_contents_loaded")] public bool KeepHouseContentsLoaded { get; set; } = true;
+
         [JsonPropertyName("shard_type")] public int ShardType { get; set; } // 0 = normal (no customization), 1 = old, 2 = outlands??
 
         [JsonPropertyName("fixed_time_step")] public bool FixedTimeStep { get; set; } = true;

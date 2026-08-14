@@ -2345,7 +2345,7 @@ namespace ClassicUO.Game.UI.Gumps
             (
                 s = new SettingsOption
                 (
-                    "", new CheckboxWithLabel(lang.GetExperimental.LogHouseDiagnostics, 0, Settings.GlobalSettings.LogHouseDiagnostics, (b) => { Settings.GlobalSettings.LogHouseDiagnostics = b; }),
+                    "", new CheckboxWithLabel(lang.GetExperimental.LogHouseDiagnostics, 0, Settings.GlobalSettings.LogHouseDiagnostics, (b) => { Settings.GlobalSettings.LogHouseDiagnostics = b; HouseDiagnostics.Announce(); }),
                     MainContent.RightWidth, (int)PAGE.Experimental
                 )
             );
@@ -2358,6 +2358,18 @@ namespace ClassicUO.Game.UI.Gumps
                 s = new SettingsOption
                 (
                     "", new CheckboxWithLabel(lang.GetExperimental.AutoRecoverHouseContents, 0, Settings.GlobalSettings.AutoRecoverHouseContents, (b) => { Settings.GlobalSettings.AutoRecoverHouseContents = b; }),
+                    MainContent.RightWidth, (int)PAGE.Experimental
+                )
+            );
+
+            PositionHelper.PositionControl(s.FullControl);
+            PositionHelper.BlankLine();
+
+            options.Add
+            (
+                s = new SettingsOption
+                (
+                    "", new CheckboxWithLabel(lang.GetExperimental.KeepHouseContentsLoaded, 0, Settings.GlobalSettings.KeepHouseContentsLoaded, (b) => { Settings.GlobalSettings.KeepHouseContentsLoaded = b; }),
                     MainContent.RightWidth, (int)PAGE.Experimental
                 )
             );

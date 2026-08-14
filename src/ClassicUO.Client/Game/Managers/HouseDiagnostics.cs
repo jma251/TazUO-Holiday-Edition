@@ -558,7 +558,7 @@ namespace ClassicUO.Game.Managers
                       + $"\tcentre=({World.RangeSize.X},{World.RangeSize.Y})"
                       + $"\tviewrange={World.ClientViewRange}"
                       + $"\titems={World.Items.Count}\tmobiles={World.Mobiles.Count}"
-                      + $"\thouses={CountHouses()}");
+                      + $"\thouses={CountHouses()}\tkeptbyhouse={KeptByHouse}");
 
                 foreach (House house in World.HouseManager.Houses)
                 {
@@ -638,6 +638,14 @@ namespace ClassicUO.Game.Managers
         private static long _handovers;
 
         /// <summary>
+        /// How many items were spared the distance cull this frame because they were
+        /// standing inside a house the client still holds. Reset by World.Update each
+        /// pass and reported once a second, so the log says what the rule is doing
+        /// without a line per item per frame.
+        /// </summary>
+        public static int KeptByHouse;
+
+        /// <summary>
         /// An item that was in the world but linked to nothing, and has been put back.
         /// This is the thing that was invisible, named.
         /// </summary>
@@ -673,14 +681,20 @@ namespace ClassicUO.Game.Managers
         // one second of tail is at risk if the client is killed outright.
         private static StreamWriter _writer;
         private static uint _lastFlush;
-        private static bool _writerFailed;
+        /// <summary>Earliest tick at which opening the log may be attempted again.</summary>
+        private static uint _retryWriterAt;
 
         // Packets are read on the network path and everything else on the game loop, so
         // two threads can reach this at once. One lock, held only for the write itself.
         private static readonly object _sync = new object();
 
-        /// <summary>Size at which the log is rolled, so a long session cannot grow past uploading.</summary>
-        private const long MaxBytes = 128L * 1024L * 1024L;
+        /// <summary>
+        /// Size at which the log is rolled. 25 MB because that is what can actually be
+        /// sent for reading - a 32 MB log was over the limit and had to be zipped by
+        /// hand. Two files are kept, so the useful window is 50 MB, and the newest is
+        /// always houselog.txt.
+        /// </summary>
+        private const long MaxBytes = 25L * 1024L * 1024L;
 
         private static void Write(string line)
         {
@@ -713,7 +727,7 @@ namespace ClassicUO.Game.Managers
                     if (Time.Ticks - _lastFlush >= 1000)
                     {
                         _lastFlush = Time.Ticks;
-                        writer.Flush();
+                        FlushHard(writer);
                     }
                 }
             }
@@ -723,12 +737,45 @@ namespace ClassicUO.Game.Managers
             }
         }
 
+        /// <summary>
+        /// Flush all the way to disk rather than just out of the StreamWriter.
+        ///
+        /// A plain Flush() hands the bytes to the OS, which is enough for the data to be
+        /// there but not enough for Windows to update the file's modified time while the
+        /// handle is still open. The log looked untouched in Explorer while it was being
+        /// written to, which is a bad thing for a file whose whole job is to be checked.
+        /// FileStream.Flush(true) forces the metadata out too. Once a second is cheap.
+        /// </summary>
+        private static void FlushHard(StreamWriter writer)
+        {
+            writer.Flush();
+
+            try
+            {
+                (writer.BaseStream as FileStream)?.Flush(true);
+            }
+            catch
+            {
+            }
+        }
+
         private static StreamWriter Writer()
         {
-            if (_writer != null || _writerFailed)
+            if (_writer != null)
             {
                 return _writer;
             }
+
+            // A failure here used to be permanent and silent, so one bad moment at
+            // startup - a locked file, a rename that would not go through - meant no log
+            // at all for the whole session with nothing to say why. Back off and try
+            // again instead, which still keeps it from retrying on every packet.
+            if (Time.Ticks < _retryWriterAt)
+            {
+                return null;
+            }
+
+            _retryWriterAt = Time.Ticks + 30000;
 
             try
             {
@@ -737,16 +784,24 @@ namespace ClassicUO.Game.Managers
 
                 string path = Path.Combine(directory, "houselog.txt");
 
-                // Roll rather than truncate, so the run before the one being examined
-                // is still on disk. Two files, bounded, newest always houselog.txt.
-                FileInfo info = new FileInfo(path);
-
-                if (info.Exists && info.Length > MaxBytes)
+                // Roll rather than truncate, so the run before the one being examined is
+                // still on disk. Two files, bounded, newest always houselog.txt. Its own
+                // try: if the rename cannot go through, carry on appending to the big
+                // file rather than losing the log entirely over housekeeping.
+                try
                 {
-                    string previous = Path.Combine(directory, "houselog-previous.txt");
+                    FileInfo info = new FileInfo(path);
 
-                    File.Delete(previous);
-                    File.Move(path, previous);
+                    if (info.Exists && info.Length > MaxBytes)
+                    {
+                        string previous = Path.Combine(directory, "houselog-previous.txt");
+
+                        File.Delete(previous);
+                        File.Move(path, previous);
+                    }
+                }
+                catch
+                {
                 }
 
                 bool fresh = !File.Exists(path);
@@ -778,13 +833,59 @@ namespace ClassicUO.Game.Managers
             }
             catch
             {
-                // Somewhere unwritable, or the file is held open elsewhere. Give up
-                // quietly and permanently rather than retrying on every packet.
-                _writerFailed = true;
+                // Somewhere unwritable, or the file is held open elsewhere. The retry
+                // clock set above keeps this from being attempted on every packet, and
+                // the next attempt is thirty seconds away rather than never.
                 _writer = null;
             }
 
             return _writer;
+        }
+
+        /// <summary>
+        /// Say out loud where the log is and whether it is on.
+        ///
+        /// This exists because the answer was previously invisible: the setting is
+        /// global, so anything that resets settings.json turns it off, and a log that
+        /// has quietly stopped being written looks exactly like a log with nothing to
+        /// report. Called when the option is toggled and once on entering the world.
+        /// </summary>
+        public static void Announce()
+        {
+            if (!Settings.GlobalSettings.LogHouseDiagnostics)
+            {
+                GameActions.Print("House logging is OFF.", 32, Data.MessageType.System);
+
+                return;
+            }
+
+            string path = Path.Combine(CUOEnviroment.ExecutablePath, "Data", "houselog.txt");
+
+            Note($"logging enabled path={path}");
+            Flush();
+
+            long size = -1;
+
+            try
+            {
+                FileInfo info = new FileInfo(path);
+
+                if (info.Exists)
+                {
+                    size = info.Length;
+                }
+            }
+            catch
+            {
+            }
+
+            GameActions.Print(
+                size < 0
+                    ? "House logging is ON, but the log could not be written. Check the Data folder is writable."
+                    : $"House logging is ON -> Data/houselog.txt ({size / 1024} KB).",
+                size < 0 ? (ushort)32 : (ushort)68,
+                Data.MessageType.System
+            );
         }
 
         /// <summary>Push whatever is buffered to disk. Called when the client shuts down cleanly.</summary>
