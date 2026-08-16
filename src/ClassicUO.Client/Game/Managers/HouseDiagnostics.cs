@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using ClassicUO.Configuration;
@@ -88,6 +89,154 @@ namespace ClassicUO.Game.Managers
             Write($"response\thouse=0x{serial:X8}");
         }
 
+
+        /// <summary>
+        /// Is this position standing inside a house the client holds, and which one?
+        ///
+        /// The whole lifecycle log is filtered through this. An empty house is a
+        /// question about the things that belong to a house, and everything else on the
+        /// map is noise that has drowned this file before.
+        /// </summary>
+        public static bool InAnyLoadedHouse(int x, int y, out uint houseSerial)
+        {
+            houseSerial = 0;
+
+            foreach (House house in World.HouseManager.Houses)
+            {
+                if (house.Serial == 0)
+                {
+                    continue;
+                }
+
+                Item multi = World.Items.Get(house.Serial);
+
+                if (multi == null || multi.IsDestroyed || !multi.MultiInfo.HasValue)
+                {
+                    continue;
+                }
+
+                if (x >= multi.X + multi.MultiInfo.Value.X
+                    && x <= multi.X + multi.MultiInfo.Value.Width
+                    && y >= multi.Y + multi.MultiInfo.Value.Y
+                    && y <= multi.Y + multi.MultiInfo.Value.Height)
+                {
+                    houseSerial = house.Serial;
+
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// The server has described an on-ground item standing inside a house. This is
+        /// the top of the chain: if an empty house never produces these, nothing was
+        /// ever sent and no amount of looking at the client will explain it.
+        /// </summary>
+        public static void LogHouseItemArrived(Item item, bool created)
+        {
+            if (!IsEnabled || item == null || !World.InGame)
+            {
+                return;
+            }
+
+            if (!InAnyLoadedHouse(item.X, item.Y, out uint houseSerial))
+            {
+                return;
+            }
+
+            Write(
+                $"arrive\tserial=0x{item.Serial:X8}\tgraphic=0x{item.Graphic:X4}"
+                + $"\tat=({item.X},{item.Y},{item.Z})\thouse=0x{houseSerial:X8}"
+                + $"\tcreated={created}\tcontainer=0x{item.Container:X8}"
+            );
+        }
+
+        /// <summary>
+        /// The server has ordered an item removed. Logged separately from the destroy
+        /// below so "the server took it away" can be told apart from "the client threw
+        /// it away", which is the difference between a shard behaviour and a bug here.
+        /// </summary>
+        public static void LogHouseItemDeleteOrdered(Item item)
+        {
+            if (!IsEnabled || item == null || !World.InGame)
+            {
+                return;
+            }
+
+            if (!InAnyLoadedHouse(item.X, item.Y, out uint houseSerial))
+            {
+                return;
+            }
+
+            Write(
+                $"srvdelete\tserial=0x{item.Serial:X8}\tgraphic=0x{item.Graphic:X4}"
+                + $"\tat=({item.X},{item.Y},{item.Z})\thouse=0x{houseSerial:X8}"
+            );
+        }
+
+        /// <summary>
+        /// An item standing in a house is being destroyed, and the call stack that is
+        /// doing it.
+        ///
+        /// Taken from inside Destroy rather than from the call sites, because the call
+        /// sites are the thing in question - instrumenting the ones already suspected
+        /// would only ever confirm a suspicion and would say nothing about the path
+        /// nobody has thought of. Everything that destroys an item passes through here.
+        ///
+        /// The stack costs real time to walk, which is why it is taken only for an item
+        /// inside a house, with the log switched on.
+        /// </summary>
+        public static void LogHouseItemDestroyed(Item item)
+        {
+            if (!IsEnabled || item == null || !World.InGame)
+            {
+                return;
+            }
+
+            if (!InAnyLoadedHouse(item.X, item.Y, out uint houseSerial))
+            {
+                return;
+            }
+
+            string via = "?";
+
+            try
+            {
+                StackTrace trace = new StackTrace(2, false);
+                System.Text.StringBuilder sb = new System.Text.StringBuilder();
+
+                for (int i = 0; i < trace.FrameCount && i < 7; i++)
+                {
+                    System.Reflection.MethodBase m = trace.GetFrame(i)?.GetMethod();
+
+                    if (m == null)
+                    {
+                        continue;
+                    }
+
+                    if (sb.Length != 0)
+                    {
+                        sb.Append('<');
+                    }
+
+                    sb.Append(m.DeclaringType?.Name).Append('.').Append(m.Name);
+                }
+
+                via = sb.ToString();
+            }
+            catch
+            {
+            }
+
+            Write(
+                $"destroy\tserial=0x{item.Serial:X8}\tgraphic=0x{item.Graphic:X4}"
+                + $"\tat=({item.X},{item.Y},{item.Z})\thouse=0x{houseSerial:X8}"
+                + $"\tvia={via}"
+            );
+        }
+
         private static long _nextContentsLog;
         private static uint _lastContentsHouse;
 
@@ -146,6 +295,7 @@ namespace ClassicUO.Game.Managers
             int inside = 0;
             int onGround = 0;
             int drawable = 0;
+            int drawn = 0;
 
             foreach (KeyValuePair<uint, Item> pair in World.Items)
             {
@@ -173,6 +323,14 @@ namespace ClassicUO.Game.Managers
                     {
                         drawable++;
                     }
+
+                    // Stamped by the draw loop when the item is actually queued for
+                    // drawing. Two seconds of slack so a frame that skipped it for an
+                    // ordinary reason does not read as never drawn.
+                    if (item.LastDrawnTime != 0 && Time.Ticks - item.LastDrawnTime < 2000)
+                    {
+                        drawn++;
+                    }
                 }
             }
 
@@ -184,7 +342,7 @@ namespace ClassicUO.Game.Managers
                 + $"\tat=({multi.X},{multi.Y},{multi.Z})"
                 + $"\tbounds=({minX},{minY})-({maxX},{maxY})"
                 + $"\tcomponents={(house == null ? -1 : house.Components.Count)}"
-                + $"\tinside={inside}\tonground={onGround}\tintile={drawable}"
+                + $"\tinside={inside}\tonground={onGround}\tintile={drawable}\tdrawn={drawn}"
                 + $"\tplayer=({World.Player.X},{World.Player.Y},{World.Player.Z})"
             );
         }

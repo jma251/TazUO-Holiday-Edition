@@ -1122,6 +1122,11 @@ namespace ClassicUO.Network
                 return;
             }
 
+            if (entity is Item ordered)
+            {
+                HouseDiagnostics.LogHouseItemDeleteOrdered(ordered);
+            }
+
             bool updateAbilities = false;
 
             if (entity is Item it)
@@ -6742,6 +6747,8 @@ namespace ClassicUO.Network
                 if (item.OnGround)
                 {
                     item.SetInWorldTile(item.X, item.Y, item.Z);
+
+                    HouseDiagnostics.LogHouseItemArrived(item, created);
 
                     if (graphic == 0x2006)
                     {

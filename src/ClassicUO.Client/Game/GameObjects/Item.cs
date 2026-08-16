@@ -267,6 +267,10 @@ namespace ClassicUO.Game.GameObjects
                 return;
             }
 
+            // Before anything is torn down, while the position still says where this
+            // was standing. See HouseDiagnostics.LogHouseItemDestroyed.
+            Managers.HouseDiagnostics.LogHouseItemDestroyed(this);
+
             if (Opened)
             {
                 UIManager.GetGump<ContainerGump>(Serial)?.Dispose();
