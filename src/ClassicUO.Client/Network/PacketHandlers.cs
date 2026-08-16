@@ -140,6 +140,7 @@ namespace ClassicUO.Network
                     _ = stream.Dequeue(packetBuffer, 0, packetlength);
 
                     PacketLogger.Default?.Log(packetBuffer.AsSpan(0, packetlength), false);
+                    HouseDiagnostics.LogPacket(packetBuffer.AsSpan(0, packetlength), false);
 
                     // TODO: the pluging function should allow Span<byte> or unsafe type only.
                     // The current one is a bad style decision.

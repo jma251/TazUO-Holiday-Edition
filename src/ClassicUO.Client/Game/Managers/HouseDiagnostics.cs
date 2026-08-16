@@ -580,6 +580,142 @@ namespace ClassicUO.Game.Managers
             }
         }
 
+
+        private static readonly Dictionary<byte, string> _packetNames = new Dictionary<byte, string>
+        {
+            { 0x11, "MobileStatus" },   { 0x1A, "WorldItem" },      { 0x1C, "ASCIIText" },
+            { 0x1D, "DeleteObject" },   { 0x20, "MobileUpdate" },   { 0x21, "DenyWalk" },
+            { 0x22, "Resync/Walk" },    { 0x24, "OpenContainer" },  { 0x25, "ContentsUpdate" },
+            { 0x2E, "EquipItem" },      { 0x3C, "ContainerContents" }, { 0x4F, "LightLevel" },
+            { 0x54, "PlaySound" },      { 0x6D, "PlayMusic" },      { 0x72, "WarMode" },
+            { 0x77, "MobileMoving" },   { 0x78, "MobileIncoming" }, { 0xA1, "UpdateHits" },
+            { 0xBF, "GeneralInfo" },    { 0xC8, "ClientViewRange" },{ 0xD6, "MegaCliloc" },
+            { 0xD8, "CustomHouse" },    { 0xDC, "OPLInfo" },        { 0xF3, "WorldItemNew" },
+        };
+
+        private static long _pktWindow;
+        private static readonly Dictionary<byte, int> _pktCounts = new Dictionary<byte, int>();
+
+        /// <summary>
+        /// Every packet, in and out - what it is and how big, and for the ones that
+        /// carry an object, which object and where.
+        ///
+        /// No hex. The previous version of this wrote whole packets and reached five
+        /// hundred megabytes; an id, a length and the decoded fields answer the question
+        /// this exists for - whether the server said anything at all - at a fraction of
+        /// the size.
+        ///
+        /// Also totalled once a second per packet type, because "nothing arrived, then
+        /// three thousand items arrived" is a shape that is easier to see in counts than
+        /// in three thousand lines.
+        /// </summary>
+        public static void LogPacket(ReadOnlySpan<byte> data, bool toServer)
+        {
+            if (!IsEnabled || data.Length == 0)
+            {
+                return;
+            }
+
+            byte id = data[0];
+
+            // Never these two. They carry account name and password in clear.
+            if (id == 0x80 || id == 0x91)
+            {
+                return;
+            }
+
+            try
+            {
+                _packetNames.TryGetValue(id, out string name);
+
+                string extra = string.Empty;
+
+                if (!toServer && (id == 0x1A || id == 0xF3))
+                {
+                    extra = DescribeWorldItem(data, id);
+                }
+                else if (!toServer && id == 0x1D && data.Length >= 5)
+                {
+                    extra = $"\tserial=0x{ReadU32(data, 1):X8}";
+                }
+                else if (!toServer && id == 0xD8 && data.Length >= 11)
+                {
+                    extra = $"\tserial=0x{ReadU32(data, 4):X8}";
+                }
+
+                Write(
+                    $"pkt\tdir={(toServer ? "out" : "in")}\tid=0x{id:X2}"
+                    + $"\tname={(name ?? "-")}\tlen={data.Length}{extra}"
+                );
+
+                if (!toServer)
+                {
+                    _pktCounts.TryGetValue(id, out int n);
+                    _pktCounts[id] = n + 1;
+
+                    if (Time.Ticks >= _pktWindow)
+                    {
+                        _pktWindow = Time.Ticks + 1000;
+
+                        if (_pktCounts.Count != 0)
+                        {
+                            System.Text.StringBuilder sb = new System.Text.StringBuilder("pktrate");
+
+                            foreach (KeyValuePair<byte, int> pair in _pktCounts)
+                            {
+                                _packetNames.TryGetValue(pair.Key, out string pn);
+
+                                sb.Append('\t').Append(pn ?? $"0x{pair.Key:X2}").Append('=').Append(pair.Value);
+                            }
+
+                            Write(sb.ToString());
+                            _pktCounts.Clear();
+                        }
+                    }
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        private static string DescribeWorldItem(ReadOnlySpan<byte> data, byte id)
+        {
+            // 0x1A: serial, graphic, [amount], x, y, [dir], [hue], [flags]
+            // 0xF3: 0x0001, type, serial, graphic, inc, amount, amount, x, y, z, dir, hue, flags
+            if (id == 0xF3 && data.Length >= 24)
+            {
+                uint serial = ReadU32(data, 8);
+                ushort graphic = (ushort)((data[12] << 8) | data[13]);
+                ushort x = (ushort)(((data[18] << 8) | data[19]) & 0x7FFF);
+                ushort y = (ushort)(((data[20] << 8) | data[21]) & 0x3FFF);
+                sbyte z = (sbyte)data[22];
+
+                string house = InAnyKnownHouse(x, y, out uint hs) ? $"0x{hs:X8}" : "-";
+
+                return $"\tserial=0x{serial:X8}\tgraphic=0x{graphic:X4}\tat=({x},{y},{z})\tinhouse={house}";
+            }
+
+            if (id == 0x1A && data.Length >= 12)
+            {
+                uint serial = ReadU32(data, 3);
+
+                return $"\tserial=0x{serial:X8}";
+            }
+
+            return string.Empty;
+        }
+
+        private static uint ReadU32(ReadOnlySpan<byte> d, int i)
+        {
+            if (i + 3 >= d.Length)
+            {
+                return 0;
+            }
+
+            return (uint)((d[i] << 24) | (d[i + 1] << 16) | (d[i + 2] << 8) | d[i + 3]);
+        }
+
         /// <summary>Tooltips arrive with newlines in them, and this file is one record a line.</summary>
         private static string Flatten(string text)
         {
@@ -591,33 +727,78 @@ namespace ClassicUO.Game.Managers
             return text.Replace("\r", " ").Replace("\n", " | ").Replace("\t", " ");
         }
 
+        private static readonly object _writeLock = new object();
+        private static readonly System.Text.StringBuilder _buffer = new System.Text.StringBuilder(1 << 16);
+        private static long _nextFlush;
+
+        /// <summary>
+        /// Buffered on purpose. Packets arrive in the hundreds a second and the previous
+        /// version opened the file for every line, which is a stutter the client would
+        /// wear for as long as the log was on. Sending is done off the game loop, so the
+        /// buffer is locked.
+        /// </summary>
         private static void Write(string line)
         {
             try
             {
-                string directory = Path.Combine(CUOEnviroment.ExecutablePath, "Data");
-                Directory.CreateDirectory(directory);
-
-                string path = Path.Combine(directory, "houselog.txt");
-
-                if (!File.Exists(path))
+                lock (_writeLock)
                 {
-                    File.AppendAllText(
-                        path,
-                        "# timestamp\tevent\tdetails" + Environment.NewLine
-                    );
-                }
+                    _buffer
+                        .Append(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture))
+                        .Append('\t')
+                        .Append(line)
+                        .Append(Environment.NewLine);
 
-                File.AppendAllText(
-                    path,
-                    DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture)
-                        + "\t" + line + Environment.NewLine
-                );
+                    if (_buffer.Length >= 32768 || Time.Ticks >= _nextFlush)
+                    {
+                        FlushLocked();
+                    }
+                }
             }
             catch
             {
                 // A diagnostic must never interrupt the game or crash the client.
             }
         }
+
+        /// <summary>Push whatever is held out to disk. Safe to call at any time.</summary>
+        public static void Flush()
+        {
+            try
+            {
+                lock (_writeLock)
+                {
+                    FlushLocked();
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        private static void FlushLocked()
+        {
+            _nextFlush = Time.Ticks + 1000;
+
+            if (_buffer.Length == 0)
+            {
+                return;
+            }
+
+            string directory = Path.Combine(CUOEnviroment.ExecutablePath, "Data");
+            Directory.CreateDirectory(directory);
+
+            string path = Path.Combine(directory, "houselog.txt");
+
+            if (!File.Exists(path))
+            {
+                File.AppendAllText(path, "# timestamp\tevent\tdetails" + Environment.NewLine);
+            }
+
+            File.AppendAllText(path, _buffer.ToString());
+
+            _buffer.Clear();
+        }
+
     }
 }

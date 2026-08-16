@@ -300,6 +300,9 @@ namespace ClassicUO
         public void SetScene(Scene scene)
         {
             Scene?.Dispose();
+
+            // The log is buffered, so a clean exit has to push the tail out.
+            Game.Managers.HouseDiagnostics.Flush();
             Scene = scene;
             Scene?.Load();
 

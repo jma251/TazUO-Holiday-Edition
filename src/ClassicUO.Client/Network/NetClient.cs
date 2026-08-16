@@ -301,6 +301,7 @@ namespace ClassicUO.Network
             if (message.IsEmpty) return;
 
             PacketLogger.Default?.Log(message, true);
+            Game.Managers.HouseDiagnostics.LogPacket(message, true);
 
             if (!skipEncryption)
             {
