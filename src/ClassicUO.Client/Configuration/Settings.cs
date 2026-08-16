@@ -138,7 +138,9 @@ namespace ClassicUO.Configuration
         [JsonPropertyName("keep_house_contents_loaded")] public bool KeepHouseContentsLoaded { get; set; } = true;
 
         // Ask the server for a house's contents again when the client takes back a house
-        // it had emptied on the way out. The client deletes what is standing in a house
+        // it had emptied on the way out. Asking with a resync was tried and the server
+        // did not answer with the contents, so this now nudges the view range instead,
+        // which is a different path on the server. The client deletes what is standing in a house
         // the moment the house goes out of range, and there is no message for telling the
         // server that, so without this the house comes back furnished with nothing.
         // Global rather than per-profile so it applies to every character.
