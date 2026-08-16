@@ -58,6 +58,9 @@ namespace ClassicUO.Game.Managers
             {
                 if (_houses.TryGetValue(serial, out House house))
                 {
+                    // The moment the contents stop being spared by the distance cull.
+                    HouseDiagnostics.LogHouseLetGo(serial, "out_of_range", house.Components.Count);
+
 
                     house.ClearComponents();
                     _houses.Remove(serial);
