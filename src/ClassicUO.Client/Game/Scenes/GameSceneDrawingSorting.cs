@@ -657,6 +657,8 @@ namespace ClassicUO.Game.Scenes
                 return;
             }
 
+            obj.LastDrawnTime = Time.Ticks;
+
             // slow as fuck
             if (
                 allowSelection

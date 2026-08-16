@@ -190,6 +190,9 @@ namespace ClassicUO.Game.GameObjects
         /// that over before unlinking itself. See RemoveFromTile.
         /// </summary>
         internal Chunk TileChunk;
+
+        /// <summary>When the draw loop last queued this for drawing. Diagnostic only.</summary>
+        internal long LastDrawnTime;
         internal int TileCellX;
         internal int TileCellY;
 
