@@ -911,6 +911,7 @@ namespace ClassicUO.Game.Scenes
             }
 
             World.Update();
+            HouseDiagnostics.LogHouseContents();
             _animatedStaticsManager.Process();
             BoatMovingManager.Update();
             Pathfinder.ProcessAutoWalk();

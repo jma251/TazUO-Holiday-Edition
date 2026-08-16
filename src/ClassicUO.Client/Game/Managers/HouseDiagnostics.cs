@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using ClassicUO.Configuration;
@@ -85,6 +86,107 @@ namespace ClassicUO.Game.Managers
             }
 
             Write($"response\thouse=0x{serial:X8}");
+        }
+
+        private static long _nextContentsLog;
+        private static uint _lastContentsHouse;
+
+        /// <summary>
+        /// Once a second while the player is standing in a house, how much of that house
+        /// the client is actually holding.
+        ///
+        /// This is the one number that splits an empty-looking house in half. The client
+        /// draws what it holds, so if the count is above zero while the room looks bare,
+        /// the things are in memory and something in the drawing is dropping them; if it
+        /// is zero, they never arrived or something took them away. Every other question
+        /// about an empty house is guesswork until this one is answered.
+        ///
+        /// Counted the same way the house itself is bounded - the multi's own footprint -
+        /// so it means "things standing in this house", not "things near the player".
+        /// </summary>
+        public static void LogHouseContents()
+        {
+            if (!IsEnabled || !World.InGame)
+            {
+                return;
+            }
+
+            if (!TryGetHouseContainingPlayer(out uint houseSerial))
+            {
+                _lastContentsHouse = 0;
+
+                return;
+            }
+
+            // Every second, and immediately on stepping into a different house, so
+            // walking in on a bare room is recorded at the moment it is seen rather than
+            // up to a second later.
+            if (houseSerial == _lastContentsHouse && Time.Ticks < _nextContentsLog)
+            {
+                return;
+            }
+
+            _lastContentsHouse = houseSerial;
+            _nextContentsLog = Time.Ticks + 1000;
+
+            Item multi = World.Items.Get(houseSerial);
+
+            if (multi == null || !multi.MultiInfo.HasValue)
+            {
+                Write($"contents\thouse=0x{houseSerial:X8}\tmulti=missing");
+
+                return;
+            }
+
+            int minX = multi.X + multi.MultiInfo.Value.X;
+            int maxX = multi.X + multi.MultiInfo.Value.Width;
+            int minY = multi.Y + multi.MultiInfo.Value.Y;
+            int maxY = multi.Y + multi.MultiInfo.Value.Height;
+
+            int inside = 0;
+            int onGround = 0;
+            int drawable = 0;
+
+            foreach (KeyValuePair<uint, Item> pair in World.Items)
+            {
+                Item item = pair.Value;
+
+                if (item.IsMulti || item.IsDestroyed)
+                {
+                    continue;
+                }
+
+                if (item.X < minX || item.X > maxX || item.Y < minY || item.Y > maxY)
+                {
+                    continue;
+                }
+
+                inside++;
+
+                if (item.OnGround)
+                {
+                    onGround++;
+
+                    // Linked into the map cell it stands on. An item that is not is held
+                    // by the world and reachable by nothing that draws.
+                    if (item.TileChunk != null)
+                    {
+                        drawable++;
+                    }
+                }
+            }
+
+            House house = null;
+            World.HouseManager.TryGetHouse(houseSerial, out house);
+
+            Write(
+                $"contents\thouse=0x{houseSerial:X8}"
+                + $"\tat=({multi.X},{multi.Y},{multi.Z})"
+                + $"\tbounds=({minX},{minY})-({maxX},{maxY})"
+                + $"\tcomponents={(house == null ? -1 : house.Components.Count)}"
+                + $"\tinside={inside}\tonground={onGround}\tintile={drawable}"
+                + $"\tplayer=({World.Player.X},{World.Player.Y},{World.Player.Z})"
+            );
         }
 
         private static bool TryGetHouseContainingPlayer(out uint houseSerial)
