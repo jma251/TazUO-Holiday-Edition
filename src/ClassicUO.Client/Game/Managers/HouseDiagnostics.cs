@@ -649,9 +649,11 @@ namespace ClassicUO.Game.Managers
                 {
                     extra = $"\tserial=0x{ReadU32(data, 1):X8}";
                 }
-                else if (!toServer && id == 0xD8 && data.Length >= 11)
+                else if (!toServer && id == 0xD8 && data.Length >= 9)
                 {
-                    extra = $"\tserial=0x{ReadU32(data, 4):X8}";
+                    // Variable length, so the reader starts past the two length bytes:
+                    // compression at 3, the response flag at 4, the serial at 5.
+                    extra = $"\tserial=0x{ReadU32(data, 5):X8}";
                 }
 
                 Write(
@@ -690,28 +692,40 @@ namespace ClassicUO.Game.Managers
             }
         }
 
+        /// <summary>
+        /// The fields of a world item packet, read at the offsets its own handler reads
+        /// them at.
+        ///
+        /// Worth stating because the first version of this guessed and was wrong, and a
+        /// wrong offset does not fail loudly - it prints a plausible-looking number and
+        /// quietly makes every count taken from it meaningless.
+        ///
+        /// 0xF3, from UpdateItemSA: id, two length bytes, type at 3, serial at 4,
+        /// graphic at 8, inc at 10, amount at 11, unknown at 13, x at 15, y at 17,
+        /// z at 19.
+        ///
+        /// 0x1A, from UpdateItem: id, two length bytes, serial at 3. The rest of that
+        /// one is conditional on flag bits in the serial and the graphic, so only the
+        /// serial is taken.
+        /// </summary>
         private static string DescribeWorldItem(ReadOnlySpan<byte> data, byte id)
         {
-            // 0x1A: serial, graphic, [amount], x, y, [dir], [hue], [flags]
-            // 0xF3: 0x0001, type, serial, graphic, inc, amount, amount, x, y, z, dir, hue, flags
-            if (id == 0xF3 && data.Length >= 24)
+            if (id == 0xF3 && data.Length >= 20)
             {
-                uint serial = ReadU32(data, 8);
-                ushort graphic = (ushort)((data[12] << 8) | data[13]);
-                ushort x = (ushort)(((data[18] << 8) | data[19]) & 0x7FFF);
-                ushort y = (ushort)(((data[20] << 8) | data[21]) & 0x3FFF);
-                sbyte z = (sbyte)data[22];
+                uint serial = ReadU32(data, 4);
+                ushort graphic = (ushort)((data[8] << 8) | data[9]);
+                ushort x = (ushort)((((data[15] << 8) | data[16])) & 0x7FFF);
+                ushort y = (ushort)((((data[17] << 8) | data[18])) & 0x3FFF);
+                sbyte z = (sbyte)data[19];
 
                 string house = InAnyKnownHouse(x, y, out uint hs) ? $"0x{hs:X8}" : "-";
 
                 return $"\tserial=0x{serial:X8}\tgraphic=0x{graphic:X4}\tat=({x},{y},{z})\tinhouse={house}";
             }
 
-            if (id == 0x1A && data.Length >= 12)
+            if (id == 0x1A && data.Length >= 7)
             {
-                uint serial = ReadU32(data, 3);
-
-                return $"\tserial=0x{serial:X8}";
+                return $"\tserial=0x{ReadU32(data, 3):X8}";
             }
 
             return string.Empty;
