@@ -21,10 +21,16 @@ namespace ClassicUO.Game.Managers
     /// side the client was told about those items once and never said otherwise. There
     /// is no message for "I have thrown away what you sent me".
     ///
-    /// So the client has to ask, and packet 0x22 is the only thing that asks - the
-    /// server's handler for it ends in SendEverything. What stepping off the foundation
-    /// and back on does is trip the server's own region enter, which does the same
-    /// thing; this simply does not require the player to know that trick.
+    /// Asking with packet 0x22 was tried and does not work. A capture has the ask going
+    /// out and the house sitting at sixteen of two hundred and thirty-eight for twenty
+    /// seconds afterwards, then filling the moment the player walked out and back. So
+    /// whatever the server gates house contents on, its resync handler does not trip it.
+    ///
+    /// The view range is the other lever, and it is a different path on the server: a
+    /// change to it makes the server work out afresh what is in range for this client
+    /// and send that. Observed on this shard - one click of the range slider, the player
+    /// standing still, and things the client had stopped hearing about were described
+    /// again. One tile is enough, and the range is put straight back.
     ///
     /// Asked for at one moment only: a house is taken back that this client previously
     /// dropped while it was holding something. Not on entering a house, which costs a
@@ -123,9 +129,19 @@ namespace ClassicUO.Game.Managers
 
             _nextAsk = Time.Ticks + AskInterval;
 
-            HouseDiagnostics.Note($"recover house=0x{serial:X8} dropped_holding={held}");
+            HouseDiagnostics.Note($"recover house=0x{serial:X8} dropped_holding={held} kind=rangenudge");
 
-            NetClient.Socket.Send_Resync();
+            // Down one and straight back, in the same breath, so the range the server
+            // ends up holding is the one it started with.
+            byte anchor = World.ClientViewRange;
+
+            if (anchor <= Constants.MIN_VIEW_RANGE)
+            {
+                return;
+            }
+
+            NetClient.Socket.Send_ClientViewRange((byte)(anchor - 1));
+            NetClient.Socket.Send_ClientViewRange(anchor);
         }
     }
 }
