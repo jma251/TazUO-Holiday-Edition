@@ -5,6 +5,7 @@ using System.Globalization;
 using System.IO;
 using ClassicUO.Configuration;
 using ClassicUO.Game.GameObjects;
+using Microsoft.Xna.Framework;
 
 namespace ClassicUO.Game.Managers
 {
@@ -91,19 +92,25 @@ namespace ClassicUO.Game.Managers
 
 
         /// <summary>
-        /// Is this position standing inside a house the client holds, and which one?
+        /// Every house footprint seen this session, kept after the house is let go of.
         ///
-        /// The whole lifecycle log is filtered through this. An empty house is a
-        /// question about the things that belong to a house, and everything else on the
-        /// map is noise that has drowned this file before.
+        /// Asking HouseManager is not enough. A house is dropped the moment it goes out
+        /// of range, and that is exactly when its contents are most likely to be taken -
+        /// so a filter that needs a loaded house is blind at the one moment worth
+        /// watching. A captured session lost two hundred and twenty-two items between
+        /// two visits with no cull, no server delete and no destroy recorded, because
+        /// all of it happened while the house was not loaded.
+        ///
+        /// Bounds do not move, so remembering them costs a few numbers per house and
+        /// nothing else.
         /// </summary>
-        public static bool InAnyLoadedHouse(int x, int y, out uint houseSerial)
-        {
-            houseSerial = 0;
+        private static readonly Dictionary<uint, Rectangle> _footprints = new Dictionary<uint, Rectangle>();
 
+        private static void RememberFootprints()
+        {
             foreach (House house in World.HouseManager.Houses)
             {
-                if (house.Serial == 0)
+                if (house.Serial == 0 || _footprints.ContainsKey(house.Serial))
                 {
                     continue;
                 }
@@ -115,18 +122,87 @@ namespace ClassicUO.Game.Managers
                     continue;
                 }
 
-                if (x >= multi.X + multi.MultiInfo.Value.X
-                    && x <= multi.X + multi.MultiInfo.Value.Width
-                    && y >= multi.Y + multi.MultiInfo.Value.Y
-                    && y <= multi.Y + multi.MultiInfo.Value.Height)
+                _footprints[house.Serial] = new Rectangle(
+                    multi.X + multi.MultiInfo.Value.X,
+                    multi.Y + multi.MultiInfo.Value.Y,
+                    multi.MultiInfo.Value.Width - multi.MultiInfo.Value.X,
+                    multi.MultiInfo.Value.Height - multi.MultiInfo.Value.Y
+                );
+
+                // Named once, the first time the house is seen. The tooltip is where the
+                // owner is - the client has no notion of who owns a house otherwise, so
+                // this is the only way a log line can say "this one is yours" instead of
+                // leaving it to be guessed from coordinates.
+                World.OPL.TryGetNameAndData(house.Serial, out string name, out string data);
+
+                Write(
+                    $"known\thouse=0x{house.Serial:X8}\tat=({multi.X},{multi.Y},{multi.Z})"
+                    + $"\tgraphic=0x{multi.Graphic:X4}"
+                    + $"\tbounds=({_footprints[house.Serial].X},{_footprints[house.Serial].Y})"
+                    + $"-({_footprints[house.Serial].X + _footprints[house.Serial].Width},"
+                    + $"{_footprints[house.Serial].Y + _footprints[house.Serial].Height})"
+                    + $"\tname={Flatten(name)}\ttip={Flatten(data)}"
+                );
+            }
+        }
+
+        /// <summary>
+        /// Is this position inside a house this session has ever known about? Loaded or
+        /// not - see the note on the footprints above.
+        /// </summary>
+        public static bool InAnyKnownHouse(int x, int y, out uint houseSerial)
+        {
+            houseSerial = 0;
+
+            foreach (KeyValuePair<uint, Rectangle> pair in _footprints)
+            {
+                Rectangle r = pair.Value;
+
+                if (x >= r.X && x <= r.X + r.Width && y >= r.Y && y <= r.Y + r.Height)
                 {
-                    houseSerial = house.Serial;
+                    houseSerial = pair.Key;
 
                     return true;
                 }
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// A house has been let go of. This is the moment its contents stop being spared
+        /// by the distance cull, so anything that happens to them just after is worth
+        /// lining up against it.
+        /// </summary>
+        public static void LogHouseLetGo(uint serial, string why, int components)
+        {
+            if (!IsEnabled)
+            {
+                return;
+            }
+
+            int held = 0;
+
+            if (_footprints.TryGetValue(serial, out Rectangle r))
+            {
+                foreach (KeyValuePair<uint, Item> pair in World.Items)
+                {
+                    Item item = pair.Value;
+
+                    if (!item.IsMulti && !item.IsDestroyed
+                        && item.X >= r.X && item.X <= r.X + r.Width
+                        && item.Y >= r.Y && item.Y <= r.Y + r.Height)
+                    {
+                        held++;
+                    }
+                }
+            }
+
+            Write(
+                $"letgo\thouse=0x{serial:X8}\twhy={why}\tcomponents={components}"
+                + $"\theld={held}"
+                + $"\tplayer={(World.Player == null ? "-" : $"({World.Player.X},{World.Player.Y},{World.Player.Z})")}"
+            );
         }
 
         /// <summary>
@@ -141,7 +217,7 @@ namespace ClassicUO.Game.Managers
                 return;
             }
 
-            if (!InAnyLoadedHouse(item.X, item.Y, out uint houseSerial))
+            if (!InAnyKnownHouse(item.X, item.Y, out uint houseSerial))
             {
                 return;
             }
@@ -165,7 +241,7 @@ namespace ClassicUO.Game.Managers
                 return;
             }
 
-            if (!InAnyLoadedHouse(item.X, item.Y, out uint houseSerial))
+            if (!InAnyKnownHouse(item.X, item.Y, out uint houseSerial))
             {
                 return;
             }
@@ -195,7 +271,7 @@ namespace ClassicUO.Game.Managers
                 return;
             }
 
-            if (!InAnyLoadedHouse(item.X, item.Y, out uint houseSerial))
+            if (!InAnyKnownHouse(item.X, item.Y, out uint houseSerial))
             {
                 return;
             }
@@ -259,6 +335,8 @@ namespace ClassicUO.Game.Managers
             {
                 return;
             }
+
+            RememberFootprints();
 
             if (!TryGetHouseContainingPlayer(out uint houseSerial))
             {
@@ -353,6 +431,15 @@ namespace ClassicUO.Game.Managers
 
             foreach (House house in World.HouseManager.Houses)
             {
+                // Never the placement preview. It is kept under serial zero with no multi
+                // item, and EntityIntoHouse answers yes for every object once the multi is
+                // gone - so it claims the player is standing in it wherever they are, and
+                // every line in this file ends up labelled with a house that is not there.
+                if (house.Serial == 0)
+                {
+                    continue;
+                }
+
                 if (World.HouseManager.EntityIntoHouse(house.Serial, World.Player))
                 {
                     houseSerial = house.Serial;
@@ -362,6 +449,17 @@ namespace ClassicUO.Game.Managers
             }
 
             return false;
+        }
+
+        /// <summary>Tooltips arrive with newlines in them, and this file is one record a line.</summary>
+        private static string Flatten(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return "-";
+            }
+
+            return text.Replace("\r", " ").Replace("\n", " | ").Replace("\t", " ");
         }
 
         private static void Write(string line)
