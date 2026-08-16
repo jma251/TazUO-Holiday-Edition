@@ -198,6 +198,8 @@ namespace ClassicUO.Game.Managers
                 }
             }
 
+            Dump(serial, "letgo");
+
             Write(
                 $"letgo\thouse=0x{serial:X8}\twhy={why}\tcomponents={components}"
                 + $"\theld={held}"
@@ -315,6 +317,7 @@ namespace ClassicUO.Game.Managers
 
         private static long _nextContentsLog;
         private static uint _lastContentsHouse;
+        private static int _lastInsideCount = -1;
 
         /// <summary>
         /// Once a second while the player is standing in a house, how much of that house
@@ -352,6 +355,8 @@ namespace ClassicUO.Game.Managers
             {
                 return;
             }
+
+            bool entered = houseSerial != _lastContentsHouse;
 
             _lastContentsHouse = houseSerial;
             _nextContentsLog = Time.Ticks + 1000;
@@ -415,6 +420,15 @@ namespace ClassicUO.Game.Managers
             House house = null;
             World.HouseManager.TryGetHouse(houseSerial, out house);
 
+            // On the way in, and on any change in what is being held. Those are the
+            // only moments a full dump says anything the previous one did not.
+            if (entered || inside != _lastInsideCount)
+            {
+                Dump(houseSerial, entered ? "entry" : "changed");
+            }
+
+            _lastInsideCount = inside;
+
             Write(
                 $"contents\thouse=0x{houseSerial:X8}"
                 + $"\tat=({multi.X},{multi.Y},{multi.Z})"
@@ -449,6 +463,121 @@ namespace ClassicUO.Game.Managers
             }
 
             return false;
+        }
+
+
+        /// <summary>
+        /// Everything the client knows about a house, and about every item standing in
+        /// it. No filtering and no judgement about what is worth recording - the point
+        /// is that a question about a house should be answerable from a capture rather
+        /// than needing another build to add the one field that was left out.
+        ///
+        /// Written on stepping into a house, on the count changing while inside, on the
+        /// house being let go of, and on demand with the -housedump command.
+        /// </summary>
+        public static void Dump(uint serial, string why)
+        {
+            if (!IsEnabled)
+            {
+                return;
+            }
+
+            // A house being dumped may never have been walked into, so its bounds may
+            // not have been picked up yet.
+            RememberFootprints();
+
+            Item multi = World.Items.Get(serial);
+            World.HouseManager.TryGetHouse(serial, out House house);
+
+            World.OPL.TryGetNameAndData(serial, out string hname, out string htip);
+
+            string bounds = "-";
+
+            if (_footprints.TryGetValue(serial, out Rectangle r))
+            {
+                bounds = $"({r.X},{r.Y})-({r.X + r.Width},{r.Y + r.Height})";
+            }
+
+            Write(
+                $"dump\thouse=0x{serial:X8}\twhy={why}"
+                + $"\tmulti={(multi == null ? "missing" : $"0x{multi.Graphic:X4}")}"
+                + $"\tat={(multi == null ? "-" : $"({multi.X},{multi.Y},{multi.Z})")}"
+                + $"\thue={(multi == null ? 0 : multi.Hue)}"
+                + $"\tflags={(multi == null ? "-" : multi.Flags.ToString())}"
+                + $"\tbounds={bounds}"
+                + $"\tcomponents={(house == null ? -1 : house.Components.Count)}"
+                + $"\trevision={(house == null ? 0 : house.Revision)}"
+                + $"\tcustom={(house == null ? false : house.IsCustom)}"
+                + $"\tname={Flatten(hname)}\ttip={Flatten(htip)}"
+                + $"\tplayerinside={(World.Player != null && World.HouseManager.EntityIntoHouse(serial, World.Player))}"
+                + $"\tplayer={(World.Player == null ? "-" : $"({World.Player.X},{World.Player.Y},{World.Player.Z})")}"
+            );
+
+            if (bounds == "-")
+            {
+                return;
+            }
+
+            int count = 0;
+
+            foreach (KeyValuePair<uint, Item> pair in World.Items)
+            {
+                Item item = pair.Value;
+
+                if (item.X < r.X || item.X > r.X + r.Width || item.Y < r.Y || item.Y > r.Y + r.Height)
+                {
+                    continue;
+                }
+
+                if (item.IsMulti)
+                {
+                    continue;
+                }
+
+                count++;
+
+                World.OPL.TryGetNameAndData(item.Serial, out string iname, out string itip);
+
+                Write(
+                    $"dumpitem\thouse=0x{serial:X8}\tkey=0x{pair.Key:X8}\tserial=0x{item.Serial:X8}"
+                    + $"\tgraphic=0x{item.Graphic:X4}\tat=({item.X},{item.Y},{item.Z})"
+                    + $"\tamount={item.Amount}\thue={item.Hue}\tlayer={item.Layer}"
+                    + $"\tcontainer=0x{item.Container:X8}\tonground={item.OnGround}"
+                    + $"\tflags={item.Flags}\tcorpse={item.IsCorpse}"
+                    + $"\tintile={item.TileChunk != null}"
+                    + $"\tdrawnms={(item.LastDrawnTime == 0 ? -1 : Time.Ticks - item.LastDrawnTime)}"
+                    + $"\talpha={item.AlphaHue}\tallowdraw={item.AllowedToDraw}"
+                    + $"\tdestroyed={item.IsDestroyed}\tdistance={item.Distance}"
+                    + $"\tname={Flatten(iname)}\ttip={Flatten(itip)}"
+                );
+            }
+
+            Write($"dumpend\thouse=0x{serial:X8}\titems={count}");
+        }
+
+        /// <summary>Every house the client is holding, in full.</summary>
+        public static void DumpAll(string why)
+        {
+            if (!IsEnabled)
+            {
+                return;
+            }
+
+            RememberFootprints();
+
+            List<uint> serials = new List<uint>();
+
+            foreach (House house in World.HouseManager.Houses)
+            {
+                serials.Add(house.Serial);
+            }
+
+            Write($"dumpall\tcount={serials.Count}\twhy={why}");
+
+            for (int i = 0; i < serials.Count; i++)
+            {
+                Dump(serials[i], why);
+            }
         }
 
         /// <summary>Tooltips arrive with newlines in them, and this file is one record a line.</summary>
