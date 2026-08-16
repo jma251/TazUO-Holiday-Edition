@@ -162,6 +162,15 @@ namespace ClassicUO.Game.Managers
             });
 
             Register("version", s => { UIManager.Add(new VersionHistory()); });
+
+            // Everything the client holds about every house it has, written to
+            // Data/houselog.txt. Needs the house log switched on in Experimental.
+            Register("housedump", s =>
+            {
+                HouseDiagnostics.DumpAll("command");
+
+                GameActions.Print("House dump written to Data/houselog.txt (if house logging is on).");
+            });
             Register("rain", s => { Client.Game.GetScene<ClassicUO.Game.Scenes.GameScene>()?.Weather.Generate(WeatherType.WT_RAIN, 30, 75); });
 
             Register("marktile", s =>
