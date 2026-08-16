@@ -137,6 +137,13 @@ namespace ClassicUO.Configuration
         // every character.
         [JsonPropertyName("keep_house_contents_loaded")] public bool KeepHouseContentsLoaded { get; set; } = true;
 
+        // Ask the server for a house's contents again when the client takes back a house
+        // it had emptied on the way out. The client deletes what is standing in a house
+        // the moment the house goes out of range, and there is no message for telling the
+        // server that, so without this the house comes back furnished with nothing.
+        // Global rather than per-profile so it applies to every character.
+        [JsonPropertyName("recover_house_contents")] public bool RecoverHouseContents { get; set; } = true;
+
         // How far to ask the server to send things. Twenty-four is the standard and is
         // what every client has always asked for; it comes from a table of old screen
         // resolutions rather than from the protocol. The server decides what it grants,

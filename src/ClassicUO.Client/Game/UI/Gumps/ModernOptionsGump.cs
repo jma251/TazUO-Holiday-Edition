@@ -2367,6 +2367,18 @@ namespace ClassicUO.Game.UI.Gumps
             (
                 (s = new SettingsOption
                 (
+                    "", new CheckboxWithLabel(lang.GetExperimental.RecoverHouseContents, 0, Settings.GlobalSettings.RecoverHouseContents, (b) => { Settings.GlobalSettings.RecoverHouseContents = b; }),
+                    MainContent.RightWidth, (int)PAGE.Experimental
+                )
+            ).FullControl);
+
+            PositionHelper.PositionControl(s.FullControl);
+            PositionHelper.BlankLine();
+
+            scroll.Add
+            (
+                (s = new SettingsOption
+                (
                     "", new CheckboxWithLabel(lang.GetExperimental.KeepHouseContentsLoaded, 0, Settings.GlobalSettings.KeepHouseContentsLoaded, (b) => { Settings.GlobalSettings.KeepHouseContentsLoaded = b; }),
                     MainContent.RightWidth, (int)PAGE.Experimental
                 )
