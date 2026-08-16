@@ -465,6 +465,7 @@ namespace ClassicUO.Configuration
             public string DisableCtrlQWMessageHistory { get; set; } = "Disable Ctrl + Q/W (message history)";
             public string DisableRightLeftClickAutoMove { get; set; } = "Disable right + left click auto move";
             public string LogHouseDiagnostics { get; set; } = "Log house loading diagnostics to Data/houselog.txt";
+            public string RecoverHouseContents { get; set; } = "Ask the server again for a house you walked away from and came back to";
             public string KeepHouseContentsLoaded { get; set; } = "Keep the contents of a house loaded for as long as the house itself is";
             public string LogMusicIndices { get; set; } = "Log music indices to Data/musiclog.txt";
             public string MusicEra { get; set; } = "Music era";

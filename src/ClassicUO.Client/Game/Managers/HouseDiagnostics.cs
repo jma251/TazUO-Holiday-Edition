@@ -70,6 +70,17 @@ namespace ClassicUO.Game.Managers
             );
         }
 
+        /// <summary>A free-text line, for the few things that are not an event of their own.</summary>
+        public static void Note(string text)
+        {
+            if (!IsEnabled)
+            {
+                return;
+            }
+
+            Write($"note\t{text}");
+        }
+
         public static void LogHouseRequest(uint serial)
         {
             if (!IsEnabled)

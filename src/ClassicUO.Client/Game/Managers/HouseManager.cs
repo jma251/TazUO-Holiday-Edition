@@ -44,7 +44,14 @@ namespace ClassicUO.Game.Managers
 
         public void Add(uint serial, House revision)
         {
+            bool reacquired = !_houses.ContainsKey(serial);
+
             _houses[serial] = revision;
+
+            if (reacquired)
+            {
+                HouseContentsRecovery.OnHouseAcquired(serial);
+            }
         }
 
         public bool TryGetHouse(uint serial, out House house)
@@ -61,6 +68,7 @@ namespace ClassicUO.Game.Managers
                     // The moment the contents stop being spared by the distance cull.
                     HouseDiagnostics.LogHouseLetGo(serial, "out_of_range", house.Components.Count);
 
+                    HouseContentsRecovery.OnHouseLetGo(serial);
 
                     house.ClearComponents();
                     _houses.Remove(serial);
