@@ -242,6 +242,64 @@ namespace ClassicUO.Game.Managers
             );
         }
 
+        private static int _lastCeilingMaxZ = int.MinValue;
+        private static int _lastCeilingPlayerZ = int.MinValue;
+
+        /// <summary>
+        /// The draw ceiling, whenever it actually changes.
+        ///
+        /// Anything at or above this height is faded out and never reaches a render
+        /// list, so when a room full of things is present, in its tile and allowed to
+        /// draw yet shows nothing, this is the number that says whether the ceiling is
+        /// the reason. Without it the connection can only be guessed at, and it was.
+        ///
+        /// Only written when the figure moves. It is recomputed on every step.
+        /// </summary>
+        public static void LogDrawCeiling(int maxZ, int maxGroundZ, bool forced, bool noDrawRoofs)
+        {
+            if (!IsEnabled || World.Player == null)
+            {
+                return;
+            }
+
+            if (maxZ == _lastCeilingMaxZ && World.Player.Z == _lastCeilingPlayerZ)
+            {
+                return;
+            }
+
+            _lastCeilingMaxZ = maxZ;
+            _lastCeilingPlayerZ = World.Player.Z;
+
+            Write(
+                $"drawz\tmaxz={maxZ}\tmaxgroundz={maxGroundZ}"
+                + $"\tplayer=({World.Player.X},{World.Player.Y},{World.Player.Z})"
+                + $"\tforced={forced}\tnoroofs={noDrawRoofs}"
+            );
+        }
+
+        /// <summary>
+        /// A multi is about to be rebuilt out of multi.mul, and what it was before.
+        ///
+        /// The whole of the h61 claim rests on this: a house that already held a custom
+        /// design should never be torn down and rebuilt from the file. If wascustom=True
+        /// ever appears, the fix does not hold and the design is still being replaced by
+        /// whatever the file has for that graphic.
+        ///
+        /// Written before anything is cleared, so the counts are what was actually lost.
+        /// </summary>
+        public static void LogMultiRebuild(uint serial, bool wasCustom, int components, uint revision)
+        {
+            if (!IsEnabled)
+            {
+                return;
+            }
+
+            Write(
+                $"multiload\tserial=0x{serial:X8}\twascustom={wasCustom}"
+                + $"\tcomponents={components}\trevision={revision}"
+            );
+        }
+
         /// <summary>
         /// Where a thing was, where the player was, and how far apart - at the instant
         /// the server first described it, or ordered it gone.

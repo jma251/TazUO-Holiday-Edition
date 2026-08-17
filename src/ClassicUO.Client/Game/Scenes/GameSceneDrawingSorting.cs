@@ -253,6 +253,11 @@ namespace ClassicUO.Game.Scenes
 
                 _maxGroundZ = maxGroundZ;
             }
+
+            // Written only when the figure moves. Anything at or above it is faded out
+            // and never reaches a render list, so this is what says whether the ceiling
+            // is why a room full of things shows nothing.
+            HouseDiagnostics.LogDrawCeiling(_maxZ, _maxGroundZ, force, _noDrawRoofs);
         }
 
         private void IsFoliageUnion(ushort graphic, int x, int y, int z)
