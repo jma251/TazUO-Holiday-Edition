@@ -953,33 +953,6 @@ namespace ClassicUO.Game.Scenes
                 }
                 else if (obj is Mobile mobile)
                 {
-                    // Not drawn while what is held is known to be out of date.
-                    //
-                    // A mobile is sent out to whatever range is asked for, but its
-                    // movement is only narrated to the clients near it, within a range
-                    // that is the server's own and is never told to the client. So a
-                    // distance test cannot answer this - there is no number here that
-                    // means anything. Freshness can: if the server has spoken about this
-                    // one recently the position is real, and if it has gone quiet the
-                    // position is where the thing used to be.
-                    //
-                    // Drawing that stale position is the whole of the jumping. Waiting
-                    // instead means it appears when it is next described, already in the
-                    // right place, so there is nothing to jump from.
-                    //
-                    // Only ever a mobile that was walking when the server went quiet. One
-                    // standing still is standing where it was last put, so silence says
-                    // nothing about it and it draws for as long as it is held. Never
-                    // applied close in either, so nothing can go missing from under the
-                    // player's nose.
-                    if (!ReferenceEquals(mobile, World.Player)
-                        && mobile.WasWalkingWhenLastHeard
-                        && mobile.Distance > Constants.ALWAYS_DRAW_MOBILE_RANGE
-                        && Time.Ticks - mobile.LastServerConfirm > Constants.MOBILE_STALE_AFTER)
-                    {
-                        continue;
-                    }
-
                     UpdateObjectHandles(mobile, useObjectHandles);
 
                     maxObjectZ += Constants.DEFAULT_CHARACTER_HEIGHT;

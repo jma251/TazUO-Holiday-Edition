@@ -6673,10 +6673,6 @@ namespace ClassicUO.Network
             {
                 graphic += graphic_inc;
 
-                // Did the server move it, or only mention it? Compared before the new
-                // position is taken, and false for one that has only just appeared.
-                bool moved = !created && (mobile.X != x || mobile.Y != y || mobile.Z != z);
-
                 if (serial != World.Player)
                 {
                     Direction cleaned_dir = direction & Direction.Up;
@@ -6706,11 +6702,6 @@ namespace ClassicUO.Network
                 mobile.Graphic = (ushort)(graphic & 0x3FFF);
                 mobile.FixHue(hue);
                 mobile.Flags = flagss;
-
-                // The server has just said where this one is, so what is held is real
-                // for now. See Mobile.LastServerConfirm.
-                mobile.LastServerConfirm = Time.Ticks;
-                mobile.WasWalkingWhenLastHeard = moved;
             }
 
             if (created && !obj.IsClicked)

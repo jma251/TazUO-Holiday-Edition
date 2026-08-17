@@ -116,19 +116,6 @@ namespace ClassicUO.Game
         public const int MIN_VIEW_RANGE = 5;
         public const int MAX_VIEW_RANGE = 40;
 
-        /// <summary>
-        /// Inside this, a mobile is drawn whatever the server has been saying. Close
-        /// enough that a thing vanishing would be worse than a thing being slightly out
-        /// of date, and close enough that the server is certainly still narrating it.
-        /// </summary>
-        public const int ALWAYS_DRAW_MOBILE_RANGE = 18;
-
-        /// <summary>
-        /// How long a mobile's position stays believable after the server last mentioned
-        /// it. Longer than any normal gap between updates for something being narrated,
-        /// short enough that a thing which has gone quiet is not drawn where it was.
-        /// </summary>
-        public const int MOBILE_STALE_AFTER = 1500;
         public const int MAX_CONTAINER_OPENED_ON_GROUND_RANGE = 3;
 
         public const int OUT_RANGE_COLOR = 0x038B;
