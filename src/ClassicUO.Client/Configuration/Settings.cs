@@ -143,19 +143,6 @@ namespace ClassicUO.Configuration
         // has can never be sent them again. Global rather than per-profile.
         [JsonPropertyName("client_view_range")] public int ClientViewRange { get; set; } = 40;
 
-        // How far mobiles are drawn - not how far they are kept. The server stops saying
-        // where a mobile is going well before it stops sending the mobile, so past this
-        // what is held is a picture of where it used to be. Global, like the one above.
-        [JsonPropertyName("mobile_draw_range")] public int MobileDrawRange { get; set; } = 24;
-
-
-        // How far to ask the server to send things. Twenty-four is the standard and is
-        // what every client has always asked for; it comes from a table of old screen
-        // resolutions rather than from the protocol. The server decides what it grants,
-        // and says so. Global rather than per-profile so it applies to every character.
-
-
-
         [JsonPropertyName("shard_type")] public int ShardType { get; set; } // 0 = normal (no customization), 1 = old, 2 = outlands??
 
         [JsonPropertyName("fixed_time_step")] public bool FixedTimeStep { get; set; } = true;
