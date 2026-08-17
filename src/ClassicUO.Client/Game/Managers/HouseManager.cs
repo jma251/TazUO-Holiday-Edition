@@ -103,19 +103,25 @@ namespace ClassicUO.Game.Managers
         }
 
         /// <summary>
-        /// Is this standing in a house this session knows of, and near enough that
-        /// letting go of it would be letting go of something the server may still count
-        /// as delivered?
+        /// Is this standing where a house this session knows of stands? If so it is never
+        /// thrown away for distance, at any distance.
         ///
-        /// Measured from the house's own edge rather than from its centre tile, so a
-        /// large house is not treated as though it were a single point, and against the
-        /// widest range the server ever gathers with - so by the time the client does let
-        /// go, the server has stopped tracking it too and an ordinary approach sends it
-        /// again with nothing having to ask.
+        /// There was a range here, measured from the house's own edge, on the assumption
+        /// that past the widest range the server gathers with it would have stopped
+        /// counting the item as delivered and would send it again on the way back. A
+        /// capture says otherwise: walking out to forty-one tiles past the edge culled
+        /// two hundred and thirty-four things, and coming back gave a house holding
+        /// sixteen. It stayed at sixteen for twenty-four minutes. Only stepping onto the
+        /// foundation - a region event, which makes the server resend regardless of what
+        /// it believes was delivered - brought the other two hundred and twenty-two back.
+        ///
+        /// So this server never forgets, and there is no distance at which letting go is
+        /// safe. What is held costs only memory; what is dropped can only come back by
+        /// accident.
         /// </summary>
         public bool IsInsideKnownHouse(GameObject obj)
         {
-            if (obj == null || World.Player == null)
+            if (obj == null)
             {
                 return false;
             }
@@ -124,20 +130,7 @@ namespace ClassicUO.Game.Managers
             {
                 Rectangle r = pair.Value;
 
-                if (obj.X < r.X || obj.X > r.X + r.Width || obj.Y < r.Y || obj.Y > r.Y + r.Height)
-                {
-                    continue;
-                }
-
-                int dx = World.Player.X < r.X ? r.X - World.Player.X
-                    : World.Player.X > r.X + r.Width ? World.Player.X - (r.X + r.Width)
-                    : 0;
-
-                int dy = World.Player.Y < r.Y ? r.Y - World.Player.Y
-                    : World.Player.Y > r.Y + r.Height ? World.Player.Y - (r.Y + r.Height)
-                    : 0;
-
-                if (Math.Max(dx, dy) <= Constants.MAX_VIEW_RANGE)
+                if (obj.X >= r.X && obj.X <= r.X + r.Width && obj.Y >= r.Y && obj.Y <= r.Y + r.Height)
                 {
                     return true;
                 }
