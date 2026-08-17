@@ -33,6 +33,7 @@
 using System;
 using System.Collections.Generic;
 using ClassicUO.Game.GameObjects;
+using Microsoft.Xna.Framework;
 
 namespace ClassicUO.Game.Managers
 {
@@ -45,6 +46,94 @@ namespace ClassicUO.Game.Managers
         public void Add(uint serial, House revision)
         {
             _houses[serial] = revision;
+
+            RememberFootprint(serial);
+        }
+
+        /// <summary>
+        /// Where every house seen this session stands, kept after the house itself has
+        /// been let go of.
+        ///
+        /// A house is dropped as soon as it is out of range, and in the same pass of the
+        /// cull everything standing in it loses what was sparing it - because the test
+        /// asked whether the item was in a *loaded* house, and a moment earlier it
+        /// stopped being one. Caught in a capture: the house dropped holding two hundred
+        /// and twenty-two things, and one millisecond later every one of them destroyed.
+        ///
+        /// The server does not send them again on the way back. It has no way of knowing
+        /// the client threw them away and there is no message for saying so, which is why
+        /// the house comes back built and bare and only stepping off the foundation and
+        /// back on - a region event on the server - refills it.
+        ///
+        /// Bounds do not move, so remembering them costs four numbers per house.
+        /// </summary>
+        private readonly Dictionary<uint, Rectangle> _footprints = new Dictionary<uint, Rectangle>();
+
+        private void RememberFootprint(uint serial)
+        {
+            if (serial == 0 || _footprints.ContainsKey(serial))
+            {
+                return;
+            }
+
+            Item multi = World.Items.Get(serial);
+
+            if (multi == null || multi.IsDestroyed || !multi.MultiInfo.HasValue)
+            {
+                return;
+            }
+
+            // Width and Height on MultiInfo hold maximum offsets, not sizes.
+            int minX = multi.X + multi.MultiInfo.Value.X;
+            int minY = multi.Y + multi.MultiInfo.Value.Y;
+            int maxX = multi.X + multi.MultiInfo.Value.Width;
+            int maxY = multi.Y + multi.MultiInfo.Value.Height;
+
+            _footprints[serial] = new Rectangle(minX, minY, maxX - minX, maxY - minY);
+        }
+
+        /// <summary>
+        /// Is this standing in a house this session knows of, and near enough that
+        /// letting go of it would be letting go of something the server may still count
+        /// as delivered?
+        ///
+        /// Measured from the house's own edge rather than from its centre tile, so a
+        /// large house is not treated as though it were a single point, and against the
+        /// widest range the server ever gathers with - so by the time the client does let
+        /// go, the server has stopped tracking it too and an ordinary approach sends it
+        /// again with nothing having to ask.
+        /// </summary>
+        public bool IsInsideKnownHouse(GameObject obj)
+        {
+            if (obj == null || World.Player == null)
+            {
+                return false;
+            }
+
+            foreach (KeyValuePair<uint, Rectangle> pair in _footprints)
+            {
+                Rectangle r = pair.Value;
+
+                if (obj.X < r.X || obj.X > r.X + r.Width || obj.Y < r.Y || obj.Y > r.Y + r.Height)
+                {
+                    continue;
+                }
+
+                int dx = World.Player.X < r.X ? r.X - World.Player.X
+                    : World.Player.X > r.X + r.Width ? World.Player.X - (r.X + r.Width)
+                    : 0;
+
+                int dy = World.Player.Y < r.Y ? r.Y - World.Player.Y
+                    : World.Player.Y > r.Y + r.Height ? World.Player.Y - (r.Y + r.Height)
+                    : 0;
+
+                if (Math.Max(dx, dy) <= Constants.MAX_VIEW_RANGE)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         public bool TryGetHouse(uint serial, out House house)

@@ -953,12 +953,25 @@ namespace ClassicUO.Game.Scenes
                 }
                 else if (obj is Mobile mobile)
                 {
-                    // Past here the server has stopped saying where this one is going, so
-                    // what is held is where it used to be. Skipped rather than thrown
-                    // away - the server counts a mobile it has sent as delivered and will
-                    // not send it again, so it has to be kept to be there when it comes
-                    // back within range. See Constants.DEFAULT_MOBILE_DRAW_RANGE.
-                    if (!ReferenceEquals(mobile, World.Player) && mobile.Distance > World.MobileDrawRange)
+                    // Not drawn while what is held is known to be out of date.
+                    //
+                    // A mobile is sent out to whatever range is asked for, but its
+                    // movement is only narrated to the clients near it, within a range
+                    // that is the server's own and is never told to the client. So a
+                    // distance test cannot answer this - there is no number here that
+                    // means anything. Freshness can: if the server has spoken about this
+                    // one recently the position is real, and if it has gone quiet the
+                    // position is where the thing used to be.
+                    //
+                    // Drawing that stale position is the whole of the jumping. Waiting
+                    // instead means it appears when it is next described, already in the
+                    // right place, so there is nothing to jump from.
+                    //
+                    // Never applied close in, whatever the server is saying, so nothing
+                    // can go missing from under the player's nose.
+                    if (!ReferenceEquals(mobile, World.Player)
+                        && mobile.Distance > Constants.ALWAYS_DRAW_MOBILE_RANGE
+                        && Time.Ticks - mobile.LastServerConfirm > Constants.MOBILE_STALE_AFTER)
                     {
                         continue;
                     }
