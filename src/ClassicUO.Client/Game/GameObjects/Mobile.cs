@@ -766,9 +766,31 @@ namespace ClassicUO.Game.GameObjects
                             );
                     }
 
-                    int maxDelay =
-                        MovementSpeed.TimeToCompleteMovement(run, mounted)
-                        - (int)Client.Game.FrameDelay[1];
+                    // A mobile is drawn at the front of its queue, and the server's real
+                    // position is the back of it. Playing that back at a fixed rate off a
+                    // compiled-in table means anything the server moves faster than the
+                    // table allows falls one step further behind on every update, with no
+                    // way to make it up - the client has no catch-up, only overflow. At
+                    // five queued steps EnqueueStep refuses, and the handler throws the
+                    // position away and puts the mobile where the server says it is. That
+                    // is the jump across the ground.
+                    //
+                    // Draining faster the deeper the queue keeps the drawn position close
+                    // to the real one and stops the queue ever reaching the point where it
+                    // has to be discarded. A full queue plays back five times as fast,
+                    // which is a mobile moving quickly - the alternative is a mobile
+                    // moving at the wrong speed and then appearing somewhere else.
+                    int stepTime = MovementSpeed.TimeToCompleteMovement(run, mounted);
+
+                    if (Steps.Count > 1)
+                    {
+                        stepTime /= Steps.Count;
+                    }
+
+                    // Never zero: it is divided by below to work out how far between two
+                    // tiles to draw, and a frame slower than the shortened step would
+                    // otherwise put a division by zero into the offset.
+                    int maxDelay = Math.Max(1, stepTime - (int)Client.Game.FrameDelay[1]);
 
                     bool removeStep = delay >= maxDelay;
                     bool directionChange = false;
