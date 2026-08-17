@@ -54,7 +54,6 @@ namespace ClassicUO.Game
     {
         private static readonly EffectManager _effectManager = new EffectManager();
         private static readonly List<uint> _toRemove = new List<uint>();
-        private static uint _timeToDelete;
 
         public static Point RangeSize;
 
@@ -244,49 +243,6 @@ namespace ClassicUO.Game
         }
         */
 
-        /// <summary>
-        /// Is this item standing inside a house the client still holds, and therefore
-        /// not to be thrown away for distance?
-        ///
-        /// A multi already gets its own size added to how far away it may be before the
-        /// client lets go of it - a big house is not dropped the moment its centre tile
-        /// passes the view range, because you may still be standing on its porch. What
-        /// is inside it never got that allowance, and was let go of at the plain view
-        /// range like a rock on the road.
-        ///
-        /// That is what emptied a large house. Stepping a few tiles out of the south
-        /// door puts the far end past twenty-four tiles, so its contents were deleted
-        /// while the house itself, kept out to thirty-six, stood there complete. The
-        /// server was never told and had no reason to send them again, so the house
-        /// stayed furnished with nothing until something made it reload. In one
-        /// captured session that was seventy items at a single instant, and two hundred
-        /// and twenty-four distinct items deleted and re-sent over one play session.
-        ///
-        /// So nothing standing inside a house the client holds is dropped for distance
-        /// at all. There is no radius here on purpose: what the client already has costs
-        /// only memory to keep, and the house being let go of is the one moment its
-        /// contents should go with it - which is also what makes the server send the
-        /// whole lot again on the way back, so this cannot quietly rot into a stale
-        /// picture of a room.
-        ///
-        /// The view range itself is untouched. Twenty-four is the protocol maximum, the
-        /// client already asks for exactly that, and it is the server's to decide.
-        /// </summary>
-        private static bool KeptByItsHouse(Item item)
-        {
-            if (item.IsMulti || !Settings.GlobalSettings.KeepHouseContentsLoaded)
-            {
-                return false;
-            }
-
-            if (!HouseManager.IsInsideKnownHouse(item))
-            {
-                return false;
-            }
-
-            return true;
-        }
-
         public static void Update()
         {
             if (Player != null)
@@ -331,13 +287,6 @@ namespace ClassicUO.Game
                     }
                 }
 
-                bool do_delete = _timeToDelete < Time.Ticks;
-
-                if (do_delete)
-                {
-                    _timeToDelete = Time.Ticks + 50;
-                }
-
                 // Walked by key, and taken out by key below.
                 //
                 // The key an entity is filed under and the serial the entity itself
@@ -353,10 +302,14 @@ namespace ClassicUO.Game
 
                     mob.Update();
 
-                    if (do_delete && mob.Distance > ClientViewRange)
-                    {
-                        RemoveMobile(mob);
-                    }
+                    // Nothing is dropped here for distance. The server decides what this
+                    // client has; the only correct way to forget a mobile is to be told,
+                    // which is DeleteObject. Deleting one because it walked too far is
+                    // the client overruling the server about its own state, and there is
+                    // no message for taking it back - so the server goes on counting it
+                    // as delivered and never sends it again. Caught between two
+                    // characters: one walked past the view range, the other deleted him,
+                    // and he stayed invisible to her standing three tiles away.
 
                     if (mob.IsDestroyed)
                     {
@@ -427,30 +380,18 @@ namespace ClassicUO.Game
 
                     item.Update();
 
-                    // A multi is kept while any part of it is in range, not only its
-                    // centre - the same rule HouseManager uses when deciding whether to
-                    // let go of it. Testing the centre alone condemned a large house
-                    // every frame and pardoned it every frame, because TryToRemove then
-                    // refused: twenty passes a second, for as long as the player stood
-                    // there. In one log 97.6% of all cull work was that loop.
-                    int keepWithin = ClientViewRange + (item.IsMulti ? item.MultiDistanceBonus : 0);
-
-                    if (do_delete && item.OnGround && item.Distance > keepWithin && !KeptByItsHouse(item))
-                    {
-                        HouseDiagnostics.LogItemCulled(item);
-
-                        if (item.IsMulti)
-                        {
-                            if (HouseManager.TryToRemove(item, ClientViewRange))
-                            {
-                                RemoveItem(item);
-                            }
-                        }
-                        else
-                        {
-                            RemoveItem(item);
-                        }
-                    }
+                    // Same as the mobiles above: nothing is dropped for distance. An item
+                    // the server sent is the server's to take back, and it does that with
+                    // DeleteObject. In one capture the server asked for 1,177 removals and
+                    // this loop performed 3,578 of its own - and every one of those was
+                    // unrecoverable, because the server had no way of learning it had
+                    // happened. That is the whole of the empty house: two hundred and
+                    // thirty-eight things deleted on the way out, sixteen on the way back,
+                    // and no way to ask for the rest.
+                    //
+                    // It costs nothing to draw what is kept. The draw loop walks a tile
+                    // box taken from the viewport, so anything beyond it is never visited.
+                    // The only price is memory, and it is small.
 
                     if (item.IsDestroyed)
                     {
