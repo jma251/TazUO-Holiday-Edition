@@ -130,13 +130,6 @@ namespace ClassicUO.Configuration
         // character. Remove with HouseDiagnostics once the cause is known.
         [JsonPropertyName("log_house_diagnostics")] public bool LogHouseDiagnostics { get; set; } = false;
 
-        // Do not throw away the contents of a house the client still holds just because
-        // they are further off than the view range. The house itself already gets that
-        // allowance and its contents did not, which is what emptied large houses when
-        // you stepped out of the door. Global rather than per-profile so it applies to
-        // every character.
-        [JsonPropertyName("keep_house_contents_loaded")] public bool KeepHouseContentsLoaded { get; set; } = true;
-
         // What the client asks the server to send. Forty rather than the old twenty-four
         // because forty is where a RunUO-derived server stops considering anything at
         // all, and because a client that lets go of things the server still believes it
