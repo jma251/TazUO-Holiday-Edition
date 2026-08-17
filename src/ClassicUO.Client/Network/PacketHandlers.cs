@@ -2454,7 +2454,21 @@ namespace ClassicUO.Network
 
                 if (Client.Version >= Utility.ClientVersion.CV_305D)
                 {
+                    // What the player set rather than the old hard-coded standard. The
+                    // server answers with what it granted, which overwrites this.
+                    World.ClientViewRange = (byte)Math.Max(
+                        Constants.MIN_VIEW_RANGE,
+                        Math.Min(Constants.MAX_VIEW_RANGE, Settings.GlobalSettings.ClientViewRange)
+                    );
+
                     NetClient.Socket.Send_ClientViewRange(World.ClientViewRange);
+
+                    // Not sent anywhere - the server has no say in how far the client
+                    // draws what it has already been given.
+                    World.MobileDrawRangeSetting = Math.Max(
+                        Constants.MIN_VIEW_RANGE,
+                        Math.Min(Constants.MAX_VIEW_RANGE, Settings.GlobalSettings.MobileDrawRange)
+                    );
                 }
 
                 // Reset the global action cooldown here because, for some reason, immediately

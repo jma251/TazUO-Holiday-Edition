@@ -953,6 +953,16 @@ namespace ClassicUO.Game.Scenes
                 }
                 else if (obj is Mobile mobile)
                 {
+                    // Past here the server has stopped saying where this one is going, so
+                    // what is held is where it used to be. Skipped rather than thrown
+                    // away - the server counts a mobile it has sent as delivered and will
+                    // not send it again, so it has to be kept to be there when it comes
+                    // back within range. See Constants.DEFAULT_MOBILE_DRAW_RANGE.
+                    if (!ReferenceEquals(mobile, World.Player) && mobile.Distance > World.MobileDrawRange)
+                    {
+                        continue;
+                    }
+
                     UpdateObjectHandles(mobile, useObjectHandles);
 
                     maxObjectZ += Constants.DEFAULT_CHARACTER_HEIGHT;

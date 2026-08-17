@@ -448,8 +448,6 @@ namespace ClassicUO.Game.Scenes
             // session inherits it - which is how the login music came back.
             Client.Game.Audio?.ForgetMusicState();
 
-            HouseContentsRecovery.Reset();
-
             Client.Game.SetWindowTitle(string.Empty);
             Client.Game.GameCursor.ItemHold.Clear();
 
