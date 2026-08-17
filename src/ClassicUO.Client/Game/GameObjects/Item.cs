@@ -346,6 +346,16 @@ namespace ClassicUO.Game.GameObjects
             }
             else
             {
+                // Before anything is cleared, so the counts are what is about to be
+                // lost. wascustom=True here is the h61 fix failing: a house holding a
+                // design read off the wire should never be rebuilt out of the file.
+                Managers.HouseDiagnostics.LogMultiRebuild(
+                    Serial,
+                    house.IsCustom,
+                    house.Components.Count,
+                    house.Revision
+                );
+
                 house.ClearComponents();
 
                 // What follows replaces the design with the plain multi out of the file,
