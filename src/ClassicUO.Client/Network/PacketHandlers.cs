@@ -1128,6 +1128,15 @@ namespace ClassicUO.Network
                 HouseDiagnostics.LogHouseItemDeleteOrdered(ordered);
             }
 
+            HouseDiagnostics.LogRangeProbe(
+                entity.Serial,
+                entity.Graphic,
+                entity.X,
+                entity.Y,
+                entity is Mobile,
+                "leave"
+            );
+
             bool updateAbilities = false;
 
             if (entity is Item it)
@@ -6738,6 +6747,22 @@ namespace ClassicUO.Network
                         GameActions.SingleClick(serial);
                     }
                 }
+            }
+
+            if (created)
+            {
+                // First time the server has described this one. The distance is stamped
+                // against the player's position at this instant, so the widest it ever
+                // gets is the range the server actually sends within - measured, not
+                // taken from what some emulator's source is said to do.
+                HouseDiagnostics.LogRangeProbe(
+                    obj.Serial,
+                    obj.Graphic,
+                    obj.X,
+                    obj.Y,
+                    mobile != null,
+                    "enter"
+                );
             }
 
             if (mobile != null)
