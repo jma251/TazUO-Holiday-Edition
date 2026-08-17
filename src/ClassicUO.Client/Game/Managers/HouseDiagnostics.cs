@@ -892,6 +892,75 @@ namespace ClassicUO.Game.Managers
             }
         }
 
+        private static StreamWriter _log;
+        private static bool _logResolved;
+
+        /// <summary>
+        /// The file this client writes to, held open for the session.
+        ///
+        /// Held, rather than opened and closed around every write, because holding it is
+        /// what lets a second client find out the name is taken. AppendAllText opens and
+        /// closes each time, so two clients collide only when they happen to write in the
+        /// same instant - and the rest of the time they interleave into one file with no
+        /// way to tell whose line is whose. The collisions that did happen were raised
+        /// into a catch that discards them, so the loss was silent.
+        ///
+        /// Two clients is how the interesting things get tested: one moves something, the
+        /// other watches. So the first to start takes houselog.txt, and the second takes
+        /// a file named after its own process and says so on screen.
+        /// </summary>
+        private static StreamWriter ResolveLog(string directory)
+        {
+            if (_logResolved)
+            {
+                return _log;
+            }
+
+            _logResolved = true;
+
+            string shared = Path.Combine(directory, "houselog.txt");
+            string mine = Path.Combine(
+                directory,
+                $"houselog-{System.Diagnostics.Process.GetCurrentProcess().Id}.txt"
+            );
+
+            foreach (string path in new[] { shared, mine })
+            {
+                try
+                {
+                    bool fresh = !File.Exists(path) || new FileInfo(path).Length == 0;
+
+                    // FileShare.Read so the file can still be opened and read while the
+                    // client is running, but not written by a second one.
+                    FileStream stream = new FileStream(
+                        path, FileMode.Append, FileAccess.Write, FileShare.Read
+                    );
+
+                    _log = new StreamWriter(stream) { AutoFlush = false };
+
+                    if (fresh)
+                    {
+                        _log.WriteLine("# timestamp\tevent\tdetails");
+                    }
+
+                    if (path != shared)
+                    {
+                        GameActions.Print(
+                            $"House log: houselog.txt is held by another client, writing to {Path.GetFileName(path)}"
+                        );
+                    }
+
+                    return _log;
+                }
+                catch (IOException)
+                {
+                    // Taken by another client. Try the next name.
+                }
+            }
+
+            return null;
+        }
+
         private static void FlushLocked()
         {
             _nextFlush = Time.Ticks + 1000;
@@ -904,14 +973,17 @@ namespace ClassicUO.Game.Managers
             string directory = Path.Combine(CUOEnviroment.ExecutablePath, "Data");
             Directory.CreateDirectory(directory);
 
-            string path = Path.Combine(directory, "houselog.txt");
+            StreamWriter log = ResolveLog(directory);
 
-            if (!File.Exists(path))
+            if (log == null)
             {
-                File.AppendAllText(path, "# timestamp\tevent\tdetails" + Environment.NewLine);
+                _buffer.Clear();
+
+                return;
             }
 
-            File.AppendAllText(path, _buffer.ToString());
+            log.Write(_buffer.ToString());
+            log.Flush();
 
             _buffer.Clear();
         }
