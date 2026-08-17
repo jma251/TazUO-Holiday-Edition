@@ -243,6 +243,39 @@ namespace ClassicUO.Game.Managers
         }
 
         /// <summary>
+        /// Where a thing was, where the player was, and how far apart - at the instant
+        /// the server first described it, or ordered it gone.
+        ///
+        /// The distance has to be taken here and nowhere else. Every other line in this
+        /// file records the object's position and leaves the player's to be worked out
+        /// from whatever nearby line happens to carry one, which is worth several tiles
+        /// of error - enough that it twice produced a boundary that was not there.
+        /// Stamped on the same line there is nothing to interpolate.
+        ///
+        /// Two numbers fall out of a single walk. The largest distance anything is ever
+        /// first described at is the range the server sends within. The distance a delete
+        /// arrives at is the range it stops caring. Neither needs a guess about which
+        /// emulator is on the other end.
+        /// </summary>
+        public static void LogRangeProbe(uint serial, ushort graphic, int x, int y, bool isMobile, string what)
+        {
+            if (!IsEnabled || World.Player == null)
+            {
+                return;
+            }
+
+            int px = World.Player.X;
+            int py = World.Player.Y;
+
+            Write(
+                $"range\t{what}\tserial=0x{serial:X8}\tgraphic=0x{graphic:X4}"
+                + $"\tkind={(isMobile ? "mobile" : "item")}"
+                + $"\tat=({x},{y})\tplayer=({px},{py})"
+                + $"\tdist={Math.Max(Math.Abs(x - px), Math.Abs(y - py))}"
+            );
+        }
+
+        /// <summary>
         /// The server has ordered an item removed. Logged separately from the destroy
         /// below so "the server took it away" can be told apart from "the client threw
         /// it away", which is the difference between a shard behaviour and a bug here.
