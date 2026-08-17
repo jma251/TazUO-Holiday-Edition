@@ -171,6 +171,65 @@ namespace ClassicUO.Game.Managers
 
                 GameActions.Print("House dump written to Data/houselog.txt (if house logging is on).");
             });
+            // What the client is holding around you, printed where you are standing.
+            //
+            // Every other count here has come from a log written earlier and read later,
+            // and the counting in it is done against a house's bounding rectangle -
+            // which takes in the yard, the porch and the steps as readily as the rooms.
+            // This counts what is standing on the tiles now and says how much of it
+            // reached the screen, so "the room is empty" and "the room is full and
+            // nothing is drawn" stop looking the same.
+            Register("nearby", s =>
+            {
+                if (!World.InGame)
+                {
+                    return;
+                }
+
+                int radius = 12;
+
+                if (s.Length > 1)
+                {
+                    int.TryParse(s[1], out radius);
+                }
+
+                int held = 0, inTile = 0, drawn = 0, invisible = 0, notAllowed = 0;
+
+                foreach (Item item in World.Items.Values)
+                {
+                    if (item.IsDestroyed || !item.OnGround || item.Distance > radius)
+                    {
+                        continue;
+                    }
+
+                    held++;
+
+                    if (item.TileChunk != null) inTile++;
+                    if (item.AlphaHue == 0) invisible++;
+                    if (!item.AllowedToDraw) notAllowed++;
+                    if (item.LastDrawnTime != 0 && Time.Ticks - item.LastDrawnTime < 1000) drawn++;
+                }
+
+                int mobs = 0, mobsDrawn = 0;
+
+                foreach (Mobile mob in World.Mobiles.Values)
+                {
+                    if (mob.IsDestroyed || mob.Distance > radius)
+                    {
+                        continue;
+                    }
+
+                    mobs++;
+
+                    if (mob.LastDrawnTime != 0 && Time.Ticks - mob.LastDrawnTime < 1000) mobsDrawn++;
+                }
+
+                GameActions.Print($"Within {radius} tiles of ({World.Player.X},{World.Player.Y},{World.Player.Z}):");
+                GameActions.Print($"  ground items held: {held}   linked to a tile: {inTile}");
+                GameActions.Print($"  drawn in the last second: {drawn}   fully transparent: {invisible}   not allowed to draw: {notAllowed}");
+                GameActions.Print($"  mobiles held: {mobs}   drawn in the last second: {mobsDrawn}");
+            });
+
             Register("rain", s => { Client.Game.GetScene<ClassicUO.Game.Scenes.GameScene>()?.Weather.Generate(WeatherType.WT_RAIN, 30, 75); });
 
             Register("marktile", s =>
