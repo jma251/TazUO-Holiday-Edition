@@ -2388,6 +2388,23 @@ namespace ClassicUO.Game.UI.Gumps
             PositionHelper.PositionControl(s.FullControl);
             PositionHelper.BlankLine();
 
+            scroll.Add
+            (
+                (s = new SettingsOption
+                (
+                    "", new SliderWithLabel
+                    (
+                        lang.GetExperimental.HouseLoadRange, 260, ThemeSettings.SLIDER_WIDTH,
+                        Constants.MIN_HOUSE_RANGE, Constants.MAX_HOUSE_RANGE,
+                        Settings.GlobalSettings.HouseLoadRange,
+                        (i) => { Settings.GlobalSettings.HouseLoadRange = i; }
+                    ), MainContent.RightWidth, (int)PAGE.Experimental
+                )
+            ).FullControl);
+
+            PositionHelper.PositionControl(s.FullControl);
+            PositionHelper.BlankLine();
+
 
             // Built from whatever folders exist under Music/Digital, so adding an era
             // pack is creating a folder - no code change and no list to keep in sync.

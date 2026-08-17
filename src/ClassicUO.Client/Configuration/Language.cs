@@ -465,7 +465,8 @@ namespace ClassicUO.Configuration
             public string DisableCtrlQWMessageHistory { get; set; } = "Disable Ctrl + Q/W (message history)";
             public string DisableRightLeftClickAutoMove { get; set; } = "Disable right + left click auto move";
             public string LogHouseDiagnostics { get; set; } = "Log house loading diagnostics to Data/houselog.txt";
-            public string ClientViewRange { get; set; } = "Server view range (40 = the server's own maximum)";
+            public string ClientViewRange { get; set; } = "View range - how far the client keeps what the server sent (match your shard, 24 is typical)";
+            public string HouseLoadRange { get; set; } = "House load range - how far out houses are built (raise for earlier, more complete houses)";
             public string LogMusicIndices { get; set; } = "Log music indices to Data/musiclog.txt";
             public string MusicEra { get; set; } = "Music era";
             public string MusicEraDefault { get; set; } = "Default";

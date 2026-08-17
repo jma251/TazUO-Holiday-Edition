@@ -130,14 +130,16 @@ namespace ClassicUO.Configuration
         // character. Remove with HouseDiagnostics once the cause is known.
         [JsonPropertyName("log_house_diagnostics")] public bool LogHouseDiagnostics { get; set; } = false;
 
-        // Back to the stock twenty-four. Forty was set here on reasoning about a server
-        // nobody runs any more, and it is one number doing two jobs: what the client asks
-        // the server to send, and how far the client keeps what it was sent. Ask for more
-        // than the server maintains and the extra band is held but never updated, so a
-        // thing moved while you were away is still drawn where it used to be. Match the
-        // server instead and the same boundary does both: what is dropped is what the
-        // server has released, and it comes back the moment you are in range again.
+        // What the client asks the server to send, and what it keeps. Held at what the
+        // server actually maintains: measured on this shard at 24, mobiles entering and
+        // leaving in a hard box at exactly that. Anything kept beyond it is never updated
+        // and never deleted, so it freezes where it stood and jumps when you close in.
         [JsonPropertyName("client_view_range")] public int ClientViewRange { get; set; } = 24;
+
+        // How far out houses are built and held, independent of the view range above.
+        // Raising this brings houses in earlier and more complete without holding any
+        // loose object past the distance the server still tracks it.
+        [JsonPropertyName("house_load_range")] public int HouseLoadRange { get; set; } = 40;
 
         [JsonPropertyName("shard_type")] public int ShardType { get; set; } // 0 = normal (no customization), 1 = old, 2 = outlands??
 

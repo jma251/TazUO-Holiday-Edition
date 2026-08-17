@@ -84,7 +84,10 @@ namespace ClassicUO.Game
         public static Map.Map Map { get; private set; }
 
         // What the server has granted, overwritten by its answer to what was asked for.
-        public static byte ClientViewRange { get; set; } = Constants.MAX_VIEW_RANGE;
+        // Starts at the stock range rather than the slider's ceiling: on a client old
+        // enough to skip the 0x55 handshake the setting is never applied, and starting
+        // at the ceiling meant culling at 40 all session with nothing to justify it.
+        public static byte ClientViewRange { get; set; } = Constants.DEFAULT_VIEW_RANGE;
 
         public static bool SkillsRequested { get; set; }
 
@@ -390,7 +393,16 @@ namespace ClassicUO.Game
                     // every frame and pardoned it every frame, because TryToRemove then
                     // refused: twenty passes a second, for as long as the player stood
                     // there. In one log 97.6% of all cull work was that loop.
-                    int keepWithin = ClientViewRange + (item.IsMulti ? item.MultiDistanceBonus : 0);
+                    // A multi answers to the house range, everything else to the view
+                    // range. They are separate numbers because they are separate
+                    // questions: a house is a design fetched by revision and safe to
+                    // hold early, a loose object is only as good as the last update the
+                    // server sent for it.
+                    int houseRange = Settings.GlobalSettings.HouseLoadRange;
+
+                    int keepWithin = item.IsMulti
+                        ? houseRange + item.MultiDistanceBonus
+                        : ClientViewRange;
 
                     if (do_delete && item.OnGround && item.Distance > keepWithin)
                     {
@@ -398,7 +410,7 @@ namespace ClassicUO.Game
 
                         if (item.IsMulti)
                         {
-                            if (HouseManager.TryToRemove(item, ClientViewRange))
+                            if (HouseManager.TryToRemove(item, houseRange))
                             {
                                 RemoveItem(item);
                             }
