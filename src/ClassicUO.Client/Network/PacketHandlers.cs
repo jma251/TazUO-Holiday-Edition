@@ -5624,6 +5624,24 @@ namespace ClassicUO.Network
                 p.Skip(clen);
             }
 
+            // ClearComponents above asks the foundation to rebuild itself out of
+            // multi.mul. That is right for a caller that only wants the house dropped, and
+            // wrong here, because the design just read out of this packet is the very
+            // thing multi.mul would replace.
+            //
+            // Left set, Item.Update saw it on the next frame and called LoadMulti, which
+            // tore down the three thousand piece design, put the six hundred piece generic
+            // shell in its place and marked the house non-custom at revision zero. That
+            // shell carries floors and a roof the real house does not, so the draw ceiling
+            // came down onto the player and every single thing in the building faded to
+            // nothing - still held, still in its tile, still allowed to draw, and
+            // invisible. Not some of them: all of them.
+            //
+            // Stepping off the foundation and back on fetched the design again, which is
+            // why the room filled instantly and without a stutter - nothing was ever
+            // missing to be re-sent.
+            foundation.WantUpdateMulti = false;
+
             if (World.CustomHouseManager != null)
             {
                 World.CustomHouseManager.GenerateFloorPlace();
