@@ -116,6 +116,16 @@ namespace ClassicUO.Game
         public const int MIN_VIEW_RANGE = 5;
         public const int MAX_VIEW_RANGE = 40;
 
+        // What the client keeps before the server has answered with a range of its own.
+        public const int DEFAULT_VIEW_RANGE = 24;
+
+        // How far out a house is built and held. Separate from the view range because
+        // they answer different questions: the view range has to match the distance the
+        // server maintains objects within, while a house is a whole design fetched by
+        // revision, so holding one early costs nothing and cannot go stale unnoticed.
+        public const int MIN_HOUSE_RANGE = 5;
+        public const int MAX_HOUSE_RANGE = 64;
+
         public const int MAX_CONTAINER_OPENED_ON_GROUND_RANGE = 3;
 
         public const int OUT_RANGE_COLOR = 0x038B;

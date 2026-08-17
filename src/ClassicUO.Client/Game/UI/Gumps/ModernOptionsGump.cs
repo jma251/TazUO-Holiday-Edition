@@ -2392,13 +2392,19 @@ namespace ClassicUO.Game.UI.Gumps
             (
                 (s = new SettingsOption
                 (
-                    "", new CheckboxWithLabel(lang.GetExperimental.KeepHouseContentsLoaded, 0, Settings.GlobalSettings.KeepHouseContentsLoaded, (b) => { Settings.GlobalSettings.KeepHouseContentsLoaded = b; }),
-                    MainContent.RightWidth, (int)PAGE.Experimental
+                    "", new SliderWithLabel
+                    (
+                        lang.GetExperimental.HouseLoadRange, 260, ThemeSettings.SLIDER_WIDTH,
+                        Constants.MIN_HOUSE_RANGE, Constants.MAX_HOUSE_RANGE,
+                        Settings.GlobalSettings.HouseLoadRange,
+                        (i) => { Settings.GlobalSettings.HouseLoadRange = i; }
+                    ), MainContent.RightWidth, (int)PAGE.Experimental
                 )
             ).FullControl);
 
             PositionHelper.PositionControl(s.FullControl);
             PositionHelper.BlankLine();
+
 
             // Built from whatever folders exist under Music/Digital, so adding an era
             // pack is creating a folder - no code change and no list to keep in sync.

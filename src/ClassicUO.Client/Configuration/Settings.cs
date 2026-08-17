@@ -130,18 +130,16 @@ namespace ClassicUO.Configuration
         // character. Remove with HouseDiagnostics once the cause is known.
         [JsonPropertyName("log_house_diagnostics")] public bool LogHouseDiagnostics { get; set; } = false;
 
-        // Do not throw away the contents of a house the client still holds just because
-        // they are further off than the view range. The house itself already gets that
-        // allowance and its contents did not, which is what emptied large houses when
-        // you stepped out of the door. Global rather than per-profile so it applies to
-        // every character.
-        [JsonPropertyName("keep_house_contents_loaded")] public bool KeepHouseContentsLoaded { get; set; } = true;
+        // What the client asks the server to send, and what it keeps. Held at what the
+        // server actually maintains: measured on this shard at 24, mobiles entering and
+        // leaving in a hard box at exactly that. Anything kept beyond it is never updated
+        // and never deleted, so it freezes where it stood and jumps when you close in.
+        [JsonPropertyName("client_view_range")] public int ClientViewRange { get; set; } = 24;
 
-        // What the client asks the server to send. Forty rather than the old twenty-four
-        // because forty is where a RunUO-derived server stops considering anything at
-        // all, and because a client that lets go of things the server still believes it
-        // has can never be sent them again. Global rather than per-profile.
-        [JsonPropertyName("client_view_range")] public int ClientViewRange { get; set; } = 40;
+        // How far out houses are built and held, independent of the view range above.
+        // Raising this brings houses in earlier and more complete without holding any
+        // loose object past the distance the server still tracks it.
+        [JsonPropertyName("house_load_range")] public int HouseLoadRange { get; set; } = 40;
 
         [JsonPropertyName("shard_type")] public int ShardType { get; set; } // 0 = normal (no customization), 1 = old, 2 = outlands??
 

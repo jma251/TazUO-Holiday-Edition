@@ -5574,18 +5574,11 @@ namespace ClassicUO.Network
 
             p.Skip(4);
 
-            if (!World.HouseManager.TryGetHouse(foundation, out House house))
-            {
-                house = new House(foundation, revision, true);
-                World.HouseManager.Add(foundation, house);
-            }
-            else
-            {
-                house.ClearComponents(true);
-                house.Revision = revision;
-                house.IsCustom = true;
-            }
-
+            // Before the house is touched. Clearing it and stamping the new revision
+            // first, then bailing here, leaves a house that is IsCustom with the
+            // server's current revision and no components - which is the one state
+            // 0xBF cmd 0x1D never re-requests (see the test at its case 0x1D), so it
+            // regenerates empty for the rest of the session.
             short minX = (short)multi.Value.X;
             short minY = (short)multi.Value.Y;
             short maxY = (short)multi.Value.Height;
@@ -5597,6 +5590,18 @@ namespace ClassicUO.Network
                 );
 
                 return;
+            }
+
+            if (!World.HouseManager.TryGetHouse(foundation, out House house))
+            {
+                house = new House(foundation, revision, true);
+                World.HouseManager.Add(foundation, house);
+            }
+            else
+            {
+                house.ClearComponents(true);
+                house.Revision = revision;
+                house.IsCustom = true;
             }
 
             byte planes = p.ReadUInt8();

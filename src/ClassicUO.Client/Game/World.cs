@@ -84,7 +84,10 @@ namespace ClassicUO.Game
         public static Map.Map Map { get; private set; }
 
         // What the server has granted, overwritten by its answer to what was asked for.
-        public static byte ClientViewRange { get; set; } = Constants.MAX_VIEW_RANGE;
+        // Starts at the stock range rather than the slider's ceiling: on a client old
+        // enough to skip the 0x55 handshake the setting is never applied, and starting
+        // at the ceiling meant culling at 40 all session with nothing to justify it.
+        public static byte ClientViewRange { get; set; } = Constants.DEFAULT_VIEW_RANGE;
 
         public static bool SkillsRequested { get; set; }
 
@@ -244,49 +247,6 @@ namespace ClassicUO.Game
         }
         */
 
-        /// <summary>
-        /// Is this item standing inside a house the client still holds, and therefore
-        /// not to be thrown away for distance?
-        ///
-        /// A multi already gets its own size added to how far away it may be before the
-        /// client lets go of it - a big house is not dropped the moment its centre tile
-        /// passes the view range, because you may still be standing on its porch. What
-        /// is inside it never got that allowance, and was let go of at the plain view
-        /// range like a rock on the road.
-        ///
-        /// That is what emptied a large house. Stepping a few tiles out of the south
-        /// door puts the far end past twenty-four tiles, so its contents were deleted
-        /// while the house itself, kept out to thirty-six, stood there complete. The
-        /// server was never told and had no reason to send them again, so the house
-        /// stayed furnished with nothing until something made it reload. In one
-        /// captured session that was seventy items at a single instant, and two hundred
-        /// and twenty-four distinct items deleted and re-sent over one play session.
-        ///
-        /// So nothing standing inside a house the client holds is dropped for distance
-        /// at all. There is no radius here on purpose: what the client already has costs
-        /// only memory to keep, and the house being let go of is the one moment its
-        /// contents should go with it - which is also what makes the server send the
-        /// whole lot again on the way back, so this cannot quietly rot into a stale
-        /// picture of a room.
-        ///
-        /// The view range itself is untouched. Twenty-four is the protocol maximum, the
-        /// client already asks for exactly that, and it is the server's to decide.
-        /// </summary>
-        private static bool KeptByItsHouse(Item item)
-        {
-            if (item.IsMulti || !Settings.GlobalSettings.KeepHouseContentsLoaded)
-            {
-                return false;
-            }
-
-            if (!HouseManager.IsInsideKnownHouse(item))
-            {
-                return false;
-            }
-
-            return true;
-        }
-
         public static void Update()
         {
             if (Player != null)
@@ -433,15 +393,24 @@ namespace ClassicUO.Game
                     // every frame and pardoned it every frame, because TryToRemove then
                     // refused: twenty passes a second, for as long as the player stood
                     // there. In one log 97.6% of all cull work was that loop.
-                    int keepWithin = ClientViewRange + (item.IsMulti ? item.MultiDistanceBonus : 0);
+                    // A multi answers to the house range, everything else to the view
+                    // range. They are separate numbers because they are separate
+                    // questions: a house is a design fetched by revision and safe to
+                    // hold early, a loose object is only as good as the last update the
+                    // server sent for it.
+                    int houseRange = Settings.GlobalSettings.HouseLoadRange;
 
-                    if (do_delete && item.OnGround && item.Distance > keepWithin && !KeptByItsHouse(item))
+                    int keepWithin = item.IsMulti
+                        ? houseRange + item.MultiDistanceBonus
+                        : ClientViewRange;
+
+                    if (do_delete && item.OnGround && item.Distance > keepWithin)
                     {
                         HouseDiagnostics.LogItemCulled(item);
 
                         if (item.IsMulti)
                         {
-                            if (HouseManager.TryToRemove(item, ClientViewRange))
+                            if (HouseManager.TryToRemove(item, houseRange))
                             {
                                 RemoveItem(item);
                             }

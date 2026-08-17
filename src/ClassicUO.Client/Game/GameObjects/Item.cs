@@ -32,6 +32,7 @@
 
 using System;
 using System.Collections.Generic;
+using ClassicUO.Configuration;
 using ClassicUO.Game.Data;
 using ClassicUO.Game.Managers;
 using ClassicUO.Game.Scenes;
@@ -585,10 +586,6 @@ namespace ClassicUO.Game.GameObjects
 
             house.Bounds = MultiInfo.Value;
 
-            // Only now are there bounds to read. Recorded here so where the house stands
-            // outlives the house itself being let go of, which is what its contents are
-            // spared by.
-            World.HouseManager.RememberFootprint(Serial);
 
             UIManager.GetGump<MiniMapGump>()?.RequestUpdateContents();
 
@@ -634,9 +631,13 @@ namespace ClassicUO.Game.GameObjects
             {
                 UoAssist.SignalAddMulti((ushort)(Graphic | 0x4000), X, Y);
 
+                // The house range, not the view range. This is the gate that decides how
+                // far out a house gets built at all, which is why raising the view range
+                // appeared to fix house loading - it was moving this, and dragging the
+                // cull along with it.
                 if (
                     MultiDistanceBonus == 0
-                    || World.HouseManager.IsHouseInRange(Serial, World.ClientViewRange)
+                    || World.HouseManager.IsHouseInRange(Serial, Settings.GlobalSettings.HouseLoadRange)
                 )
                 {
                     LoadMulti();
