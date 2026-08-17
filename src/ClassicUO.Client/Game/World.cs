@@ -289,7 +289,7 @@ namespace ClassicUO.Game
                 return false;
             }
 
-            if (!HouseManager.IsInsideLoadedHouse(item))
+            if (!HouseManager.IsInsideKnownHouse(item))
             {
                 return false;
             }

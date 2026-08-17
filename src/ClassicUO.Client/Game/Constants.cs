@@ -116,46 +116,18 @@ namespace ClassicUO.Game
         public const int MIN_VIEW_RANGE = 5;
 
         /// <summary>
-        /// The largest view range that can be asked for, and now the default.
-        ///
-        /// Twenty-four was never a protocol limit or a server one - it is the largest
-        /// useful value for a 1024x768 window, off a table of old client resolutions,
-        /// and it has been the client's default ever since. Forty is where a
-        /// RunUO-derived server stops considering anything at all: both the per-step
-        /// item send and SendEverything gather candidates with GetObjectsInRange at
-        /// GlobalRadarRange, and that is forty.
-        ///
-        /// Those two numbers not matching is a real fault rather than a preference. A
-        /// house is let go of at the view range plus its own size - thirty-six for a
-        /// large one - while the server still counts everything in it as delivered out
-        /// to forty. Stop anywhere in that band and the client has thrown the contents
-        /// away while the server sees no reason to send them, and there is no message
-        /// for saying so. Caught in a capture: the house dropped holding two hundred and
-        /// twenty-two things at thirty-seven tiles, and one millisecond later the cull
-        /// destroyed every one of them.
-        ///
-        /// Asking for forty closes the band: by the time this client lets go of
-        /// something, the server has stopped tracking it too, so an ordinary approach
-        /// sends it again with nothing having to ask.
+        /// Inside this, a mobile is drawn whatever the server has been saying. Close
+        /// enough that a thing vanishing would be worse than a thing being slightly out
+        /// of date, and close enough that the server is certainly still narrating it.
         /// </summary>
-        public const int MAX_VIEW_RANGE = 40;
+        public const int ALWAYS_DRAW_MOBILE_RANGE = 18;
 
         /// <summary>
-        /// How far mobiles are drawn, as opposed to how far they are kept.
-        ///
-        /// The one range that cannot simply be raised to match. A RunUO-derived server
-        /// sends a mobile out to whatever range is asked for, but gathers the clients to
-        /// tell about its movement with a fixed number of its own - so past that a
-        /// mobile moves without anyone being told, and what is held is where it used to
-        /// be. Holding it further only means holding the stale picture for longer.
-        ///
-        /// Nothing the client sends changes who the server tells, so this is answered in
-        /// the drawing: kept like everything else, drawn only as far as it is still
-        /// being described. Twenty-four is stock ServUO, and the real number for a given
-        /// shard is the distance at which an approaching mobile stops jumping - hence a
-        /// setting rather than a constant.
+        /// How long a mobile's position stays believable after the server last mentioned
+        /// it. Longer than any normal gap between updates for something being narrated,
+        /// short enough that a thing which has gone quiet is not drawn where it was.
         /// </summary>
-        public const int DEFAULT_MOBILE_DRAW_RANGE = 24;
+        public const int MOBILE_STALE_AFTER = 1500;
         public const int MAX_CONTAINER_OPENED_ON_GROUND_RANGE = 3;
 
         public const int OUT_RANGE_COLOR = 0x038B;
