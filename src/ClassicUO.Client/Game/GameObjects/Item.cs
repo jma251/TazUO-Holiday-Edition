@@ -575,6 +575,11 @@ namespace ClassicUO.Game.GameObjects
 
             house.Bounds = MultiInfo.Value;
 
+            // Only now are there bounds to read. Recorded here so where the house stands
+            // outlives the house itself being let go of, which is what its contents are
+            // spared by.
+            World.HouseManager.RememberFootprint(Serial);
+
             UIManager.GetGump<MiniMapGump>()?.RequestUpdateContents();
 
             // Same as the two in PacketHandlers: the multi has just finished building,

@@ -46,8 +46,6 @@ namespace ClassicUO.Game.Managers
         public void Add(uint serial, House revision)
         {
             _houses[serial] = revision;
-
-            RememberFootprint(serial);
         }
 
         /// <summary>
@@ -69,9 +67,21 @@ namespace ClassicUO.Game.Managers
         /// </summary>
         private readonly Dictionary<uint, Rectangle> _footprints = new Dictionary<uint, Rectangle>();
 
-        private void RememberFootprint(uint serial)
+        /// <summary>
+        /// Called once the multi has finished building, never before it.
+        ///
+        /// This used to be called from Add, which LoadMulti calls at its top - and
+        /// MultiInfo is not assigned until the bottom of that same method. So every call
+        /// found no bounds to read, returned having stored nothing, and never came back,
+        /// because Add only runs on a house's first load. The table stayed empty and the
+        /// sparing below never spared anything.
+        ///
+        /// Rewritten rather than skipped when it is already known: a house that is
+        /// customized changes size, and the later word is the true one.
+        /// </summary>
+        public void RememberFootprint(uint serial)
         {
-            if (serial == 0 || _footprints.ContainsKey(serial))
+            if (serial == 0)
             {
                 return;
             }

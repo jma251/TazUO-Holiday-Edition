@@ -6702,10 +6702,6 @@ namespace ClassicUO.Network
                 mobile.Graphic = (ushort)(graphic & 0x3FFF);
                 mobile.FixHue(hue);
                 mobile.Flags = flagss;
-
-                // The server has just said where this one is, so what is held is real
-                // for now. See Mobile.LastServerConfirm.
-                mobile.LastServerConfirm = Time.Ticks;
             }
 
             if (created && !obj.IsClicked)
