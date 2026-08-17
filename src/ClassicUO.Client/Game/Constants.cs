@@ -114,6 +114,7 @@ namespace ClassicUO.Game
         public const int MIN_PICKUP_DRAG_DISTANCE_PIXELS = 5;
 
         public const int MIN_VIEW_RANGE = 5;
+        public const int MAX_VIEW_RANGE = 40;
 
         /// <summary>
         /// Inside this, a mobile is drawn whatever the server has been saying. Close

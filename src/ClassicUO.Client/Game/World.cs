@@ -86,16 +86,6 @@ namespace ClassicUO.Game
         // What the server has granted, overwritten by its answer to what was asked for.
         public static byte ClientViewRange { get; set; } = Constants.MAX_VIEW_RANGE;
 
-        /// <summary>
-        /// How far mobiles are drawn. Never how far they are kept - see
-        /// Constants.DEFAULT_MOBILE_DRAW_RANGE. Held to the view range, since drawing
-        /// further out than the client is even asking for buys nothing.
-        /// </summary>
-        public static int MobileDrawRange => Math.Min(MobileDrawRangeSetting, (int)ClientViewRange);
-
-        /// <summary>What the player asked for, before the view range is taken into account.</summary>
-        public static int MobileDrawRangeSetting { get; set; } = Constants.DEFAULT_MOBILE_DRAW_RANGE;
-
         public static bool SkillsRequested { get; set; }
 
         public static Season Season { get; private set; } = Season.Summer;
