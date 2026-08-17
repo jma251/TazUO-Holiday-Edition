@@ -1,0 +1,70 @@
+name: Prune branches
+
+# Run from the Actions tab. Nothing here fires on a push or on a schedule.
+#
+# Removes every branch except the four that are kept: legacy, legacy-dev, main,
+# dev. Merged or not - a branch that is not one of those four is a leftover.
+#
+# Tags are never touched. The h1..hN release tags are the rollback history and
+# nothing in this file can reach them.
+#
+# Defaults to a dry run, so the first click only ever prints a list.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type DELETE to remove them. Anything else lists only.'
+        required: true
+        default: 'dry-run'
+
+permissions:
+  contents: write
+
+jobs:
+  prune:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out with full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: List what would go
+        run: |
+          git fetch --prune origin
+
+          git branch -r \
+            | grep -v HEAD \
+            | sed 's|origin/||' \
+            | tr -d ' ' \
+            | grep -Ev '^(legacy|legacy-dev|main|dev)$' \
+            | sort > doomed.txt
+
+          echo "Keeping: legacy, legacy-dev, main, dev"
+          echo
+          echo "Would remove $(wc -l < doomed.txt) branches:"
+          sed 's/^/  /' doomed.txt
+
+          echo
+          echo "Commits unique to these branches, if any - the only thing a"
+          echo "delete could cost. Empty is the usual answer:"
+          git branch -r --no-merged origin/legacy \
+            | grep -v HEAD | sed 's|origin/||' | tr -d ' ' \
+            | grep -Ev '^(legacy|legacy-dev|main|dev)$' \
+            | sed 's/^/  /' || true
+
+      - name: Remove them
+        if: ${{ github.event.inputs.confirm == 'DELETE' }}
+        run: |
+          # Twenty at a time, so one bad name cannot take the whole run with it
+          # and the log reads as batches rather than a single wall of output.
+          xargs -a doomed.txt -n 20 git push origin --delete
+          echo
+          echo "Removed $(wc -l < doomed.txt) branches. Tags untouched."
+
+      - name: Nothing was removed
+        if: ${{ github.event.inputs.confirm != 'DELETE' }}
+        run: |
+          echo "Dry run. Run again with DELETE in the confirm box to remove the list above."
