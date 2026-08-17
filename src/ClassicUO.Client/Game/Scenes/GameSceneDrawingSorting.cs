@@ -967,9 +967,13 @@ namespace ClassicUO.Game.Scenes
                     // instead means it appears when it is next described, already in the
                     // right place, so there is nothing to jump from.
                     //
-                    // Never applied close in, whatever the server is saying, so nothing
-                    // can go missing from under the player's nose.
+                    // Only ever a mobile that was walking when the server went quiet. One
+                    // standing still is standing where it was last put, so silence says
+                    // nothing about it and it draws for as long as it is held. Never
+                    // applied close in either, so nothing can go missing from under the
+                    // player's nose.
                     if (!ReferenceEquals(mobile, World.Player)
+                        && mobile.WasWalkingWhenLastHeard
                         && mobile.Distance > Constants.ALWAYS_DRAW_MOBILE_RANGE
                         && Time.Ticks - mobile.LastServerConfirm > Constants.MOBILE_STALE_AFTER)
                     {

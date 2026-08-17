@@ -51,6 +51,7 @@ namespace ClassicUO.Game.GameObjects
             {
                 mobile._inPool = false;
                 mobile.LastServerConfirm = 0;
+                mobile.WasWalkingWhenLastHeard = false;
                 mobile.IsDestroyed = false;
                 mobile.Graphic = 0;
                 mobile.Steps.Clear();
@@ -1151,6 +1152,16 @@ namespace ClassicUO.Game.GameObjects
         /// described recently the position is real, and if it has not, it is not.
         /// </summary>
         public long LastServerConfirm;
+
+        /// <summary>
+        /// Whether the last thing the server said about this one was that it had moved.
+        ///
+        /// Only a mobile that was walking when the server went quiet can be somewhere
+        /// else by now. One that was standing still is standing where it was last put,
+        /// so its position never goes stale however long the server says nothing, and
+        /// there is no reason to stop drawing it.
+        /// </summary>
+        public bool WasWalkingWhenLastHeard;
 
         public struct Step
         {
