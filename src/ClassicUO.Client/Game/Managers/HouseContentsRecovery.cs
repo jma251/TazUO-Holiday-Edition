@@ -6,20 +6,12 @@ using ClassicUO.Network;
 namespace ClassicUO.Game.Managers
 {
     /// <summary>
-    /// Asks the server for what stood in a house this client emptied while it was away.
+    /// Asks the server for what stood in a house this client is no longer holding.
     ///
-    /// Measured on this shard: crossing out of the server's twenty-four tile box makes it
-    /// send 0x1D for the room. Coming back, it streams only what it counts as newly in
-    /// range - seventeen items where two hundred and twenty-two were deleted - because
-    /// its delete never cleared its own record of what it had delivered. Stepping one
-    /// tile off the foundation and back is a region crossing rather than a range
-    /// re-entry, which is why that always works and a long trip does not.
-    ///
-    /// Packet 0x22 is the only thing that makes the server disregard that record. It is
-    /// asked for at one moment: a house is taken back that this client let go of while
-    /// it was holding something. Five events in a twenty-four hour capture. Never on
-    /// entering a house, never on a timer, never for a house that was not dropped -
-    /// which is every house you simply walk into.
+    /// Packet 0x22 is the only thing that makes the server disregard its record of what
+    /// it has already delivered. It is asked for at two moments: a house is taken back
+    /// that this client let go of while it was holding something, and a house being
+    /// stood in is holding fewer things than it has been seen holding.
     ///
     /// An earlier version also counted individual items culled near any house and polled
     /// once a second. That fired ten times in twenty-five minutes with the house full
@@ -34,24 +26,12 @@ namespace ClassicUO.Game.Managers
         /// <summary>How often the standing-inside count is taken. Only while the option is on.</summary>
         private const long PollInterval = 1000;
 
-        /// <summary>
-        /// How long a shortfall must persist before it counts as one.
-        ///
-        /// Standing on the threshold tile drops the count to a handful and it comes back
-        /// on the next sample - roughly seventy times in a day's capture, every one of
-        /// them recovering within a second. Three seconds is well clear of that and well
-        /// inside the thirty-one a real one lasted.
-        /// </summary>
-        private const long ShortfallGrace = 3000;
-
         /// <summary>Below this, a difference is churn rather than a missing room.</summary>
         private const int ShortfallFloor = 10;
 
         /// <summary>The most this house has been seen holding, per house.</summary>
         private static readonly Dictionary<uint, int> _highWater = new Dictionary<uint, int>();
 
-        private static uint _shortHouse;
-        private static long _shortSince;
         private static long _nextPoll;
 
         /// <summary>
@@ -66,8 +46,6 @@ namespace ClassicUO.Game.Managers
         {
             _emptied.Clear();
             _highWater.Clear();
-            _shortHouse = 0;
-            _shortSince = 0;
             _nextPoll = 0;
             _nextAsk = 0;
         }
@@ -77,9 +55,13 @@ namespace ClassicUO.Game.Managers
         ///
         /// Caught on a capture: the house held 238, the player walked out and back, and
         /// it held 189 for thirty-one seconds while they walked around inside it. The
-        /// house was never let go of, so nothing else here noticed. Stepping back out to
-        /// the threshold and in again fixed it, which is the region crossing the server
-        /// answers and a walk around the inside is not.
+        /// house was never let go of, so nothing else here noticed.
+        ///
+        /// Judged only from a tile that is not on the house's perimeter. Standing on the
+        /// perimeter the count dips to a handful and recovers on the next sample - about
+        /// seventy times in a day's capture, none of them real. Replaying both captures,
+        /// that test on its own removes every one of them, so a shortfall seen from
+        /// inside is acted on at once rather than waited out.
         ///
         /// Only runs while the option is on, because it counts the room once a second.
         /// </summary>
@@ -96,19 +78,22 @@ namespace ClassicUO.Game.Managers
 
             if (!World.HouseManager.TryGetLoadedHouseAt(World.Player, out serial))
             {
-                _shortHouse = 0;
-
                 return;
             }
 
-            int held = CountInside(serial);
+            int minX, minY, maxX, maxY;
 
-            if (held < 0)
+            if (!TryGetBounds(serial, out minX, out minY, out maxX, out maxY))
             {
-                _shortHouse = 0;
-
                 return;
             }
+
+            if (World.Player.X <= minX || World.Player.X >= maxX || World.Player.Y <= minY || World.Player.Y >= maxY)
+            {
+                return;
+            }
+
+            int held = CountInside(minX, minY, maxX, maxY);
 
             int high;
 
@@ -116,32 +101,13 @@ namespace ClassicUO.Game.Managers
             {
                 _highWater[serial] = held;
 
-                _shortHouse = 0;
-
                 return;
             }
 
             if (high - held < ShortfallFloor)
             {
-                _shortHouse = 0;
-
                 return;
             }
-
-            if (_shortHouse != serial)
-            {
-                _shortHouse = serial;
-                _shortSince = Time.Ticks;
-
-                return;
-            }
-
-            if (Time.Ticks - _shortSince < ShortfallGrace)
-            {
-                return;
-            }
-
-            _shortHouse = 0;
 
             // Whatever comes back is the new truth. Asked once per shortfall, so a room
             // that is genuinely emptier than it was does not get asked about forever.
@@ -151,21 +117,29 @@ namespace ClassicUO.Game.Managers
             Ask(serial, missing, "shortfall");
         }
 
-        /// <summary>How many ground items this house is holding, or -1 if it cannot be counted.</summary>
-        private static int CountInside(uint serial)
+        /// <summary>Where this house's multi says its floor is, or false if it cannot say.</summary>
+        private static bool TryGetBounds(uint serial, out int minX, out int minY, out int maxX, out int maxY)
         {
+            minX = minY = maxX = maxY = 0;
+
             Item multi = World.Items.Get(serial);
 
             if (multi == null || multi.IsDestroyed || !multi.MultiInfo.HasValue)
             {
-                return -1;
+                return false;
             }
 
-            int minX = multi.X + multi.MultiInfo.Value.X;
-            int maxX = multi.X + multi.MultiInfo.Value.Width;
-            int minY = multi.Y + multi.MultiInfo.Value.Y;
-            int maxY = multi.Y + multi.MultiInfo.Value.Height;
+            minX = multi.X + multi.MultiInfo.Value.X;
+            maxX = multi.X + multi.MultiInfo.Value.Width;
+            minY = multi.Y + multi.MultiInfo.Value.Y;
+            maxY = multi.Y + multi.MultiInfo.Value.Height;
 
+            return true;
+        }
+
+        /// <summary>How many ground items are standing within these bounds.</summary>
+        private static int CountInside(int minX, int minY, int maxX, int maxY)
+        {
             int held = 0;
 
             foreach (KeyValuePair<uint, Item> pair in World.Items)
@@ -197,34 +171,14 @@ namespace ClassicUO.Game.Managers
                 return;
             }
 
-            Item multi = World.Items.Get(serial);
+            int minX, minY, maxX, maxY;
 
-            if (multi == null || multi.IsDestroyed || !multi.MultiInfo.HasValue)
+            if (!TryGetBounds(serial, out minX, out minY, out maxX, out maxY))
             {
                 return;
             }
 
-            int minX = multi.X + multi.MultiInfo.Value.X;
-            int maxX = multi.X + multi.MultiInfo.Value.Width;
-            int minY = multi.Y + multi.MultiInfo.Value.Y;
-            int maxY = multi.Y + multi.MultiInfo.Value.Height;
-
-            int held = 0;
-
-            foreach (KeyValuePair<uint, Item> pair in World.Items)
-            {
-                Item item = pair.Value;
-
-                if (item.IsMulti || item.IsDestroyed || !item.OnGround)
-                {
-                    continue;
-                }
-
-                if (item.X >= minX && item.X <= maxX && item.Y >= minY && item.Y <= maxY)
-                {
-                    held++;
-                }
-            }
+            int held = CountInside(minX, minY, maxX, maxY);
 
             if (held > 0)
             {
