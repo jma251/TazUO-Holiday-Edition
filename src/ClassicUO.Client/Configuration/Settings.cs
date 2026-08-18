@@ -144,6 +144,12 @@ namespace ClassicUO.Configuration
         // house design is fetched by revision and cannot go stale unnoticed.
         [JsonPropertyName("house_load_range")] public int HouseLoadRange { get; set; } = 40;
 
+        // Ask the server again for what stands in a house this client discarded on the way
+        // out. It drops what it cannot see, which is right, but no packet says so, and the
+        // server goes on believing those items were delivered. Packet 0x22 is the only
+        // thing that makes it reconsider. Global rather than per-profile.
+        [JsonPropertyName("recover_house_contents")] public bool RecoverHouseContents { get; set; } = true;
+
         [JsonPropertyName("shard_type")] public int ShardType { get; set; } // 0 = normal (no customization), 1 = old, 2 = outlands??
 
         [JsonPropertyName("fixed_time_step")] public bool FixedTimeStep { get; set; } = true;
