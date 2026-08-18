@@ -445,6 +445,7 @@ namespace ClassicUO.Game
                     _toRemove.Clear();
                 }
 
+                HouseContentsRecovery.Update();
                 _effectManager.Update();
                 WorldTextManager.Update();
                 WMapManager.RemoveUnupdatedWEntity();

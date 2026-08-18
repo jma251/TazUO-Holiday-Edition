@@ -31,6 +31,29 @@ namespace ClassicUO.Game.Managers
         /// <summary>Long enough for an answer to arrive before another is asked for.</summary>
         private const long AskInterval = 3000;
 
+        /// <summary>How often the standing-inside count is taken. Only while the option is on.</summary>
+        private const long PollInterval = 1000;
+
+        /// <summary>
+        /// How long a shortfall must persist before it counts as one.
+        ///
+        /// Standing on the threshold tile drops the count to a handful and it comes back
+        /// on the next sample - roughly seventy times in a day's capture, every one of
+        /// them recovering within a second. Three seconds is well clear of that and well
+        /// inside the thirty-one a real one lasted.
+        /// </summary>
+        private const long ShortfallGrace = 3000;
+
+        /// <summary>Below this, a difference is churn rather than a missing room.</summary>
+        private const int ShortfallFloor = 10;
+
+        /// <summary>The most this house has been seen holding, per house.</summary>
+        private static readonly Dictionary<uint, int> _highWater = new Dictionary<uint, int>();
+
+        private static uint _shortHouse;
+        private static long _shortSince;
+        private static long _nextPoll;
+
         /// <summary>
         /// Houses let go of while holding something, and how much. Counts only - nothing
         /// here keeps an object alive or remembers where one stood.
@@ -42,7 +65,125 @@ namespace ClassicUO.Game.Managers
         public static void Reset()
         {
             _emptied.Clear();
+            _highWater.Clear();
+            _shortHouse = 0;
+            _shortSince = 0;
+            _nextPoll = 0;
             _nextAsk = 0;
+        }
+
+        /// <summary>
+        /// Standing in a house that is holding less than it was.
+        ///
+        /// Caught on a capture: the house held 238, the player walked out and back, and
+        /// it held 189 for thirty-one seconds while they walked around inside it. The
+        /// house was never let go of, so nothing else here noticed. Stepping back out to
+        /// the threshold and in again fixed it, which is the region crossing the server
+        /// answers and a walk around the inside is not.
+        ///
+        /// Only runs while the option is on, because it counts the room once a second.
+        /// </summary>
+        public static void Update()
+        {
+            if (!Settings.GlobalSettings.RecoverHouseContents || !World.InGame || Time.Ticks < _nextPoll)
+            {
+                return;
+            }
+
+            _nextPoll = Time.Ticks + PollInterval;
+
+            uint serial;
+
+            if (!World.HouseManager.TryGetLoadedHouseAt(World.Player, out serial))
+            {
+                _shortHouse = 0;
+
+                return;
+            }
+
+            int held = CountInside(serial);
+
+            if (held < 0)
+            {
+                _shortHouse = 0;
+
+                return;
+            }
+
+            int high;
+
+            if (!_highWater.TryGetValue(serial, out high) || held > high)
+            {
+                _highWater[serial] = held;
+
+                _shortHouse = 0;
+
+                return;
+            }
+
+            if (high - held < ShortfallFloor)
+            {
+                _shortHouse = 0;
+
+                return;
+            }
+
+            if (_shortHouse != serial)
+            {
+                _shortHouse = serial;
+                _shortSince = Time.Ticks;
+
+                return;
+            }
+
+            if (Time.Ticks - _shortSince < ShortfallGrace)
+            {
+                return;
+            }
+
+            _shortHouse = 0;
+
+            // Whatever comes back is the new truth. Asked once per shortfall, so a room
+            // that is genuinely emptier than it was does not get asked about forever.
+            int missing = high - held;
+            _highWater[serial] = held;
+
+            Ask(serial, missing, "shortfall");
+        }
+
+        /// <summary>How many ground items this house is holding, or -1 if it cannot be counted.</summary>
+        private static int CountInside(uint serial)
+        {
+            Item multi = World.Items.Get(serial);
+
+            if (multi == null || multi.IsDestroyed || !multi.MultiInfo.HasValue)
+            {
+                return -1;
+            }
+
+            int minX = multi.X + multi.MultiInfo.Value.X;
+            int maxX = multi.X + multi.MultiInfo.Value.Width;
+            int minY = multi.Y + multi.MultiInfo.Value.Y;
+            int maxY = multi.Y + multi.MultiInfo.Value.Height;
+
+            int held = 0;
+
+            foreach (KeyValuePair<uint, Item> pair in World.Items)
+            {
+                Item item = pair.Value;
+
+                if (item.IsMulti || item.IsDestroyed || !item.OnGround)
+                {
+                    continue;
+                }
+
+                if (item.X >= minX && item.X <= maxX && item.Y >= minY && item.Y <= maxY)
+                {
+                    held++;
+                }
+            }
+
+            return held;
         }
 
         /// <summary>
@@ -114,6 +255,11 @@ namespace ClassicUO.Game.Managers
             // about again on every future approach.
             _emptied.Remove(serial);
 
+            Ask(serial, emptied, "reacquired");
+        }
+
+        private static void Ask(uint serial, int missing, string why)
+        {
             if (!Settings.GlobalSettings.RecoverHouseContents || Time.Ticks < _nextAsk)
             {
                 return;
@@ -121,7 +267,7 @@ namespace ClassicUO.Game.Managers
 
             _nextAsk = Time.Ticks + AskInterval;
 
-            HouseDiagnostics.Note($"recover house=0x{serial:X8} emptied={emptied}");
+            HouseDiagnostics.Note($"recover house=0x{serial:X8} missing={missing} why={why}");
 
             NetClient.Socket.Send_Resync();
         }
