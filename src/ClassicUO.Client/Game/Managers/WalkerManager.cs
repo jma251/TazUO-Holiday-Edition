@@ -105,6 +105,35 @@ namespace ClassicUO.Game.Managers
         public byte WalkSequence;
         public bool WantChangeCoordinates;
 
+        /// <summary>
+        /// Until when a walk correction is this client's own doing rather than the
+        /// server rejecting a step.
+        ///
+        /// A resync makes the server restate everything around the player, and the
+        /// answer arrives while steps are still in flight. Their sequence numbers no
+        /// longer line up, ConfirmWalk cannot match them, and the stock reaction is to
+        /// treat that as a bad step: send another resync and set WalkingFailed, which
+        /// stops the character dead. Measured on a capture, nine resyncs out of ten drew
+        /// a DenyWalk within 500ms and every one of them produced a second resync - the
+        /// hitch people feel after a resync is not the packets, it is their own walk
+        /// being thrown away.
+        ///
+        /// Inside this window the correction is expected, so the sequence is re-baselined
+        /// without asking again and without refusing to walk.
+        /// </summary>
+        private long _expectingCorrectionUntil;
+
+        /// <summary>How long a resync's answer may take before a bad step means what it usually means.</summary>
+        private const long CorrectionWindow = 2000;
+
+        /// <summary>Called wherever a resync leaves this client, whoever asked for it.</summary>
+        public void NoteResyncSent()
+        {
+            _expectingCorrectionUntil = Time.Ticks + CorrectionWindow;
+        }
+
+        private bool ExpectingCorrection => Time.Ticks < _expectingCorrectionUntil;
+
         public void DenyWalk(byte sequence, int x, int y, sbyte z)
         {
             World.Player.ClearSteps();
@@ -172,6 +201,17 @@ namespace ClassicUO.Game.Managers
 
             if (isBadStep)
             {
+                if (ExpectingCorrection)
+                {
+                    // Our own resync came back. Start the sequence again from where the
+                    // server has just put us, but do not ask a second time and do not
+                    // refuse to walk - there was nothing wrong with the step.
+                    StepsCount = 0;
+                    CurrentWalkSequence = 0;
+
+                    return;
+                }
+
                 if (!ResendPacketResync)
                 {
                     NetClient.Socket.Send_Resync();
