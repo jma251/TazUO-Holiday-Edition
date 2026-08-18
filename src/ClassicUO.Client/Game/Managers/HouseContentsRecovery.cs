@@ -6,68 +6,48 @@ using ClassicUO.Network;
 namespace ClassicUO.Game.Managers
 {
     /// <summary>
-    /// Asks the server for what is standing in a house the client discarded behind its
-    /// own back.
+    /// Asks the server for what stood in a house this client emptied while it was away.
     ///
-    /// The client drops what it cannot see, which is correct - holding it would mean
-    /// drawing furniture that may have been carried off hours ago. But there is no
-    /// message in the protocol for "I have thrown away what you sent me", so the server
-    /// goes on believing those items were delivered and never mentions them again.
+    /// Measured on this shard: crossing out of the server's twenty-four tile box makes it
+    /// send 0x1D for the room. Coming back, it streams only what it counts as newly in
+    /// range - seventeen items where two hundred and twenty-two were deleted - because
+    /// its delete never cleared its own record of what it had delivered. Stepping one
+    /// tile off the foundation and back is a region crossing rather than a range
+    /// re-entry, which is why that always works and a long trip does not.
     ///
-    /// Measured on a capture: standing inside the house holding 16 of 238 things, fifty
-    /// seconds of walking around produced 25 arrivals and not one of them a new object.
-    /// One 0x22 produced 242 arrivals, 222 of them new, and the room was whole again
-    /// before the next log sample. Stepping off the foundation and back on works because
-    /// it trips the server's own region enter, which resends unconditionally; 0x22 is the
-    /// same instruction without needing to know the trick.
+    /// Packet 0x22 is the only thing that makes the server disregard that record. It is
+    /// asked for at one moment: a house is taken back that this client let go of while
+    /// it was holding something. Five events in a twenty-four hour capture. Never on
+    /// entering a house, never on a timer, never for a house that was not dropped -
+    /// which is every house you simply walk into.
     ///
-    /// Asked for only when this client is holding less than it handed back, and only
-    /// while standing in the house it is short on. Not on entering any house, which would
-    /// cost a full resend every time a door is walked through.
+    /// An earlier version also counted individual items culled near any house and polled
+    /// once a second. That fired ten times in twenty-five minutes with the house full
+    /// every time, because ordinary boundary culls near neighbouring houses armed it.
+    /// It is not coming back.
     /// </summary>
     internal static class HouseContentsRecovery
     {
         /// <summary>Long enough for an answer to arrive before another is asked for.</summary>
         private const long AskInterval = 3000;
 
-        /// <summary>How often the standing-inside check runs at all.</summary>
-        private const long PollInterval = 1000;
-
         /// <summary>
-        /// Houses this client has discarded things from, and how many. Counts only -
-        /// nothing here keeps an object alive or remembers where one stood.
+        /// Houses let go of while holding something, and how much. Counts only - nothing
+        /// here keeps an object alive or remembers where one stood.
         /// </summary>
-        private static readonly Dictionary<uint, int> _owed = new Dictionary<uint, int>();
+        private static readonly Dictionary<uint, int> _emptied = new Dictionary<uint, int>();
 
         private static long _nextAsk;
-        private static long _nextPoll;
 
         public static void Reset()
         {
-            _owed.Clear();
+            _emptied.Clear();
             _nextAsk = 0;
-            _nextPoll = 0;
         }
 
         /// <summary>
-        /// One item standing in a loaded house has just been dropped for distance. The
-        /// house is still held, so it will not be re-acquired and nothing else would ever
-        /// notice the shortfall.
-        /// </summary>
-        public static void OnContentsCulled(uint house)
-        {
-            if (house == 0)
-            {
-                return;
-            }
-
-            int held;
-            _owed[house] = _owed.TryGetValue(house, out held) ? held + 1 : 1;
-        }
-
-        /// <summary>
-        /// A house is about to be let go of. Counted now, while its things are still
-        /// here - a moment later they are gone and there is nothing left to count.
+        /// A house is about to be let go of. Counted now, while its things are still here
+        /// to count - a moment later the same sweep has taken them.
         /// </summary>
         public static void OnHouseLetGo(uint serial)
         {
@@ -107,74 +87,41 @@ namespace ClassicUO.Game.Managers
 
             if (held > 0)
             {
-                int already;
-                _owed[serial] = _owed.TryGetValue(serial, out already) ? already + held : held;
+                _emptied[serial] = held;
             }
         }
 
         /// <summary>
-        /// A house has been taken back after being let go. If this client emptied it on
-        /// the way out, say so the only way there is.
+        /// A house has been taken back. If this client emptied it on the way out, say so
+        /// the only way there is.
         /// </summary>
         public static void OnHouseAcquired(uint serial)
         {
-            if (!World.InGame || !_owed.ContainsKey(serial))
+            if (!World.InGame)
             {
                 return;
             }
 
-            Ask(serial);
-        }
+            int emptied;
 
-        /// <summary>
-        /// Standing inside a house this client is short on. Covers the case the acquire
-        /// hook cannot see: the house never left range, so it was never re-acquired, but
-        /// its contents were dropped at the view range all the same.
-        /// </summary>
-        public static void Update()
-        {
-            if (_owed.Count == 0 || !World.InGame || Time.Ticks < _nextPoll)
+            if (!_emptied.TryGetValue(serial, out emptied))
             {
                 return;
             }
 
-            _nextPoll = Time.Ticks + PollInterval;
+            // Taken off whether the ask happens or not. A house that has come back is no
+            // longer a house that was dropped, and leaving the record would have it asked
+            // about again on every future approach.
+            _emptied.Remove(serial);
 
-            uint house;
-
-            if (World.HouseManager.TryGetLoadedHouseAt(World.Player, out house) && _owed.ContainsKey(house))
-            {
-                Ask(house);
-            }
-        }
-
-        private static void Ask(uint serial)
-        {
-            int owed;
-
-            if (!_owed.TryGetValue(serial, out owed))
+            if (!Settings.GlobalSettings.RecoverHouseContents || Time.Ticks < _nextAsk)
             {
                 return;
             }
 
-            if (!Settings.GlobalSettings.RecoverHouseContents)
-            {
-                _owed.Remove(serial);
-
-                return;
-            }
-
-            if (Time.Ticks < _nextAsk)
-            {
-                return;
-            }
-
-            // Taken off whether the answer helps or not. Leaving it would have the same
-            // house asked about on every poll for as long as the shortfall persisted.
-            _owed.Remove(serial);
             _nextAsk = Time.Ticks + AskInterval;
 
-            HouseDiagnostics.Note($"recover house=0x{serial:X8} discarded={owed}");
+            HouseDiagnostics.Note($"recover house=0x{serial:X8} emptied={emptied}");
 
             NetClient.Socket.Send_Resync();
         }

@@ -417,15 +417,6 @@ namespace ClassicUO.Game
                         }
                         else
                         {
-                            // Recorded before it goes. The server still believes this was
-                            // delivered and will not mention it again on its own.
-                            uint shortHouse;
-
-                            if (HouseManager.TryGetLoadedHouseAt(item, out shortHouse))
-                            {
-                                HouseContentsRecovery.OnContentsCulled(shortHouse);
-                            }
-
                             RemoveItem(item);
                         }
                     }
@@ -454,7 +445,6 @@ namespace ClassicUO.Game
                     _toRemove.Clear();
                 }
 
-                HouseContentsRecovery.Update();
                 _effectManager.Update();
                 WorldTextManager.Update();
                 WMapManager.RemoveUnupdatedWEntity();

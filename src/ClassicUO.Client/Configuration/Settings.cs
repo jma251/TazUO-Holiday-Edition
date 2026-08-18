@@ -144,11 +144,12 @@ namespace ClassicUO.Configuration
         // house design is fetched by revision and cannot go stale unnoticed.
         [JsonPropertyName("house_load_range")] public int HouseLoadRange { get; set; } = 40;
 
-        // Ask the server again for what stands in a house this client discarded on the way
-        // out. It drops what it cannot see, which is right, but no packet says so, and the
-        // server goes on believing those items were delivered. Packet 0x22 is the only
-        // thing that makes it reconsider. Global rather than per-profile.
-        [JsonPropertyName("recover_house_contents")] public bool RecoverHouseContents { get; set; } = true;
+        // Automatic recovery for a house that comes back empty, by asking the server to
+        // disregard what it believes it has already delivered. Off by default: the Resync
+        // macro does the same thing by hand and leaves the choice with the player. On, it
+        // asks once when a house is taken back that this client emptied on the way out -
+        // five events in a twenty-four hour capture. Global rather than per-profile.
+        [JsonPropertyName("recover_house_contents")] public bool RecoverHouseContents { get; set; } = false;
 
         [JsonPropertyName("shard_type")] public int ShardType { get; set; } // 0 = normal (no customization), 1 = old, 2 = outlands??
 
