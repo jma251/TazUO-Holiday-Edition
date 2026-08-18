@@ -136,10 +136,19 @@ namespace ClassicUO.Configuration
         // and never deleted, so it freezes where it stood and jumps when you close in.
         [JsonPropertyName("client_view_range")] public int ClientViewRange { get; set; } = 24;
 
-        // How far out houses are built and held, independent of the view range above.
-        // Raising this brings houses in earlier and more complete without holding any
-        // loose object past the distance the server still tracks it.
+        // How far away a house the client already holds is kept before it is dropped,
+        // independent of the view range above. Retention only: a house is built when the
+        // server sends its multi item and never before, and nothing here can ask for one
+        // (0xBF cmd 0x1D removes the house outright when the item is absent). Raising it
+        // holds no loose object past the distance the server still tracks it, because a
+        // house design is fetched by revision and cannot go stale unnoticed.
         [JsonPropertyName("house_load_range")] public int HouseLoadRange { get; set; } = 40;
+
+        // Ask the server again for what stands in a house this client discarded on the way
+        // out. It drops what it cannot see, which is right, but no packet says so, and the
+        // server goes on believing those items were delivered. Packet 0x22 is the only
+        // thing that makes it reconsider. Global rather than per-profile.
+        [JsonPropertyName("recover_house_contents")] public bool RecoverHouseContents { get; set; } = true;
 
         [JsonPropertyName("shard_type")] public int ShardType { get; set; } // 0 = normal (no customization), 1 = old, 2 = outlands??
 

@@ -45,7 +45,14 @@ namespace ClassicUO.Game.Managers
 
         public void Add(uint serial, House revision)
         {
+            bool reacquired = !_houses.ContainsKey(serial);
+
             _houses[serial] = revision;
+
+            if (reacquired)
+            {
+                HouseContentsRecovery.OnHouseAcquired(serial);
+            }
         }
 
         public bool TryGetHouse(uint serial, out House house)
@@ -61,6 +68,9 @@ namespace ClassicUO.Game.Managers
                 {
                     // The moment the contents stop being spared by the distance cull.
                     HouseDiagnostics.LogHouseLetGo(serial, "out_of_range", house.Components.Count);
+
+                    // Counted while its contents are still here to count.
+                    HouseContentsRecovery.OnHouseLetGo(serial);
 
                     house.ClearComponents();
                     _houses.Remove(serial);
@@ -140,6 +150,18 @@ namespace ClassicUO.Game.Managers
         /// </summary>
         public bool IsInsideLoadedHouse(GameObject obj)
         {
+            uint ignored;
+
+            return TryGetLoadedHouseAt(obj, out ignored);
+        }
+
+        /// <summary>
+        /// Which house the client currently holds is this standing in, if any.
+        /// </summary>
+        public bool TryGetLoadedHouseAt(GameObject obj, out uint serial)
+        {
+            serial = 0;
+
             if (obj == null)
             {
                 return false;
@@ -166,6 +188,8 @@ namespace ClassicUO.Game.Managers
 
                 if (obj.X >= minX && obj.X <= maxX && obj.Y >= minY && obj.Y <= maxY)
                 {
+                    serial = pair.Key;
+
                     return true;
                 }
             }
