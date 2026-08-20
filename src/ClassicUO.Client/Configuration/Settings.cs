@@ -144,14 +144,6 @@ namespace ClassicUO.Configuration
         // house design is fetched by revision and cannot go stale unnoticed.
         [JsonPropertyName("house_load_range")] public int HouseLoadRange { get; set; } = 40;
 
-        // Automatic recovery for a house that comes back empty, by asking the server to
-        // disregard what it believes it has already delivered. Off by default: the Resync
-        // macro does the same thing by hand and leaves the choice with the player. On, it
-        // asks when a house is taken back that this client emptied on the way out, and
-        // when a house being stood in is holding fewer things than it has been seen
-        // holding - seven events in a twenty-four hour capture. Global, not per-profile.
-        [JsonPropertyName("recover_house_contents")] public bool RecoverHouseContents { get; set; } = false;
-
         [JsonPropertyName("shard_type")] public int ShardType { get; set; } // 0 = normal (no customization), 1 = old, 2 = outlands??
 
         [JsonPropertyName("fixed_time_step")] public bool FixedTimeStep { get; set; } = true;

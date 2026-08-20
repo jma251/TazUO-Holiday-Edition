@@ -445,7 +445,6 @@ namespace ClassicUO.Game
                     _toRemove.Clear();
                 }
 
-                HouseContentsRecovery.Update();
                 _effectManager.Update();
                 WorldTextManager.Update();
                 WMapManager.RemoveUnupdatedWEntity();
@@ -921,7 +920,6 @@ namespace ClassicUO.Game
             OPL.Clear();
             WMapManager.Clear();
             HouseManager?.Clear();
-            HouseContentsRecovery.Reset();
 
             Season = Season.Summer;
             OldSeason = Season.Summer;
