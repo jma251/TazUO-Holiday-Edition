@@ -466,7 +466,6 @@ namespace ClassicUO.Configuration
             public string DisableRightLeftClickAutoMove { get; set; } = "Disable right + left click auto move";
             public string LogHouseDiagnostics { get; set; } = "Log house loading diagnostics to Data/houselog.txt";
             public string ClientViewRange { get; set; } = "View range - how far the client keeps what the server sent (match your shard, 24 is typical)";
-            public string RecoverHouseContents { get; set; } = "Auto-resync a house that comes back empty (off = use a Resync macro by hand)";
             public string HouseLoadRange { get; set; } = "House keep range - how far away a loaded house is held before it is dropped (the server decides how early one arrives)";
             public string LogMusicIndices { get; set; } = "Log music indices to Data/musiclog.txt";
             public string MusicEra { get; set; } = "Music era";
