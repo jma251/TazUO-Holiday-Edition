@@ -3803,12 +3803,6 @@ namespace ClassicUO.Network
 
         public static void Send_Resync(this AsyncNetClient socket)
         {
-            // Whoever asked for it - a macro, the hang check, WalkerManager itself - the
-            // answer restates the world around the player and arrives while steps are in
-            // flight. Marked here so the walk correction that follows is not mistaken for
-            // the server refusing a step. See WalkerManager.NoteResyncSent.
-            World.Player?.Walker?.NoteResyncSent();
-
             const byte ID = 0x22;
 
             int length = PacketsTable.GetPacketLength(ID);
