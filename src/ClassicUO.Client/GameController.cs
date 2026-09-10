@@ -91,7 +91,7 @@ namespace ClassicUO
 
             Window.ClientSizeChanged += WindowOnClientSizeChanged;
             Window.AllowUserResizing = true;
-            Window.Title = $"TazUO [Legacy] - {CUOEnviroment.Version} - Holiday Edition";
+            Window.Title = $"TazUO [Legacy] - {CUOEnviroment.ShortVersion} - Holiday Edition";
             IsMouseVisible = Settings.GlobalSettings.RunMouseInASeparateThread;
 
             IsFixedTimeStep = false; // Settings.GlobalSettings.FixedTimeStep;
@@ -276,17 +276,17 @@ namespace ClassicUO
             if (string.IsNullOrEmpty(title))
             {
 #if DEV_BUILD
-                Window.Title = $"TazUO [Legacy] - {CUOEnviroment.Version} - Holiday Edition";
+                Window.Title = $"TazUO [Legacy] - {CUOEnviroment.ShortVersion} - Holiday Edition";
 #else
-                Window.Title = $"TazUO [Legacy] - {CUOEnviroment.Version} - Holiday Edition";
+                Window.Title = $"TazUO [Legacy] - {CUOEnviroment.ShortVersion} - Holiday Edition";
 #endif
             }
             else
             {
 #if DEV_BUILD
-                Window.Title = $"{title} - TazUO [Legacy] - {CUOEnviroment.Version} - Holiday Edition";
+                Window.Title = $"{title} - TazUO [Legacy] - {CUOEnviroment.ShortVersion} - Holiday Edition";
 #else
-                Window.Title = $"{title} - TazUO [Legacy] - {CUOEnviroment.Version} - Holiday Edition";
+                Window.Title = $"{title} - TazUO [Legacy] - {CUOEnviroment.ShortVersion} - Holiday Edition";
 #endif
             }
         }
