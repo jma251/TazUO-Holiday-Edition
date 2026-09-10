@@ -32,6 +32,24 @@
     <DefineConstants>$(DefineConstants);DEV_BUILD</DefineConstants>
   </PropertyGroup>
 
+  <!--
+    Separates the dev client from the release client.
+
+    DEV_BUILD above cannot do this: both workflows pass IS_DEV_BUILD=true, because
+    all it does is produce a windowed (WinExe) app rather than one with a console
+    attached. Release needs that too.
+
+    HOLIDAY_DEV is set only by build-legacy-dev.yml. Anything behind it is compiled
+    out of what other people download - the house contents recovery, the
+    diagnostics and their logs - so the release carries no investigation
+    machinery, while legacy-dev keeps every bit of it. One codebase, one branch
+    line, no divergence to maintain: legacy-dev merges into legacy as usual and
+    the flag decides what is in the binary.
+  -->
+  <PropertyGroup Condition="'$(HOLIDAY_DEV_BUILD)' == 'true'">
+    <DefineConstants>$(DefineConstants);HOLIDAY_DEV</DefineConstants>
+  </PropertyGroup>
+
   <ItemGroup Condition="$(TargetFramework.StartsWith('net4'))">
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.*" PrivateAssets="All" />
     <PackageReference Include="System.Buffers" Version="4.5.1" />
