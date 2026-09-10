@@ -22,6 +22,16 @@ namespace ClassicUO.Game.Managers
     /// </summary>
     internal static class HouseDiagnostics
     {
+        // Every logging entry point below carries [Conditional("HOLIDAY_DEV")], so the
+        // compiler removes the calls - and the evaluation of their arguments - from the
+        // release build outright. That is why the twenty call sites across ten files need
+        // no #if of their own: there is nothing to guard. The class still compiles, since
+        // the compiler has to resolve a method to see the attribute, but in a release
+        // build nothing reaches it and no log is ever opened.
+        //
+        // InAnyKnownHouse is deliberately not attributed - it returns a value, which
+        // Conditional does not allow, and it is only ever called from inside this file.
+
         private static bool IsEnabled => Settings.GlobalSettings.LogHouseDiagnostics;
 
         private static int _lastLoggedViewRange = -1;
@@ -31,6 +41,7 @@ namespace ClassicUO.Game.Managers
         /// house, items at the far end are legitimately out of range while the player is
         /// inside, which would explain contents loading only partially.
         /// </summary>
+        [System.Diagnostics.Conditional("HOLIDAY_DEV")]
         public static void LogViewRange(int viewRange)
         {
             if (!IsEnabled || viewRange == _lastLoggedViewRange)
@@ -48,6 +59,7 @@ namespace ClassicUO.Game.Managers
         /// while the player is inside a house, otherwise this fires for every item left
         /// behind while walking and drowns the file.
         /// </summary>
+        [System.Diagnostics.Conditional("HOLIDAY_DEV")]
         public static void LogItemCulled(Item item)
         {
             if (!IsEnabled || item == null || World.Player == null)
@@ -71,6 +83,7 @@ namespace ClassicUO.Game.Managers
         }
 
         /// <summary>A free-text line, for the few things that are not an event of their own.</summary>
+        [System.Diagnostics.Conditional("HOLIDAY_DEV")]
         public static void Note(string text)
         {
             if (!IsEnabled)
@@ -81,6 +94,7 @@ namespace ClassicUO.Game.Managers
             Write($"note\t{text}");
         }
 
+        [System.Diagnostics.Conditional("HOLIDAY_DEV")]
         public static void LogHouseRequest(uint serial)
         {
             if (!IsEnabled)
@@ -91,6 +105,7 @@ namespace ClassicUO.Game.Managers
             Write($"request\thouse=0x{serial:X8}");
         }
 
+        [System.Diagnostics.Conditional("HOLIDAY_DEV")]
         public static void LogHouseResponse(uint serial)
         {
             if (!IsEnabled)
@@ -185,6 +200,7 @@ namespace ClassicUO.Game.Managers
         /// by the distance cull, so anything that happens to them just after is worth
         /// lining up against it.
         /// </summary>
+        [System.Diagnostics.Conditional("HOLIDAY_DEV")]
         public static void LogHouseLetGo(uint serial, string why, int components)
         {
             if (!IsEnabled)
@@ -223,6 +239,7 @@ namespace ClassicUO.Game.Managers
         /// the top of the chain: if an empty house never produces these, nothing was
         /// ever sent and no amount of looking at the client will explain it.
         /// </summary>
+        [System.Diagnostics.Conditional("HOLIDAY_DEV")]
         public static void LogHouseItemArrived(Item item, bool created)
         {
             if (!IsEnabled || item == null || !World.InGame)
@@ -255,6 +272,7 @@ namespace ClassicUO.Game.Managers
         ///
         /// Only written when the figure moves. It is recomputed on every step.
         /// </summary>
+        [System.Diagnostics.Conditional("HOLIDAY_DEV")]
         public static void LogDrawCeiling(int maxZ, int maxGroundZ, bool forced, bool noDrawRoofs)
         {
             if (!IsEnabled || World.Player == null)
@@ -287,6 +305,7 @@ namespace ClassicUO.Game.Managers
         ///
         /// Written before anything is cleared, so the counts are what was actually lost.
         /// </summary>
+        [System.Diagnostics.Conditional("HOLIDAY_DEV")]
         public static void LogMultiRebuild(uint serial, bool wasCustom, int components, uint revision)
         {
             if (!IsEnabled)
@@ -315,6 +334,7 @@ namespace ClassicUO.Game.Managers
         /// arrives at is the range it stops caring. Neither needs a guess about which
         /// emulator is on the other end.
         /// </summary>
+        [System.Diagnostics.Conditional("HOLIDAY_DEV")]
         public static void LogRangeProbe(uint serial, ushort graphic, int x, int y, bool isMobile, string what)
         {
             if (!IsEnabled || World.Player == null)
@@ -338,6 +358,7 @@ namespace ClassicUO.Game.Managers
         /// below so "the server took it away" can be told apart from "the client threw
         /// it away", which is the difference between a shard behaviour and a bug here.
         /// </summary>
+        [System.Diagnostics.Conditional("HOLIDAY_DEV")]
         public static void LogHouseItemDeleteOrdered(Item item)
         {
             if (!IsEnabled || item == null || !World.InGame)
@@ -368,6 +389,7 @@ namespace ClassicUO.Game.Managers
         /// The stack costs real time to walk, which is why it is taken only for an item
         /// inside a house, with the log switched on.
         /// </summary>
+        [System.Diagnostics.Conditional("HOLIDAY_DEV")]
         public static void LogHouseItemDestroyed(Item item)
         {
             if (!IsEnabled || item == null || !World.InGame)
@@ -434,6 +456,7 @@ namespace ClassicUO.Game.Managers
         /// Counted the same way the house itself is bounded - the multi's own footprint -
         /// so it means "things standing in this house", not "things near the player".
         /// </summary>
+        [System.Diagnostics.Conditional("HOLIDAY_DEV")]
         public static void LogHouseContents()
         {
             if (!IsEnabled || !World.InGame)
@@ -577,6 +600,7 @@ namespace ClassicUO.Game.Managers
         /// Written on stepping into a house, on the count changing while inside, on the
         /// house being let go of, and on demand with the -housedump command.
         /// </summary>
+        [System.Diagnostics.Conditional("HOLIDAY_DEV")]
         public static void Dump(uint serial, string why)
         {
             if (!IsEnabled)
@@ -658,6 +682,7 @@ namespace ClassicUO.Game.Managers
         }
 
         /// <summary>Every house the client is holding, in full.</summary>
+        [System.Diagnostics.Conditional("HOLIDAY_DEV")]
         public static void DumpAll(string why)
         {
             if (!IsEnabled)
@@ -711,6 +736,7 @@ namespace ClassicUO.Game.Managers
         /// three thousand items arrived" is a shape that is easier to see in counts than
         /// in three thousand lines.
         /// </summary>
+        [System.Diagnostics.Conditional("HOLIDAY_DEV")]
         public static void LogPacket(ReadOnlySpan<byte> data, bool toServer)
         {
             if (!IsEnabled || data.Length == 0)
@@ -878,6 +904,7 @@ namespace ClassicUO.Game.Managers
         }
 
         /// <summary>Push whatever is held out to disk. Safe to call at any time.</summary>
+        [System.Diagnostics.Conditional("HOLIDAY_DEV")]
         public static void Flush()
         {
             try

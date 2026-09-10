@@ -2335,6 +2335,9 @@ namespace ClassicUO.Game.UI.Gumps
             PositionHelper.BlankLine();
 
             // Global rather than per-profile, so it applies to every character.
+#if HOLIDAY_DEV
+            // Dev-only: a log file, not a feature. The music era and the on-screen panel
+            // are ordinary options and stay in the release; this writes musiclog.txt.
             scroll.Add
             (
                 (s = new SettingsOption
@@ -2346,10 +2349,14 @@ namespace ClassicUO.Game.UI.Gumps
 
             PositionHelper.PositionControl(s.FullControl);
             PositionHelper.BlankLine();
+#endif
 
             // Temporary diagnostic, global like the one above.
 
 
+#if HOLIDAY_DEV
+            // Dev-only: writes houselog.txt. Every HouseDiagnostics call is compiled out
+            // of the release anyway, so without this the checkbox would do nothing.
             // Temporary diagnostic, global like the one above.
             scroll.Add
             (
@@ -2362,6 +2369,7 @@ namespace ClassicUO.Game.UI.Gumps
 
             PositionHelper.PositionControl(s.FullControl);
             PositionHelper.BlankLine();
+#endif
 
             scroll.Add
             (

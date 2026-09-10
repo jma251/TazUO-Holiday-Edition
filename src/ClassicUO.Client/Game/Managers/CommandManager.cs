@@ -179,6 +179,8 @@ namespace ClassicUO.Game.Managers
             // This counts what is standing on the tiles now and says how much of it
             // reached the screen, so "the room is empty" and "the room is full and
             // nothing is drawn" stop looking the same.
+#if HOLIDAY_DEV
+            // Dev-only: a counting tool for the house investigation, not a player command.
             Register("nearby", s =>
             {
                 if (!World.InGame)
@@ -230,6 +232,7 @@ namespace ClassicUO.Game.Managers
                 GameActions.Print($"  mobiles held: {mobs}   drawn in the last second: {mobsDrawn}");
             });
 
+#endif
             Register("rain", s => { Client.Game.GetScene<ClassicUO.Game.Scenes.GameScene>()?.Weather.Generate(WeatherType.WT_RAIN, 30, 75); });
 
             Register("marktile", s =>
