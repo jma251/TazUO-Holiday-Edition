@@ -1098,9 +1098,18 @@ namespace ClassicUO.Game.UI.Controls
                 return;
             }
 
+            // Marked before the children are walked, not after. Disposing a child can come
+            // back round to this control - a gump closing itself out of its own Update, a
+            // control detaching on the way out - and while this is still false the guard
+            // above lets that second call run the whole body underneath the first.
+            IsDisposed = true;
+
             if (Children != null)
             {
-                foreach (Control c in Children)
+                // Disposing a child is allowed to add to or remove from this list, and a
+                // List<T> stops dead once the collection it is enumerating has been
+                // touched. Walk a copy so nothing a child does can break the loop.
+                foreach (Control c in Children.ToArray())
                 {
                     c.Dispose();
                 }
@@ -1108,7 +1117,6 @@ namespace ClassicUO.Game.UI.Controls
                 Children.Clear();
             }
 
-            IsDisposed = true;
             AfterDispose();
             Disposed?.Invoke(null, null);
         }
