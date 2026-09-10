@@ -67,6 +67,16 @@ namespace ClassicUO
         public static readonly string BuildTag = ReadBuildTag();
 
         /// <summary>
+        /// The version as it is written down: "4.5.2301", three parts.
+        ///
+        /// Version alone renders "4.5.2301.0". Assembly metadata holds four numbers and
+        /// fills the unset one with zero, so the trailing part is an artefact of the
+        /// format rather than anything anyone chose. ToString(3) asks for the three that
+        /// were actually set.
+        /// </summary>
+        public static string ShortVersion => Version.ToString(3);
+
+        /// <summary>
         /// One short string for the login screen, where the label sits next to the
         /// ClassicUO links and has little room. The Holiday tag already carries the base
         /// version, so printing both ran the label underneath those links; this prints
@@ -74,7 +84,7 @@ namespace ClassicUO
         /// </summary>
         public static string DisplayVersion => BuildTag.StartsWith("v", StringComparison.Ordinal)
             ? BuildTag.Substring(1)
-            : Version.ToString();
+            : ShortVersion;
 
         private static string ReadBuildTag()
         {
