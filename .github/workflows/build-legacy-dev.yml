@@ -91,11 +91,11 @@ jobs:
           dotnet-version: 8.0.x
 
       # The commit is stamped into the binary so a crash log from a dev build says
-      # which dev build. CUOEnviroment.ReadBuildTag only accepts a stamp containing
-      # "-h" - anything else reads as "local build" - hence the "-hdev." shape,
-      # which displays as e.g. 4.5.23-hdev.a1b2c3d.
+      # which dev build. CUOEnviroment.ReadBuildTag keys off the leading "v" to tell a
+      # stamped build from an unstamped one, so the "v" is load-bearing; it displays
+      # as e.g. 4.5.2301-dev.a1b2c3d.
       - name: Publish client
-        run: dotnet publish ${{ env.CUO_PROJECT_PATH }} -c Release -o ${{ env.CUO_OUTPUT_PATH }} -p:IS_DEV_BUILD=true -p:InformationalVersion=v${{ env.VERSION }}-hdev.${{ env.SHORT_SHA }}
+        run: dotnet publish ${{ env.CUO_PROJECT_PATH }} -c Release -o ${{ env.CUO_OUTPUT_PATH }} -p:IS_DEV_BUILD=true -p:InformationalVersion=v${{ env.VERSION }}-dev.${{ env.SHORT_SHA }}
 
       - name: Place FNA native libraries next to the exe
         shell: pwsh
@@ -148,8 +148,8 @@ jobs:
             Unfinished and unconfirmed work lands here first. If you want the
             stable client, use the `latest` release instead.
 
-            - Base version: `v${{ env.VERSION }}` (from TazUO)
-            - Build stamp: `v${{ env.VERSION }}-hdev.${{ env.SHORT_SHA }}` (shown in-client and in crash logs)
+            - Release this was cut from: `v${{ env.VERSION }}`
+            - Build stamp: `v${{ env.VERSION }}-dev.${{ env.SHORT_SHA }}` (shown in-client and in crash logs)
             - Commit: ${{ env.DEV_SHA }}
 
             Download `${{ env.CUO_ZIP_NAME }}` below, unzip it, and run `ClassicUO.exe`.

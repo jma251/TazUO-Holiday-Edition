@@ -5,7 +5,7 @@ TazUO and has one hard constraint that is easy to break by accident.
 
 ## What this repository is
 
-A private personal fork of [TazUO](https://github.com/PlayTazUO/TazUO), which is
+A personal fork of [TazUO](https://github.com/PlayTazUO/TazUO), which is
 itself a fork of ClassicUO — an open-source reimplementation of the Ultima
 Online Classic Client, written in C# on top of FNA (an XNA reimplementation).
 
@@ -13,8 +13,8 @@ Online Classic Client, written in C# on top of FNA (an XNA reimplementation).
 
 | Branch | Framework | Version | Role |
 | --- | --- | --- | --- |
-| **`legacy`** | .NET Framework **4.7.2** (`net472`) | 4.5.23 | **Release.** What other people download. Only tested, confirmed work lands here, and landing here *is* the release. |
-| **`legacy-dev`** | .NET Framework **4.7.2** (`net472`) | 4.5.23 | **Development.** Where work goes first and is tested from. Cut from `legacy`, merged into `legacy`. |
+| **`legacy`** | .NET Framework **4.7.2** (`net472`) | 4.5.2301 | **Release.** What other people download. Only tested, confirmed work lands here, and landing here *is* the release. |
+| **`legacy-dev`** | .NET Framework **4.7.2** (`net472`) | 4.5.2301 | **Development.** Where work goes first and is tested from. Cut from `legacy`, merged into `legacy`. |
 | `main` | .NET **10** (`net10.0`) | 5.24.5 | Reference only — a mirror of upstream, kept so fixes can be read out of it. |
 | `dev` | — | — | Inherited from upstream. Not used here, not built, not a release path. |
 
@@ -161,11 +161,11 @@ the dev one must never be able to touch what users download.
 - Builds on `windows-latest`, checks out submodules recursively, publishes the
   client, verifies the natives are present, and zips `bin/dist` into
   `TazUO-Holiday-Edition.zip`.
-- Publishes the rolling `latest` release **and** a permanent `v<base>-h<N>` one.
+- Publishes the rolling `latest` release **and** a permanent `v<version>` one.
 - Needs `permissions: contents: write` to manage releases and tags.
 
 **It is the only workflow here that publishes a release to users, and the only
-one that mints an `h` number. It should stay that way.**
+one that publishes a numbered version. It should stay that way.**
 
 `.github/workflows/build-legacy-dev.yml` — **the testing path**:
 
@@ -173,57 +173,84 @@ one that mints an `h` number. It should stay that way.**
 - Same build and the same hard-fail check on the natives, so a dev build is a
   real, launchable client and not a half-packaged one.
 - Publishes to a single **prerelease** tagged `dev-latest`, replaced every build.
-  It does **not** touch `latest` and does **not** mint an `h` number, so the
-  release numbering stays one-per-release.
+  It does **not** touch `latest` and is **never numbered**, so the version line
+  only ever moves when a release is cut.
 - The zip is `HolidayEdition-Dev.zip`. The name deliberately avoids the `TazUO`
   prefix — the launcher falls back to picking any asset starting with that, and
   a dev zip must never be selectable as a release download.
 - The tag is `dev-latest`, not `dev`, because a tag named `dev` would collide
   with the inherited `dev` branch and make `git checkout dev` ambiguous.
-- Stamps the commit into the binary as `v<base>-hdev.<short sha>`, so a crash log
-  from a dev build says which dev build. The `-hdev.` shape is not decoration:
-  `CUOEnviroment.ReadBuildTag` only accepts a stamp containing `-h` and reads
-  anything else as `local build`.
+- Stamps the commit into the binary as `v<version>-dev.<short sha>`, so a crash
+  log from a dev build says which dev build. The leading `v` is load-bearing:
+  `CUOEnviroment.ReadBuildTag` uses it to tell a stamped build from an unstamped
+  one, and reads anything without it as `local build`.
 
 Both run only on their own branch, and their `concurrency` groups are separate,
 so a dev build can never cancel a release build.
 
-### Two releases per build
+### Versioning — Holiday continues TazUO's numbering
 
-Every build publishes the same zip twice, to two different releases:
+Holiday Edition is a fork with its own version line that **starts from TazUO's
+number instead of restarting at 1**. Taz is on `4.5.23`; Holiday builds on that
+base read `4.5.23xx`:
+
+| | |
+| --- | --- |
+| TazUO base | `4.5.23` |
+| First Holiday release | `4.5.2301` |
+| Then | `4.5.2302`, `4.5.2303`, … |
+| If Taz moves to `4.5.24` | rebase to `4.5.2401` |
+
+Two things this buys, both deliberate:
+
+- **A launcher can compare it.** `4.5.2302` sorts above `4.5.2301` under ordinary
+  version rules, so "is there an update?" needs no custom logic. The retired
+  `-hN` scheme could not do this: sorted as text, `h73` came out *below* `h9`.
+- **It cannot collide with upstream.** Taz would have to reach patch `2301` for
+  two different clients to claim one number, and the base version stays readable
+  inside it.
+
+**The version lives in exactly one place**: `<AssemblyVersion>` (and
+`<FileVersion>`) in `src/ClassicUO.Client/ClassicUO.Client.csproj`. Everything
+downstream follows it — the window title, the login-screen label, the crash-log
+header, the release tag, and `v.txt` (see below).
+
+**Bumping that file is how a release is cut.** Nothing auto-increments. Merging
+to `legacy` without a bump refreshes `latest` and publishes no new numbered
+release, and the workflow says so in its log rather than failing. That is the
+point: a release should be a decision, not a side effect of merging.
+
+The retired `v4.5.23-h1` … `v4.5.23-h73` tags stay exactly where they are as
+rollback history. **Never prune them.** The counter simply stops at 73.
+
+#### `v.txt` — how a launcher reads the installed version
+
+`ClassicUO.Client.csproj` writes `v.txt` next to the exe on both build and
+publish, containing the bare `AssemblyVersion` (e.g. `4.5.2301`). **Nothing in
+the client reads it.** It exists for outside consumers — a launcher comparing
+what is installed against what is published. It follows `AssemblyVersion`
+automatically, so it needs no separate maintenance, but do not remove those two
+targets: a launcher depends on that file existing.
+
+#### Two releases per numbered build
+
+Every release build publishes the same zip twice:
 
 | Release | Tag | Lifetime | Purpose |
 | --- | --- | --- | --- |
 | Rolling | **`latest`** | Deleted and recreated each build | Fixed download URL, carries the "Latest" badge |
-| Permanent | **`v<base>-h<N>`** e.g. `v4.5.23-h4` | Never updated, never deleted | Rollback history |
+| Permanent | **`v<version>`** e.g. `v4.5.2301` | Never updated, never deleted | Rollback history |
 
-`<base>` is TazUO's version, read from `ClassicUO.Client.csproj` as before. `<N>`
-is the Holiday increment, and it is **not stored anywhere in the repo** — it is
-derived at build time from the tags that already exist:
+Dev builds publish once, to the **`dev-latest`** prerelease, and are replaced
+every push. They are never numbered.
 
-```bash
-git tag -l "v${VERSION}-h*"   # highest N wins, +1 for this build
-```
-
-That keeps the counter durable (tags are never pruned) without the workflow
-having to commit a counter file back to `legacy`, which would retrigger itself.
-
-Two consequences worth knowing:
-
-- **Numbering is per base version.** If TazUO's version moves to 4.5.24, the next
-  Holiday build is `v4.5.24-h1`, not a continuation of the 4.5.23 series.
-- **Re-running a build for an already-tagged commit does not mint a new number.**
-  The workflow detects a Holiday tag on `HEAD` and skips the permanent release;
-  `latest` still refreshes. This stops manual re-runs filling the releases page
-  with identical entries.
+Only `latest` and `dev-latest` are ever deleted
+(`gh release delete <tag> --cleanup-tag`). Numbered releases are immutable.
+`makeLatest: false` on the permanent release keeps the "Latest" badge on
+`latest`.
 
 Both releases' notes carry the commit SHA and the commits since the previous
-Holiday tag, so the releases page reads as a running changelog.
-
-Only the `latest` tag is ever deleted (`gh release delete latest --cleanup-tag`).
-**Holiday tags and releases must never be pruned** — they are the rollback
-history. `makeLatest: false` on the permanent release keeps the "Latest" badge
-on `latest`.
+release, so the releases page reads as a running changelog.
 
 The other deploy workflows (`net472-deploy.yml`, `net9-deploy.yml`,
 `tuo-deploy.yml`, `tuo-dev-deploy.yml`) are inherited from upstream and target

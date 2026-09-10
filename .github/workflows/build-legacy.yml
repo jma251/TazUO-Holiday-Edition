@@ -63,43 +63,34 @@ jobs:
           echo "VERSION=$(grep -oP '<AssemblyVersion>\K\d+\.\d+\.\d+' src/ClassicUO.Client/ClassicUO.Client.csproj | head -1)" >> $GITHUB_ENV
           echo "LEGACY_SHA=$(git rev-parse HEAD)" >> $GITHUB_ENV
 
-      # Work out this build's Holiday tag, e.g. v4.5.23-h4. The counter is derived
-      # from the tags already on the repo rather than stored in a file, so nothing
-      # has to be committed back (which would retrigger this workflow).
+      # The release version IS the assembly version in ClassicUO.Client.csproj.
+      # Bumping that file is how a release is cut - nothing here auto-increments, so
+      # merging to legacy without a bump refreshes "latest" and publishes no new
+      # numbered release. That is deliberate: a release should be a decision.
       #
-      # Numbering is per base version: if Taz's version moves to 4.5.24, the next
-      # Holiday build is v4.5.24-h1, not a continuation of the 4.5.23 series.
-      #
-      # If this exact commit already carries a Holiday tag (a manual re-run of a
-      # build that already published), the permanent release is skipped rather
-      # than minting a second number for identical code. "latest" still refreshes.
-      - name: Compute Holiday increment
+      # The scheme continues TazUO's numbering rather than restarting. Taz is on
+      # 4.5.23; Holiday builds on top of that base read 4.5.23xx, so 4.5.2301 is the
+      # first. Taz would have to reach patch 2301 to collide, and the base version
+      # stays legible inside the number.
+      - name: Resolve release tag
         shell: bash
         run: |
           export LC_ALL=C.UTF-8
 
-          HIGHEST=0
-          for t in $(git tag -l "v${VERSION}-h*"); do
-            n=${t##*-h}
-            case "$n" in ''|*[!0-9]*) continue ;; esac
-            if [ "$n" -gt "$HIGHEST" ]; then HIGHEST="$n"; fi
-          done
+          # Highest existing release tag, semver-ordered, ignoring the rolling
+          # "latest"/"dev-latest" tags and the retired v<base>-hN series.
+          PREV=$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' | grep -Ev -- '-h[0-9]+$' | sort -V | tail -1)
+          echo "PREV_TAG=$PREV" >> $GITHUB_ENV
 
-          if [ "$HIGHEST" -gt 0 ]; then
-            echo "PREV_TAG=v${VERSION}-h${HIGHEST}" >> $GITHUB_ENV
-          else
-            echo "PREV_TAG=" >> $GITHUB_ENV
-          fi
-
-          EXISTING=$(git tag --points-at HEAD -l "v${VERSION}-h*" | head -1)
-          if [ -n "$EXISTING" ]; then
-            echo "This commit already has Holiday tag $EXISTING; skipping a new permanent release."
-            echo "HOLIDAY_TAG=$EXISTING" >> $GITHUB_ENV
+          if git rev-parse -q --verify "refs/tags/v${VERSION}" >/dev/null; then
+            echo "::notice::v${VERSION} is already released. Refreshing 'latest' only."
+            echo "::notice::To publish a new numbered release, raise <AssemblyVersion> in src/ClassicUO.Client/ClassicUO.Client.csproj."
             echo "SKIP_PERMANENT=true" >> $GITHUB_ENV
           else
-            echo "HOLIDAY_TAG=v${VERSION}-h$((HIGHEST + 1))" >> $GITHUB_ENV
             echo "SKIP_PERMANENT=false" >> $GITHUB_ENV
           fi
+
+          echo "HOLIDAY_TAG=v${VERSION}" >> $GITHUB_ENV
 
       # Collect the commits since the previous Holiday build so each release's
       # notes read as a running list of what changed.
@@ -112,7 +103,7 @@ jobs:
             HEADER="Changes since \`${PREV_TAG}\`:"
             LOG=$(git log --no-merges --pretty=format:'- %s (%h)' "${PREV_TAG}..HEAD")
           else
-            HEADER="Recent changes (first Holiday build of v${VERSION}):"
+            HEADER="Recent changes (first release of v${VERSION}):"
             LOG=$(git log --no-merges -20 --pretty=format:'- %s (%h)')
           fi
 
@@ -184,10 +175,9 @@ jobs:
           artifacts: "${{ env.CUO_OUTPUT_PATH }}/${{ env.CUO_ZIP_NAME }}"
           name: "TazUO Holiday Edition ${{ env.HOLIDAY_TAG }}"
           body: |
-            Permanent Holiday build of the `legacy` branch (.NET Framework 4.7.2).
+            Permanent release off the `legacy` branch (.NET Framework 4.7.2).
 
-            - Holiday build: `${{ env.HOLIDAY_TAG }}`
-            - Base version: `v${{ env.VERSION }}` (from TazUO)
+            - Version: `${{ env.HOLIDAY_TAG }}`
             - Commit: ${{ env.LEGACY_SHA }}
 
             Download `${{ env.CUO_ZIP_NAME }}` below, unzip it, and run `ClassicUO.exe`.
@@ -215,13 +205,13 @@ jobs:
         uses: ncipollo/release-action@v1.16.0
         with:
           artifacts: "${{ env.CUO_OUTPUT_PATH }}/${{ env.CUO_ZIP_NAME }}"
-          name: "TazUO Holiday Edition (latest) - v${{ env.VERSION }}"
+          name: "TazUO Holiday Edition (latest) - ${{ env.HOLIDAY_TAG }}"
           body: |
             Automated build of the `legacy` branch (.NET Framework 4.7.2).
             This release always points at the newest build; its download URL never changes.
 
-            - Version: `v${{ env.VERSION }}`
-            - Holiday build: `${{ env.HOLIDAY_TAG }}` (permanent copy, for rollback)
+            - Version: `${{ env.HOLIDAY_TAG }}`
+            - Permanent copy, for rollback: `${{ env.HOLIDAY_TAG }}`
             - Commit: ${{ env.LEGACY_SHA }}
 
             Download `${{ env.CUO_ZIP_NAME }}` below, unzip it, and run `ClassicUO.exe`.

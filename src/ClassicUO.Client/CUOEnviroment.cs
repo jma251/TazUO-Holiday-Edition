@@ -57,11 +57,12 @@ namespace ClassicUO
         public static readonly Version Version = Assembly.GetExecutingAssembly().GetName().Version;
 
         /// <summary>
-        /// The Holiday build this binary came from, e.g. "v4.5.23-h26". The assembly
-        /// version is TazUO's and is the same in every Holiday build, so it cannot tell
-        /// one from another - which makes a log or a bug report ambiguous about which
-        /// build produced it. The release workflow stamps the tag in as the
-        /// informational version; a local build has none and says so.
+        /// The build this binary came from: "v4.5.2301" for a release, or
+        /// "v4.5.2301-dev.a1b2c3d" for a dev build, which names the commit. The assembly
+        /// version alone cannot separate a dev build from the release it was cut from,
+        /// which makes a log or a bug report ambiguous about which build produced it.
+        /// Both workflows stamp the tag in as the informational version; a local build
+        /// has none and says so.
         /// </summary>
         public static readonly string BuildTag = ReadBuildTag();
 
@@ -83,9 +84,11 @@ namespace ClassicUO
                     .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
                     ?.InformationalVersion;
 
-                // The SDK falls back to the plain version when nothing is stamped, which
-                // is no more use than the assembly version itself.
-                if (string.IsNullOrWhiteSpace(informational) || informational.IndexOf("-h", StringComparison.Ordinal) < 0)
+                // The leading "v" is what separates a stamped build from an unstamped one.
+                // Both workflows stamp a tag ("v4.5.2301"); when nothing is stamped the SDK
+                // falls back to the plain version ("4.5.2301"), with no "v" and no more use
+                // than the assembly version itself.
+                if (string.IsNullOrWhiteSpace(informational) || !informational.StartsWith("v", StringComparison.Ordinal))
                 {
                     return "local build";
                 }
