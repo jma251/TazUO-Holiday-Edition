@@ -9,20 +9,34 @@ A private personal fork of [TazUO](https://github.com/PlayTazUO/TazUO), which is
 itself a fork of ClassicUO — an open-source reimplementation of the Ultima
 Online Classic Client, written in C# on top of FNA (an XNA reimplementation).
 
-## Branches: `legacy` is the one that matters
+## Branches: `legacy` releases, `legacy-dev` develops
 
 | Branch | Framework | Version | Role |
 | --- | --- | --- | --- |
-| **`legacy`** | .NET Framework **4.7.2** (`net472`) | 4.5.23 | **The only branch that is developed, built, or released here.** |
+| **`legacy`** | .NET Framework **4.7.2** (`net472`) | 4.5.23 | **Release.** What other people download. Only tested, confirmed work lands here, and landing here *is* the release. |
+| **`legacy-dev`** | .NET Framework **4.7.2** (`net472`) | 4.5.23 | **Development.** Where work goes first and is tested from. Cut from `legacy`, merged into `legacy`. |
 | `main` | .NET **10** (`net10.0`) | 5.24.5 | Reference only — a mirror of upstream, kept so fixes can be read out of it. |
+| `dev` | — | — | Inherited from upstream. Not used here, not built, not a release path. |
 
 **Rules:**
 
-- All work happens on `legacy`. Branch from it, and merge back into it.
+- Feature branches are cut from **`legacy-dev`** and merged back into `legacy-dev`.
+- `legacy-dev` merges into `legacy` **only** when the work has been built, run,
+  and confirmed good. That merge publishes a release to real users, so it is not
+  a routine step — it is the decision to ship.
+- **Never commit directly to `legacy`.** Everything reaches it through a merge
+  from `legacy-dev`.
 - **Never build, modify, or release `main`.** It exists to be read.
-- Feature branches should be cut from `legacy`, never from `main`.
+- Keep `legacy-dev` current with `legacy` (merge `legacy` in) so the two do not
+  drift; a release cut from a stale dev branch silently reverts things.
 
-### Porting a fix from `main` to `legacy`
+The one exception to going through `legacy-dev`: a fix for something that is
+broken *in the wild right now*. Those may go straight to a branch off `legacy`,
+because routing an emergency through a dev branch full of untested work would
+ship that work alongside it. Merge `legacy` back down into `legacy-dev`
+afterwards.
+
+### Porting a fix from `main` to the 4.7.2 branches
 
 This is the main reason `main` is present. It is rarely a clean cherry-pick,
 because the two branches have diverged structurally:
@@ -138,16 +152,41 @@ the build if any of the three is missing.
 
 ## CI / releases
 
-`.github/workflows/build-legacy.yml` is the one that matters for this fork:
+Two workflows build this fork, one per branch. They are deliberately separate:
+the dev one must never be able to touch what users download.
+
+`.github/workflows/build-legacy.yml` — **the release path**:
 
 - Triggers on push to `legacy`, or manually from the Actions tab.
 - Builds on `windows-latest`, checks out submodules recursively, publishes the
   client, verifies the natives are present, and zips `bin/dist` into
   `TazUO-Holiday-Edition.zip`.
+- Publishes the rolling `latest` release **and** a permanent `v<base>-h<N>` one.
 - Needs `permissions: contents: write` to manage releases and tags.
 
-**It is the only workflow here that publishes a release automatically, and it
-should stay that way.**
+**It is the only workflow here that publishes a release to users, and the only
+one that mints an `h` number. It should stay that way.**
+
+`.github/workflows/build-legacy-dev.yml` — **the testing path**:
+
+- Triggers on push to `legacy-dev`, or manually.
+- Same build and the same hard-fail check on the natives, so a dev build is a
+  real, launchable client and not a half-packaged one.
+- Publishes to a single **prerelease** tagged `dev-latest`, replaced every build.
+  It does **not** touch `latest` and does **not** mint an `h` number, so the
+  release numbering stays one-per-release.
+- The zip is `HolidayEdition-Dev.zip`. The name deliberately avoids the `TazUO`
+  prefix — the launcher falls back to picking any asset starting with that, and
+  a dev zip must never be selectable as a release download.
+- The tag is `dev-latest`, not `dev`, because a tag named `dev` would collide
+  with the inherited `dev` branch and make `git checkout dev` ambiguous.
+- Stamps the commit into the binary as `v<base>-hdev.<short sha>`, so a crash log
+  from a dev build says which dev build. The `-hdev.` shape is not decoration:
+  `CUOEnviroment.ReadBuildTag` only accepts a stamp containing `-h` and reads
+  anything else as `local build`.
+
+Both run only on their own branch, and their `concurrency` groups are separate,
+so a dev build can never cancel a release build.
 
 ### Two releases per build
 
