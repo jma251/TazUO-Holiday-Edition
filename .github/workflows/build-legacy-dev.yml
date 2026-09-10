@@ -95,7 +95,7 @@ jobs:
       # stamped build from an unstamped one, so the "v" is load-bearing; it displays
       # as e.g. 4.5.2301-dev.a1b2c3d.
       - name: Publish client
-        run: dotnet publish ${{ env.CUO_PROJECT_PATH }} -c Release -o ${{ env.CUO_OUTPUT_PATH }} -p:IS_DEV_BUILD=true -p:InformationalVersion=v${{ env.VERSION }}-dev.${{ env.SHORT_SHA }}
+        run: dotnet publish ${{ env.CUO_PROJECT_PATH }} -c Release -o ${{ env.CUO_OUTPUT_PATH }} -p:IS_DEV_BUILD=true -p:HOLIDAY_DEV_BUILD=true -p:InformationalVersion=v${{ env.VERSION }}-dev.${{ env.SHORT_SHA }}
 
       - name: Place FNA native libraries next to the exe
         shell: pwsh

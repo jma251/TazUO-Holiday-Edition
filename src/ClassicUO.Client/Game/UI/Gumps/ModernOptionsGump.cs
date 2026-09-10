@@ -2405,6 +2405,21 @@ namespace ClassicUO.Game.UI.Gumps
             PositionHelper.PositionControl(s.FullControl);
             PositionHelper.BlankLine();
 
+#if HOLIDAY_DEV
+            // Dev-only: the release client has no automatic house resync to offer.
+            scroll.Add
+            (
+                (s = new SettingsOption
+                (
+                    "", new CheckboxWithLabel(lang.GetExperimental.RecoverHouseContents, 0, Settings.GlobalSettings.RecoverHouseContents, (b) => { Settings.GlobalSettings.RecoverHouseContents = b; }),
+                    MainContent.RightWidth, (int)PAGE.Experimental
+                )
+            ).FullControl);
+
+            PositionHelper.PositionControl(s.FullControl);
+            PositionHelper.BlankLine();
+#endif
+
 
             // Built from whatever folders exist under Music/Digital, so adding an era
             // pack is creating a folder - no code change and no list to keep in sync.

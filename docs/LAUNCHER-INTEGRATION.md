@@ -109,14 +109,44 @@ The binary itself carries a fuller stamp readable from the file properties'
 The dev stamp is also shown in-client and in crash logs, so a bug report from a
 dev build names the exact commit it came from.
 
-### Suggested update check
+### Update policy — the two channels behave differently on purpose
 
-1. Read the release for the channel's tag (`latest` or `dev-latest`).
-2. **Stable:** compare that release's version against `v.txt`. Newer → offer the
-   update.
-3. **Dev:** the version will usually be unchanged even when the build is new, so
-   compare the release's `published_at` or the `-dev.<sha>` stamp instead of the
-   version. Comparing versions alone will miss almost every dev update.
+**Version-tracked auto-update applies to the stable channel only.**
+
+| | Stable | Dev |
+| --- | --- | --- |
+| Update check | **Yes** — this is the channel the launcher follows | **No** |
+| How the user gets it | Offered automatically when the version rises | **Manual — the user picks "install latest dev"** |
+| Audience | everyone | the maintainer |
+
+**Stable:** read the `latest` release, compare its version against `v.txt`, and
+offer the update when it is higher. Ordinary three-part version comparison; see
+the versioning section above.
+
+**Dev:** do not poll it, do not offer it, do not nag. Expose it as an explicit
+action the user chooses — "install the latest dev build" — which fetches
+`dev-latest` and installs it. That is the only way it should ever arrive.
+
+Two reasons this is not just a preference:
+
+- **A dev build's version is usually unchanged.** It is cut from the current
+  release plus untested commits, so `v.txt` still reads `4.5.2301` even when the
+  build is hours old. Version comparison would miss nearly every dev update, and
+  an auto-updater would either do nothing or thrash.
+- **Dev builds are replaced on every push to `legacy-dev`**, several times a day.
+  Nothing should be chasing that automatically.
+
+If the launcher wants to show whether an installed dev build is current, compare
+the release's `published_at` or the `-dev.<sha>` stamp — but as information, not
+as an update prompt.
+
+### Switching between channels
+
+A user who installs a dev build and later wants the stable one is going
+*backwards* in some sense but not in version number — both may read `4.5.2301`.
+So an update check alone cannot get them back. Whichever way the launcher records
+the installed channel, moving from dev to stable should be an explicit reinstall
+of `latest` rather than something the version comparison is expected to notice.
 
 ## Packaging — the parts that break installs
 
