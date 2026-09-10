@@ -5,9 +5,9 @@ name: Build Legacy
 # tagged "latest". Each run replaces the previous "latest" release and zip.
 
 on:
-  # Run automatically whenever the legacy branch is updated.
+  # Run automatically whenever the release branch is updated.
   push:
-    branches: [legacy]
+    branches: [release]
   # Allow starting a build by hand from the Actions tab.
   workflow_dispatch:
 
@@ -36,14 +36,14 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      # Always build the legacy branch, whether triggered by push or by hand.
+      # Always build the release branch, whether triggered by push or by hand.
       # fetch-depth: 0 pulls full history and all tags. Both are required: the
       # Holiday increment is derived from existing tags, and the release notes
       # need the commit range since the previous Holiday tag.
-      - name: Check out legacy branch
+      - name: Check out release branch
         uses: actions/checkout@v4
         with:
-          ref: legacy
+          ref: release
           fetch-depth: 0
 
       # Pull in FNA, MP3Sharp, etc. (and anything nested inside them).
@@ -61,7 +61,7 @@ jobs:
         run: |
           export LC_ALL=C.UTF-8
           echo "VERSION=$(grep -oP '<AssemblyVersion>\K\d+\.\d+\.\d+' src/ClassicUO.Client/ClassicUO.Client.csproj | head -1)" >> $GITHUB_ENV
-          echo "LEGACY_SHA=$(git rev-parse HEAD)" >> $GITHUB_ENV
+          echo "RELEASE_SHA=$(git rev-parse HEAD)" >> $GITHUB_ENV
 
       # The release version IS the assembly version in ClassicUO.Client.csproj.
       # Bumping that file is how a release is cut - nothing here auto-increments, so
@@ -175,16 +175,16 @@ jobs:
           artifacts: "${{ env.CUO_OUTPUT_PATH }}/${{ env.CUO_ZIP_NAME }}"
           name: "TazUO Holiday Edition ${{ env.HOLIDAY_TAG }}"
           body: |
-            Permanent release off the `legacy` branch (.NET Framework 4.7.2).
+            Permanent release off the `release` branch (.NET Framework 4.7.2).
 
             - Version: `${{ env.HOLIDAY_TAG }}`
-            - Commit: ${{ env.LEGACY_SHA }}
+            - Commit: ${{ env.RELEASE_SHA }}
 
             Download `${{ env.CUO_ZIP_NAME }}` below, unzip it, and run `ClassicUO.exe`.
 
             ${{ env.NOTES }}
           tag: ${{ env.HOLIDAY_TAG }}
-          commit: ${{ env.LEGACY_SHA }}
+          commit: ${{ env.RELEASE_SHA }}
           allowUpdates: false   # these are immutable once published
           makeLatest: false     # the "latest" release keeps the badge
           prerelease: false
@@ -207,18 +207,18 @@ jobs:
           artifacts: "${{ env.CUO_OUTPUT_PATH }}/${{ env.CUO_ZIP_NAME }}"
           name: "TazUO Holiday Edition (latest) - ${{ env.HOLIDAY_TAG }}"
           body: |
-            Automated build of the `legacy` branch (.NET Framework 4.7.2).
+            Automated build of the `release` branch (.NET Framework 4.7.2).
             This release always points at the newest build; its download URL never changes.
 
             - Version: `${{ env.HOLIDAY_TAG }}`
             - Permanent copy, for rollback: `${{ env.HOLIDAY_TAG }}`
-            - Commit: ${{ env.LEGACY_SHA }}
+            - Commit: ${{ env.RELEASE_SHA }}
 
             Download `${{ env.CUO_ZIP_NAME }}` below, unzip it, and run `ClassicUO.exe`.
 
             ${{ env.NOTES }}
           tag: ${{ env.TAG_NAME }}
-          commit: ${{ env.LEGACY_SHA }}
+          commit: ${{ env.RELEASE_SHA }}
           allowUpdates: true      # reuse the existing "latest" release
           removeArtifacts: true   # drop the old zip before attaching the new one
           makeLatest: true
