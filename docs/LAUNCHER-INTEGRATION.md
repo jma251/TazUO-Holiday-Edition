@@ -4,6 +4,51 @@ Handoff notes for whoever is working on the launcher. Everything below is
 observed from the live repository, not planned — the release side has been
 running since August, the dev side since 2026-09-10.
 
+## Quick reference — the URLs
+
+All verified reachable anonymously (HTTP 200) at the time of writing. The
+repository is **public**: no token, no auth, no rate-limit workaround needed.
+
+### Stable channel — the one the launcher auto-updates
+
+```
+Release JSON   https://api.github.com/repos/jma251/TazUO-Holiday-Edition/releases/tags/latest
+Download       https://github.com/jma251/TazUO-Holiday-Edition/releases/download/latest/TazUO-Holiday-Edition.zip
+```
+
+### Dev channel — manual install only, never polled
+
+```
+Release JSON   https://api.github.com/repos/jma251/TazUO-Holiday-Edition/releases/tags/dev-latest
+Download       https://github.com/jma251/TazUO-Holiday-Edition/releases/download/dev-latest/HolidayEdition-Dev.zip
+```
+
+### Rollback list, if the launcher ever offers older versions
+
+```
+All releases   https://api.github.com/repos/jma251/TazUO-Holiday-Edition/releases
+```
+
+Filter to tags matching `v<digits>.<digits>.<digits>`. **Reject anything ending
+`-h<number>`** — those are a retired scheme that cannot be version-compared, kept
+only as history. Also skip `latest` and `dev-latest`, which are rolling pointers
+rather than versions.
+
+Both download URLs are stable and never change. The releases behind them are
+deleted and recreated on each build, so re-read the release rather than caching
+an asset id.
+
+> ### One thing to know before wiring up the version check
+>
+> **The live stable release is not yet on the version scheme this document
+> describes.** It currently reports `4.5.23` from an older numbering. The first
+> release under `4.5.2301` has not been cut yet.
+>
+> Everything about *where* to look and *how* to parse is correct and testable
+> today. Only the number you get back will change. Worth knowing so a version
+> comparison written against this document is not tested against a value that is
+> about to move.
+
 ## What is being added
 
 Two channels, from one public repository. They are separate releases and must
