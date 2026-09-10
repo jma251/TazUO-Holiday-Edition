@@ -9,31 +9,37 @@ A personal fork of [TazUO](https://github.com/PlayTazUO/TazUO), which is
 itself a fork of ClassicUO — an open-source reimplementation of the Ultima
 Online Classic Client, written in C# on top of FNA (an XNA reimplementation).
 
-## Branches: `legacy` releases, `legacy-dev` develops
+## Branches: `release` ships, `legacy-dev` develops
 
 | Branch | Framework | Version | Role |
 | --- | --- | --- | --- |
-| **`legacy`** | .NET Framework **4.7.2** (`net472`) | 4.5.2301 | **Release.** What other people download. Only tested, confirmed work lands here, and landing here *is* the release. |
-| **`legacy-dev`** | .NET Framework **4.7.2** (`net472`) | 4.5.2301 | **Development.** Where work goes first and is tested from. Cut from `legacy`, merged into `legacy`. |
+| **`release`** | .NET Framework **4.7.2** (`net472`) | 4.5.2301 | **Release.** What other people download. Only tested, confirmed work lands here, and landing here *is* the release. |
+| **`legacy-dev`** | .NET Framework **4.7.2** (`net472`) | 4.5.2301 | **Development.** Where work goes first and is tested from. Everything lands here before it lands anywhere else. |
 | `main` | .NET **10** (`net10.0`) | 5.24.5 | Reference only — a mirror of upstream, kept so fixes can be read out of it. |
+| `legacy` | .NET Framework **4.7.2** (`net472`) | 4.5.23 | **Frozen.** The old single-branch line, kept because the `v4.5.23-h1`…`h73` tags point into its history. Not built, not developed, never deleted. |
 | `dev` | — | — | Inherited from upstream. Not used here, not built, not a release path. |
 
 **Rules:**
 
 - Feature branches are cut from **`legacy-dev`** and merged back into `legacy-dev`.
-- `legacy-dev` merges into `legacy` **only** when the work has been built, run,
-  and confirmed good. That merge publishes a release to real users, so it is not
-  a routine step — it is the decision to ship.
-- **Never commit directly to `legacy`.** Everything reaches it through a merge
+- `legacy-dev` merges into `release` **only** when the work has been built, run,
+  and confirmed good. That merge publishes to real users, so it is not a routine
+  step — it is the decision to ship, and it needs a version bump to go with it.
+- **Never commit directly to `release`.** Everything reaches it through a merge
   from `legacy-dev`.
 - **Never build, modify, or release `main`.** It exists to be read.
-- Keep `legacy-dev` current with `legacy` (merge `legacy` in) so the two do not
+- Keep `legacy-dev` current with `release` (merge `release` in) so the two do not
   drift; a release cut from a stale dev branch silently reverts things.
 
+Dev-only work does **not** need holding back from `release` by hand. Anything
+behind `HOLIDAY_DEV` is compiled out of the release build wherever it lands, so
+the branches stay mergeable rather than diverging. See the flag's description in
+`Directory.Build.props`.
+
 The one exception to going through `legacy-dev`: a fix for something that is
-broken *in the wild right now*. Those may go straight to a branch off `legacy`,
+broken *in the wild right now*. Those may go straight to a branch off `release`,
 because routing an emergency through a dev branch full of untested work would
-ship that work alongside it. Merge `legacy` back down into `legacy-dev`
+ship that work alongside it. Merge `release` back down into `legacy-dev`
 afterwards.
 
 ### Porting a fix from `main` to the 4.7.2 branches
@@ -41,14 +47,14 @@ afterwards.
 This is the main reason `main` is present. It is rarely a clean cherry-pick,
 because the two branches have diverged structurally:
 
-- `main` targets `net10.0`; `legacy` targets `net472`. Modern C#/BCL APIs that
+- `main` targets `net10.0`; the 4.7.2 branches target `net472`. Modern C#/BCL APIs that
   compile on `main` may not exist on 4.7.2.
-- `main` keeps its MSBuild config at `src/Directory.Build.props`; `legacy` keeps
-  it at the repo root as `Directory.Build.props`.
+- `main` keeps its MSBuild config at `src/Directory.Build.props`; here it is at
+  the repo root as `Directory.Build.props`.
 - The two are ~1 major version apart (4.5.x vs 5.24.x), so surrounding code
   often differs.
 
-Expect to read the change on `main` and **re-apply it by hand** to `legacy`,
+Expect to read the change on `main` and **re-apply it by hand** to `legacy-dev`,
 rather than cherry-picking the commit.
 
 ## The .NET Framework 4.7.2 constraint
@@ -157,7 +163,7 @@ the dev one must never be able to touch what users download.
 
 `.github/workflows/build-legacy.yml` — **the release path**:
 
-- Triggers on push to `legacy`, or manually from the Actions tab.
+- Triggers on push to `release`, or manually from the Actions tab.
 - Builds on `windows-latest`, checks out submodules recursively, publishes the
   client, verifies the natives are present, and zips `bin/dist` into
   `TazUO-Holiday-Edition.zip`.
@@ -216,7 +222,7 @@ downstream follows it — the window title, the login-screen label, the crash-lo
 header, the release tag, and `v.txt` (see below).
 
 **Bumping that file is how a release is cut.** Nothing auto-increments. Merging
-to `legacy` without a bump refreshes `latest` and publishes no new numbered
+to `release` without a bump refreshes `latest` and publishes no new numbered
 release, and the workflow says so in its log rather than failing. That is the
 point: a release should be a decision, not a side effect of merging.
 

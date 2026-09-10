@@ -66,7 +66,7 @@ https://github.com/jma251/TazUO-Holiday-Edition
 ```
 
 **Public.** No token, no auth. The release assets were fetched anonymously to
-confirm this — `HTTP 200`, ~67 MB. Default branch is `legacy`.
+confirm this — `HTTP 200`, ~67 MB. Default branch is `release`.
 
 ## Where each channel lives
 
@@ -237,9 +237,10 @@ channel rather than by prefix:
   ambiguous.
 - **Dev builds are frequent.** If the launcher polls, the dev channel will show
   a new build far more often than the stable one. Consider not nagging on it.
-- **The stable channel currently publishes whatever is on `legacy`.** A curated
-  first public release is still being assembled, so treat the stable channel as
-  not-yet-announced until that lands as `v4.5.2301`.
+- **The stable channel is cut from the `release` branch**, which carries only
+  work that has been run and confirmed. Investigation tooling, diagnostic logs
+  and unfinished experiments are compiled out of it entirely — they exist only in
+  the dev build.
 - **Client identity.** Both channels report as
   `TazUO [Legacy] - <version> - Holiday Edition` in the window title. It is a
   .NET Framework 4.7.2, x64-only build — there is no x86 or ARM variant, so
