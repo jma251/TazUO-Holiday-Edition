@@ -145,6 +145,14 @@ namespace ClassicUO.Game.Managers
         /// </summary>
         public static event EventHandler<int> SpellCastBegin;
         public static void InvokeSpellCastBegin(int spell) => SpellCastBegin?.Invoke(null, spell);
+
+        /// <summary>
+        /// Called when the visual spell manager stops believing a spell is being cast -
+        /// whether it was interrupted, refused, or simply ran its duration out. The argument
+        /// is the spell id that ended, or -1 if none was being tracked.
+        /// </summary>
+        public static event EventHandler<int> SpellCastEnd;
+        public static void InvokeSpellCastEnd(int spell) => SpellCastEnd?.Invoke(null, spell);
     }
 
     public class OPLEventArgs : EventArgs
