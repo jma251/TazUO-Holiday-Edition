@@ -148,6 +148,13 @@ namespace ClassicUO.Game.Managers
         /// constantly by accident. That guess is gone, so this is what ends a cast the
         /// server never reported a problem with.
         ///
+        /// The wait is the spell's own MaxDuration, which is the field that exists to say how
+        /// long to allow before giving up, and which is per spell and editable. No arithmetic
+        /// is done on it here - not Faster Casting, not a margin, nothing invented. Releasing
+        /// a flag that would otherwise latch forever is the client's job; working out how long
+        /// a cast should really have taken for a given character is the caller's, and every
+        /// figure that needs is exposed on the spell and on the player.
+        ///
         /// Called once a tick from World.Update. Cheap: one comparison unless a cast is live.
         /// </summary>
         public void CheckCastExpiry()
@@ -157,46 +164,10 @@ namespace ClassicUO.Game.Managers
                 return;
             }
 
-            if (LastSpellTime + TimeSpan.FromSeconds(ExpectedCastSeconds(currentSpell)) <= DateTime.Now)
+            if (LastSpellTime + TimeSpan.FromSeconds(currentSpell.MaxDuration) <= DateTime.Now)
             {
                 ClearCasting();
             }
-        }
-
-        /// <summary>
-        /// Slack on top of the spell's own cast time before the flag is let go.
-        ///
-        /// Only a backstop. A cast normally ends because the server said something about it;
-        /// this is what catches the one that simply worked, and a little room means a slow
-        /// round trip does not end a cast the server still has running.
-        /// </summary>
-        private const double CastExpiryGraceSeconds = 1.0;
-
-        /// <summary>
-        /// How long to wait before deciding a cast is over.
-        ///
-        /// The spell's own cast time plus a margin, never past MaxDuration.
-        ///
-        /// Faster Casting is deliberately not applied here. It shortens a real cast, so this
-        /// errs late for a character wearing it - which is the right way round for a backstop,
-        /// and the arithmetic belongs to whatever is reading the state rather than to the
-        /// client guessing on its behalf. The figures it needs are exposed alongside:
-        /// CastTime, RecoveryTime, MaxFasterCasting and MaxFasterCastRecovery are all on the
-        /// spell, and FasterCasting and FasterCastRecovery are on the player.
-        ///
-        /// A spell with no cast time recorded falls back to MaxDuration, as everything did
-        /// before the timings were seeded.
-        /// </summary>
-        private double ExpectedCastSeconds(SpellRangeInfo spell)
-        {
-            if (spell.CastTime <= 0)
-            {
-                return spell.MaxDuration;
-            }
-
-            double seconds = spell.CastTime + CastExpiryGraceSeconds;
-
-            return spell.MaxDuration > 0 && seconds > spell.MaxDuration ? spell.MaxDuration : seconds;
         }
 
         public SpellRangeInfo GetCurrentSpell()
