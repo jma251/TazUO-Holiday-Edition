@@ -352,6 +352,35 @@ namespace ClassicUO.Game.UI.Controls
         /// </summary>
         /// <returns>int</returns>
         public int GetY() => Y;
+
+        /// <summary>
+        /// Width, by value.
+        ///
+        /// Width itself is a ref return (ref _bounds.Width), and reflection cannot invoke a
+        /// ByRef-returning property - GetValue throws rather than handing back the number.
+        /// That is why an assistant reaching in from outside cannot read the size of a gump
+        /// even though the property is public, and it is the same reason GetX and GetY above
+        /// exist. This is the missing pair.
+        /// </summary>
+        public int GetWidth() => Width;
+
+        /// <summary>Height, by value. See GetWidth.</summary>
+        public int GetHeight() => Height;
+
+        /// <summary>
+        /// Position and size together, by value. Bounds is a ref return for the same reason
+        /// the four above are, so this is the form anything outside the client can read.
+        /// </summary>
+        public Rectangle GetBounds() => new Rectangle(X, Y, Width, Height);
+
+        /// <summary>
+        /// Where this control actually sits on screen, and how big, by value.
+        ///
+        /// X and Y are relative to the parent; a gump nested in another is not where its own
+        /// X and Y say it is. ScreenCoordinateX/Y already resolve that and are plain ints, so
+        /// they were readable - this just puts them together with the size in one call.
+        /// </summary>
+        public Rectangle GetScreenBounds() => new Rectangle(ScreenCoordinateX, ScreenCoordinateY, Width, Height);
         
         public void UpdateOffset(int x, int y)
         {
