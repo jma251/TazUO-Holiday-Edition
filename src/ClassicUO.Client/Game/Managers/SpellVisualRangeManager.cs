@@ -95,6 +95,14 @@ namespace ClassicUO.Game.Managers
             LastSpellTime = DateTime.Now;
             currentSpell = spell;
             isCasting = true;
+
+            // Mirrored onto the player so it can be read from outside this manager.
+            // Guarded because nothing above this point requires a player to exist.
+            if (World.Player != null)
+            {
+                World.Player.IsCasting = true;
+            }
+
             if (currentSpell != null && currentSpell.FreezeCharacterWhileCasting)
             {
                 World.Player.Flags |= Flags.Frozen;
@@ -104,10 +112,30 @@ namespace ClassicUO.Game.Managers
 
         public void ClearCasting()
         {
+            // Only a real transition is worth announcing. UpdateHits calls this on every
+            // HP packet for the player, casting or not, so firing unconditionally would
+            // mean an event per hit point for the whole session.
+            bool wasCasting = isCasting;
+            int ended = currentSpell != null ? currentSpell.ID : -1;
+
             isCasting = false;
             currentSpell = null;
             LastSpellTime = DateTime.MinValue;
+
+            if (World.Player != null)
+            {
+                World.Player.IsCasting = false;
+            }
+
             World.Player.Flags &= ~Flags.Frozen;
+
+            // The other half of SpellCastBegin. Without it the only way to know a cast is
+            // over is to watch the flag or wait out the duration, which is what every
+            // consumer was doing separately.
+            if (wasCasting)
+            {
+                EventSink.InvokeSpellCastEnd(ended);
+            }
         }
 
         public SpellRangeInfo GetCurrentSpell()

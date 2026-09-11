@@ -80,6 +80,25 @@ namespace ClassicUO.Game.GameObjects
         public ref Ability SecondaryAbility => ref Abilities[1];
         public override bool IsWalking => LastStepTime > Time.Ticks - Constants.PLAYER_WALKING_DELAY;
 
+        /// <summary>
+        /// Whether a spell cast is believed to be in progress.
+        ///
+        /// Written by SpellVisualRangeManager, which is the only thing that decides it, and
+        /// held here so anything outside that manager can read it - the assistant reaching in
+        /// by reflection included. Named to match upstream, where it sits on this class too.
+        ///
+        /// It is inference, not fact. The server never says "you are casting". The manager
+        /// starts it on hearing the spell's power words and ends it on one of a handful of
+        /// clilocs or on the spell's own duration running out. Two consequences worth knowing
+        /// before trusting an edge:
+        ///
+        /// - It can be wrong about a cast that succeeded, because success has no signal; the
+        ///   flag simply times out.
+        /// - It drops to false on any HP change, so taking a hit mid-cast reads as the cast
+        ///   ending while it is in fact still going.
+        /// </summary>
+        public bool IsCasting { get; set; }
+
         public bool HasGump { get; set; }
         public uint LastGumpID { get; set; }
 
