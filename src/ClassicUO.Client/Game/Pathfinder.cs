@@ -78,6 +78,35 @@ namespace ClassicUO.Game
 
         public static bool AutoWalking { get; set; }
 
+        /// <summary>
+        /// How far along the current path the player is. Pairs with PathSize.
+        /// </summary>
+        public static int PathIndex => _pointIndex;
+
+        /// <summary>
+        /// The path currently being walked, as plain coordinates.
+        ///
+        /// The path is computed here and never goes near the network, so it exists nowhere
+        /// but inside this client. PathSize and AutoWalking already said whether one was
+        /// running and how long it was; this is the route itself. The nodes are copied out
+        /// as tuples rather than handed over, because PathNode is pooled and reused - a
+        /// caller holding one would be reading a node that has since become part of some
+        /// later path.
+        ///
+        /// Empty when nothing is being walked.
+        /// </summary>
+        public static List<(int X, int Y, int Z)> GetCurrentPath()
+        {
+            List<(int X, int Y, int Z)> result = new List<(int X, int Y, int Z)>(_path.Count);
+
+            foreach (PathNode node in _path)
+            {
+                result.Add((node.X, node.Y, node.Z));
+            }
+
+            return result;
+        }
+
         public static bool PathFindingCanBeCancelled { get; set; }
 
         public static bool BlockMoving { get; set; }
