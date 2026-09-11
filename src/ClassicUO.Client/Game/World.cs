@@ -448,6 +448,10 @@ namespace ClassicUO.Game
 #if HOLIDAY_DEV
                 HouseContentsRecovery.Update();
 #endif
+                // Ends a cast that needed no target and that the server never commented on.
+                // See SpellVisualRangeManager.CheckCastExpiry.
+                SpellVisualRangeManager.Instance.CheckCastExpiry();
+
                 _effectManager.Update();
                 WorldTextManager.Update();
                 WMapManager.RemoveUnupdatedWEntity();
