@@ -138,38 +138,6 @@ namespace ClassicUO.Game.Managers
             }
         }
 
-        /// <summary>
-        /// Ends a cast that has simply run out of time.
-        ///
-        /// Nothing else does. A cast that is never interrupted has no completion signal at
-        /// all - the server does not say "you cast that" - so without this the flag latched
-        /// true until the next stop cliloc or the next cast. It went unnoticed because the
-        /// hit point handler used to clear on every HP packet, which reset the flag
-        /// constantly by accident. That guess is gone, so this is what ends a cast the
-        /// server never reported a problem with.
-        ///
-        /// The wait is the spell's own MaxDuration, which is the field that exists to say how
-        /// long to allow before giving up, and which is per spell and editable. No arithmetic
-        /// is done on it here - not Faster Casting, not a margin, nothing invented. Releasing
-        /// a flag that would otherwise latch forever is the client's job; working out how long
-        /// a cast should really have taken for a given character is the caller's, and every
-        /// figure that needs is exposed on the spell and on the player.
-        ///
-        /// Called once a tick from World.Update. Cheap: one comparison unless a cast is live.
-        /// </summary>
-        public void CheckCastExpiry()
-        {
-            if (!isCasting || currentSpell == null)
-            {
-                return;
-            }
-
-            if (LastSpellTime + TimeSpan.FromSeconds(currentSpell.MaxDuration) <= DateTime.Now)
-            {
-                ClearCasting();
-            }
-        }
-
         public SpellRangeInfo GetCurrentSpell()
         {
             return currentSpell;

@@ -3730,17 +3730,7 @@ namespace ClassicUO.Network
             if (entity == World.Player)
             {
                 UoAssist.SignalHits();
-
-                // Deliberately does not touch the casting state. Losing hit points is not
-                // what ends a cast - being disturbed is, and only the server knows whether
-                // that happened. Protection is the plain case: with it up, damage does not
-                // disturb at all, so anything inferring an interrupt from a falling hit
-                // point count is simply wrong about it.
-                //
-                // The server says so itself, as cliloc 500641 "Your concentration is
-                // disturbed, thus ruining thy spell", which SpellVisualRangeManager already
-                // listens for. Clearing here as well only added a guess on top of an answer.
-
+                SpellVisualRangeManager.Instance.ClearCasting();
                 TitleBarStatsManager.UpdateTitleBar();
             }
         }

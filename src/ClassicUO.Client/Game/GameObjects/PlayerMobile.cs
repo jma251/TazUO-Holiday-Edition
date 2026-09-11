@@ -84,27 +84,22 @@ namespace ClassicUO.Game.GameObjects
         /// Whether a spell cast is believed to be in progress.
         ///
         /// Written by SpellVisualRangeManager, which is the only thing that decides it, and
-        /// held here so anything outside that manager can read it - the assistant reaching in
-        /// by reflection included. Named to match upstream, where it sits on this class too.
+        /// held here so anything outside that manager can read it - an assistant reaching in
+        /// by reflection included. Same name and same place as upstream, and the same
+        /// behaviour: set on hearing the spell's power words, cleared on one of the stop
+        /// clilocs, on a new cast, and on any hit point packet for the player.
         ///
-        /// It is inference, not fact. The server never says "you are casting". The manager
-        /// starts it on hearing the spell's power words, and ends it when the server reports
-        /// the cast was stopped - concentration disturbed, out of mana, out of reagents and
-        /// the rest - or when the spell's own duration runs out.
+        /// Two things to know rather than discover. A cast that succeeds has no signal of
+        /// its own - the server never says "you cast that" - so the flag is not cleared by
+        /// the cast finishing. And because a hit point packet clears it, taking damage
+        /// mid-cast reads as the cast ending whether or not it really was disturbed, which
+        /// it is not if Protection is up.
         ///
-        /// It deliberately does not end on damage. Whether a hit disturbs a cast is the
-        /// server's business, not the client's: with Protection up it does not disturb at
-        /// all. The server states it as cliloc 500641, and that is what is listened for.
-        ///
-        /// One thing to be clear about: a cast that simply succeeds has no signal of its own,
-        /// so the flag is released after the spell's configured maximum duration rather than
-        /// because anything was observed. That is a backstop, not a measurement - it errs late
-        /// by design, and no Faster Casting or other per-character arithmetic is applied to it
-        /// here.
-        ///
-        /// Precise timing is the caller's to do, and every figure it needs is exposed rather
-        /// than consumed: CastTime, RecoveryTime, MaxFasterCasting and MaxFasterCastRecovery
-        /// on the spell, FasterCasting and FasterCastRecovery on the player.
+        /// Both are upstream's behaviour, kept deliberately rather than corrected here, so
+        /// this reports the same thing the reference client does. Judging either is left to
+        /// whatever is reading: the player's buffs say whether Protection is up, and
+        /// CastTime, RecoveryTime, MaxFasterCasting and MaxFasterCastRecovery are on the
+        /// spell, alongside FasterCasting and FasterCastRecovery here.
         /// </summary>
         public bool IsCasting { get; set; }
 

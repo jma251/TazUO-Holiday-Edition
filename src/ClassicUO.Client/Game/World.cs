@@ -448,10 +448,6 @@ namespace ClassicUO.Game
 #if HOLIDAY_DEV
                 HouseContentsRecovery.Update();
 #endif
-                // A successful cast has no completion signal from the server, so this is
-                // what ends one. See SpellVisualRangeManager.CheckCastExpiry.
-                SpellVisualRangeManager.Instance.CheckCastExpiry();
-
                 _effectManager.Update();
                 WorldTextManager.Update();
                 WMapManager.RemoveUnupdatedWEntity();
