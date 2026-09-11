@@ -97,9 +97,12 @@ namespace ClassicUO.Game.GameObjects
         /// all. The server states it as cliloc 500641, and that is what is listened for.
         ///
         /// The remaining imprecision worth knowing: a cast that simply succeeds has no signal
-        /// of its own, so the flag is cleared by that duration expiring rather than by
-        /// anything observed. A spell that resolves faster than its configured duration reads
-        /// as still casting until the timer catches up.
+        /// of its own, so the flag is cleared by the spell's duration expiring rather than by
+        /// anything observed, and Faster Casting is not applied to that wait. It therefore
+        /// errs late rather than early for a character wearing any - which is the right way
+        /// round for a backstop, and leaves the arithmetic to whatever is reading this. Every
+        /// figure needed for it is exposed: CastTime, RecoveryTime, MaxFasterCasting and
+        /// MaxFasterCastRecovery on the spell, FasterCasting and FasterCastRecovery here.
         /// </summary>
         public bool IsCasting { get; set; }
 

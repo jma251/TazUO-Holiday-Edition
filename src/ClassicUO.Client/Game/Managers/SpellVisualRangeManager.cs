@@ -163,30 +163,29 @@ namespace ClassicUO.Game.Managers
             }
         }
 
-        /// <summary>Seconds of cast time one point of Faster Casting removes.</summary>
-        private const double FasterCastingSecondsPerPoint = 0.25;
-
-        /// <summary>No cast resolves faster than this, however much Faster Casting is worn.</summary>
-        private const double MinimumCastSeconds = 0.25;
-
         /// <summary>
-        /// Slack on top of the calculated cast, so a slow round trip does not end the cast
-        /// while the server still has it running. Only a backstop: the cast normally ends on
-        /// what the server says, not on this.
+        /// Slack on top of the spell's own cast time before the flag is let go.
+        ///
+        /// Only a backstop. A cast normally ends because the server said something about it;
+        /// this is what catches the one that simply worked, and a little room means a slow
+        /// round trip does not end a cast the server still has running.
         /// </summary>
         private const double CastExpiryGraceSeconds = 1.0;
 
         /// <summary>
-        /// How long this cast should take for this character, rather than a flat number.
+        /// How long to wait before deciding a cast is over.
         ///
-        /// Cast time is per spell, and Faster Casting shortens it - but only up to the number
-        /// of points the spell's school actually counts, which is not the same everywhere:
-        /// magery and necromancy stop at 2, chivalry, spellweaving and mysticism at 4. Both
-        /// figures come from the spell data rather than being assumed here, so a shard that
-        /// differs is corrected in the file instead of in code.
+        /// The spell's own cast time plus a margin, never past MaxDuration.
         ///
-        /// A spell with no cast time recorded falls back to MaxDuration, which is what every
-        /// spell used before the timings were seeded.
+        /// Faster Casting is deliberately not applied here. It shortens a real cast, so this
+        /// errs late for a character wearing it - which is the right way round for a backstop,
+        /// and the arithmetic belongs to whatever is reading the state rather than to the
+        /// client guessing on its behalf. The figures it needs are exposed alongside:
+        /// CastTime, RecoveryTime, MaxFasterCasting and MaxFasterCastRecovery are all on the
+        /// spell, and FasterCasting and FasterCastRecovery are on the player.
+        ///
+        /// A spell with no cast time recorded falls back to MaxDuration, as everything did
+        /// before the timings were seeded.
         /// </summary>
         private double ExpectedCastSeconds(SpellRangeInfo spell)
         {
@@ -195,28 +194,8 @@ namespace ClassicUO.Game.Managers
                 return spell.MaxDuration;
             }
 
-            int fasterCasting = World.Player != null ? World.Player.FasterCasting : 0;
+            double seconds = spell.CastTime + CastExpiryGraceSeconds;
 
-            if (fasterCasting < 0)
-            {
-                fasterCasting = 0;
-            }
-
-            if (spell.MaxFasterCasting > 0 && fasterCasting > spell.MaxFasterCasting)
-            {
-                fasterCasting = spell.MaxFasterCasting;
-            }
-
-            double seconds = spell.CastTime - (fasterCasting * FasterCastingSecondsPerPoint);
-
-            if (seconds < MinimumCastSeconds)
-            {
-                seconds = MinimumCastSeconds;
-            }
-
-            seconds += CastExpiryGraceSeconds;
-
-            // MaxDuration stays the ceiling it always was.
             return spell.MaxDuration > 0 && seconds > spell.MaxDuration ? spell.MaxDuration : seconds;
         }
 
