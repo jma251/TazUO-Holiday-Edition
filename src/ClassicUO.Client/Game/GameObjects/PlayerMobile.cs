@@ -88,8 +88,13 @@ namespace ClassicUO.Game.GameObjects
         /// by reflection included. Named to match upstream, where it sits on this class too.
         ///
         /// It is inference, not fact. The server never says "you are casting". The manager
-        /// starts it on hearing the spell's power words, and ends it on one of a handful of
-        /// clilocs, on taking damage, or on the spell's own duration running out.
+        /// starts it on hearing the spell's power words, and ends it when the server reports
+        /// the cast was stopped - concentration disturbed, out of mana, out of reagents and
+        /// the rest - or when the spell's own duration runs out.
+        ///
+        /// It deliberately does not end on damage. Whether a hit disturbs a cast is the
+        /// server's business, not the client's: with Protection up it does not disturb at
+        /// all. The server states it as cliloc 500641, and that is what is listened for.
         ///
         /// The remaining imprecision worth knowing: a cast that simply succeeds has no signal
         /// of its own, so the flag is cleared by that duration expiring rather than by

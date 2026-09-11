@@ -144,9 +144,9 @@ namespace ClassicUO.Game.Managers
         /// Nothing else does. A cast that is never interrupted has no completion signal at
         /// all - the server does not say "you cast that" - so without this the flag latched
         /// true until the next stop cliloc or the next cast. It went unnoticed because the
-        /// hit point handler used to clear on every HP packet, which meant the flag was being
-        /// reset constantly by accident. With that corrected to only fire on damage, this is
-        /// what actually ends a successful cast.
+        /// hit point handler used to clear on every HP packet, which reset the flag
+        /// constantly by accident. That guess is gone, so this is what ends a cast the
+        /// server never reported a problem with.
         ///
         /// Called once a tick from World.Update. Cheap: one comparison unless a cast is live.
         /// </summary>

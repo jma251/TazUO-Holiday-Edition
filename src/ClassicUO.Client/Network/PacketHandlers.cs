@@ -3719,8 +3719,6 @@ namespace ClassicUO.Network
                 return;
             }
 
-            ushort previousHits = entity.Hits;
-
             entity.HitsMax = p.ReadUInt16BE();
             entity.Hits = p.ReadUInt16BE();
 
@@ -3733,15 +3731,15 @@ namespace ClassicUO.Network
             {
                 UoAssist.SignalHits();
 
-                // Only losing hit points disturbs a cast. Healing, regeneration, a bandage
-                // finishing and the server simply restating the number all arrive down this
-                // same packet, and clearing on every one of them ended the cast dozens of
-                // times in a fight - worst exactly while healing under fire, which is when
-                // something asking "am I casting" most needs a straight answer.
-                if (entity.Hits < previousHits)
-                {
-                    SpellVisualRangeManager.Instance.ClearCasting();
-                }
+                // Deliberately does not touch the casting state. Losing hit points is not
+                // what ends a cast - being disturbed is, and only the server knows whether
+                // that happened. Protection is the plain case: with it up, damage does not
+                // disturb at all, so anything inferring an interrupt from a falling hit
+                // point count is simply wrong about it.
+                //
+                // The server says so itself, as cliloc 500641 "Your concentration is
+                // disturbed, thus ruining thy spell", which SpellVisualRangeManager already
+                // listens for. Clearing here as well only added a guess on top of an answer.
 
                 TitleBarStatsManager.UpdateTitleBar();
             }
