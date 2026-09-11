@@ -88,14 +88,13 @@ namespace ClassicUO.Game.GameObjects
         /// by reflection included. Named to match upstream, where it sits on this class too.
         ///
         /// It is inference, not fact. The server never says "you are casting". The manager
-        /// starts it on hearing the spell's power words and ends it on one of a handful of
-        /// clilocs or on the spell's own duration running out. Two consequences worth knowing
-        /// before trusting an edge:
+        /// starts it on hearing the spell's power words, and ends it on one of a handful of
+        /// clilocs, on taking damage, or on the spell's own duration running out.
         ///
-        /// - It can be wrong about a cast that succeeded, because success has no signal; the
-        ///   flag simply times out.
-        /// - It drops to false on any HP change, so taking a hit mid-cast reads as the cast
-        ///   ending while it is in fact still going.
+        /// The remaining imprecision worth knowing: a cast that simply succeeds has no signal
+        /// of its own, so the flag is cleared by that duration expiring rather than by
+        /// anything observed. A spell that resolves faster than its configured duration reads
+        /// as still casting until the timer catches up.
         /// </summary>
         public bool IsCasting { get; set; }
 

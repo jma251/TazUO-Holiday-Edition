@@ -112,9 +112,9 @@ namespace ClassicUO.Game.Managers
 
         public void ClearCasting()
         {
-            // Only a real transition is worth announcing. UpdateHits calls this on every
-            // HP packet for the player, casting or not, so firing unconditionally would
-            // mean an event per hit point for the whole session.
+            // Only a real transition is worth announcing: this is called from several
+            // places that do not know whether a cast was live, so announcing
+            // unconditionally would fire the event on clears that ended nothing.
             bool wasCasting = isCasting;
             int ended = currentSpell != null ? currentSpell.ID : -1;
 
@@ -135,6 +135,31 @@ namespace ClassicUO.Game.Managers
             if (wasCasting)
             {
                 EventSink.InvokeSpellCastEnd(ended);
+            }
+        }
+
+        /// <summary>
+        /// Ends a cast that has simply run out of time.
+        ///
+        /// Nothing else does. A cast that is never interrupted has no completion signal at
+        /// all - the server does not say "you cast that" - so without this the flag latched
+        /// true until the next stop cliloc or the next cast. It went unnoticed because the
+        /// hit point handler used to clear on every HP packet, which meant the flag was being
+        /// reset constantly by accident. With that corrected to only fire on damage, this is
+        /// what actually ends a successful cast.
+        ///
+        /// Called once a tick from World.Update. Cheap: one comparison unless a cast is live.
+        /// </summary>
+        public void CheckCastExpiry()
+        {
+            if (!isCasting || currentSpell == null)
+            {
+                return;
+            }
+
+            if (LastSpellTime + TimeSpan.FromSeconds(currentSpell.MaxDuration) <= DateTime.Now)
+            {
+                ClearCasting();
             }
         }
 

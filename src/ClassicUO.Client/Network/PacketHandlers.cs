@@ -3719,6 +3719,8 @@ namespace ClassicUO.Network
                 return;
             }
 
+            ushort previousHits = entity.Hits;
+
             entity.HitsMax = p.ReadUInt16BE();
             entity.Hits = p.ReadUInt16BE();
 
@@ -3730,7 +3732,17 @@ namespace ClassicUO.Network
             if (entity == World.Player)
             {
                 UoAssist.SignalHits();
-                SpellVisualRangeManager.Instance.ClearCasting();
+
+                // Only losing hit points disturbs a cast. Healing, regeneration, a bandage
+                // finishing and the server simply restating the number all arrive down this
+                // same packet, and clearing on every one of them ended the cast dozens of
+                // times in a fight - worst exactly while healing under fire, which is when
+                // something asking "am I casting" most needs a straight answer.
+                if (entity.Hits < previousHits)
+                {
+                    SpellVisualRangeManager.Instance.ClearCasting();
+                }
+
                 TitleBarStatsManager.UpdateTitleBar();
             }
         }
