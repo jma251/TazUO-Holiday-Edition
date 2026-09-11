@@ -157,10 +157,67 @@ namespace ClassicUO.Game.Managers
                 return;
             }
 
-            if (LastSpellTime + TimeSpan.FromSeconds(currentSpell.MaxDuration) <= DateTime.Now)
+            if (LastSpellTime + TimeSpan.FromSeconds(ExpectedCastSeconds(currentSpell)) <= DateTime.Now)
             {
                 ClearCasting();
             }
+        }
+
+        /// <summary>Seconds of cast time one point of Faster Casting removes.</summary>
+        private const double FasterCastingSecondsPerPoint = 0.25;
+
+        /// <summary>No cast resolves faster than this, however much Faster Casting is worn.</summary>
+        private const double MinimumCastSeconds = 0.25;
+
+        /// <summary>
+        /// Slack on top of the calculated cast, so a slow round trip does not end the cast
+        /// while the server still has it running. Only a backstop: the cast normally ends on
+        /// what the server says, not on this.
+        /// </summary>
+        private const double CastExpiryGraceSeconds = 1.0;
+
+        /// <summary>
+        /// How long this cast should take for this character, rather than a flat number.
+        ///
+        /// Cast time is per spell, and Faster Casting shortens it - but only up to the number
+        /// of points the spell's school actually counts, which is not the same everywhere:
+        /// magery and necromancy stop at 2, chivalry, spellweaving and mysticism at 4. Both
+        /// figures come from the spell data rather than being assumed here, so a shard that
+        /// differs is corrected in the file instead of in code.
+        ///
+        /// A spell with no cast time recorded falls back to MaxDuration, which is what every
+        /// spell used before the timings were seeded.
+        /// </summary>
+        private double ExpectedCastSeconds(SpellRangeInfo spell)
+        {
+            if (spell.CastTime <= 0)
+            {
+                return spell.MaxDuration;
+            }
+
+            int fasterCasting = World.Player != null ? World.Player.FasterCasting : 0;
+
+            if (fasterCasting < 0)
+            {
+                fasterCasting = 0;
+            }
+
+            if (spell.MaxFasterCasting > 0 && fasterCasting > spell.MaxFasterCasting)
+            {
+                fasterCasting = spell.MaxFasterCasting;
+            }
+
+            double seconds = spell.CastTime - (fasterCasting * FasterCastingSecondsPerPoint);
+
+            if (seconds < MinimumCastSeconds)
+            {
+                seconds = MinimumCastSeconds;
+            }
+
+            seconds += CastExpiryGraceSeconds;
+
+            // MaxDuration stays the ceiling it always was.
+            return spell.MaxDuration > 0 && seconds > spell.MaxDuration ? spell.MaxDuration : seconds;
         }
 
         public SpellRangeInfo GetCurrentSpell()
@@ -424,8 +481,97 @@ namespace ClassicUO.Game.Managers
             }
         }
 
+        /// <summary>
+        /// Fills in timings for spells that have none.
+        ///
+        /// The spell definitions the cache is built from carry no timing at all - no cast
+        /// time, no recovery, nothing about Faster Casting - so every entry used to default
+        /// to a cast time of zero and a flat ten second ceiling. That is enough for an
+        /// indicator and not enough to say when a cast is over.
+        ///
+        /// Only empty values are filled. A spell whose cast time has been set by hand, in
+        /// the saved file or the in-game editor, keeps it: this seeds, it does not overwrite.
+        /// That also means an existing profile picks the timings up rather than having to be
+        /// deleted.
+        /// </summary>
+        private void SeedMissingTimings()
+        {
+            try
+            {
+                using (Stream stream = typeof(SpellVisualRangeManager).Assembly
+                    .GetManifestResourceStream("ClassicUO.Game.Managers.DefaultSpellIndicatorConfig.json"))
+                {
+                    if (stream == null)
+                    {
+                        Log.Warn("Spell timing defaults are missing from the assembly; cast times stay unset.");
+
+                        return;
+                    }
+
+                    using (StreamReader reader = new StreamReader(stream))
+                    {
+                        SpellRangeInfo[] defaults = JsonSerializer.Deserialize(
+                            reader.ReadToEnd(),
+                            typeof(SpellRangeInfo[]),
+                            SpellVisualRangeJsonContext.Default) as SpellRangeInfo[];
+
+                        if (defaults == null)
+                        {
+                            return;
+                        }
+
+                        foreach (SpellRangeInfo d in defaults)
+                        {
+                            if (!spellRangeCache.TryGetValue(d.ID, out SpellRangeInfo entry))
+                            {
+                                continue;
+                            }
+
+                            if (entry.CastTime <= 0)
+                            {
+                                entry.CastTime = d.CastTime;
+                            }
+
+                            if (entry.RecoveryTime <= 0)
+                            {
+                                entry.RecoveryTime = d.RecoveryTime;
+                            }
+
+                            if (entry.MaxFasterCasting <= 0)
+                            {
+                                entry.MaxFasterCasting = d.MaxFasterCasting;
+                            }
+
+                            if (entry.MaxFasterCastRecovery <= 0)
+                            {
+                                entry.MaxFasterCastRecovery = d.MaxFasterCastRecovery;
+                            }
+
+                            if (string.IsNullOrEmpty(entry.School))
+                            {
+                                entry.School = d.School;
+                            }
+
+                            if (!entry.CapChivalryFasterCasting.HasValue)
+                            {
+                                entry.CapChivalryFasterCasting = d.CapChivalryFasterCasting;
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                // A missing or malformed defaults file must not stop the client. Without it
+                // every spell simply falls back to MaxDuration, which is where it was before.
+                Log.Warn($"Could not seed spell timings: {e.Message}");
+            }
+        }
+
         private void AfterLoad()
         {
+            SeedMissingTimings();
+
             spellRangePowerWordCache.Clear();
             foreach (var entry in spellRangeCache.Values)
             {
@@ -573,6 +719,29 @@ namespace ClassicUO.Game.Managers
             public bool ShowCastRangeDuringCasting { get; set; } = false;
             public bool FreezeCharacterWhileCasting { get; set; } = false;
             public bool ExpectTargetCursor { get; set; } = false;
+
+            // --- Timing. Seeded from DefaultSpellIndicatorConfig.json, overridable per
+            // --- spell in the saved file and in the in-game editor.
+
+            /// <summary>Seconds before another spell may be cast, before any Faster Cast Recovery.</summary>
+            public double RecoveryTime { get; set; } = 0.0;
+
+            /// <summary>Which spell school, for reference when tuning by hand.</summary>
+            public string School { get; set; } = "";
+
+            /// <summary>
+            /// Points of Faster Casting this spell's school actually counts. It is not a
+            /// single number across the game - magery and necromancy stop at 2, chivalry,
+            /// spellweaving and mysticism at 4 - which is why it is carried per spell
+            /// rather than assumed.
+            /// </summary>
+            public int MaxFasterCasting { get; set; } = 0;
+
+            /// <summary>Points of Faster Cast Recovery this spell's school counts.</summary>
+            public int MaxFasterCastRecovery { get; set; } = 0;
+
+            /// <summary>Chivalry counts Faster Casting differently; null where it does not apply.</summary>
+            public bool? CapChivalryFasterCasting { get; set; }
 
             public static SpellRangeInfo FromSpellDef(SpellDefinition spell)
             {

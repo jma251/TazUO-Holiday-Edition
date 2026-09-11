@@ -66,6 +66,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Cast times, recovery times and per-school Faster Casting caps for every spell.
+         Embedded rather than shipped loose so it cannot go missing; it only seeds values
+         the saved profile has not got, so a hand-tuned file is never overwritten. -->
+    <EmbeddedResource Include="Game\Managers\DefaultSpellIndicatorConfig.json" />
     <EmbeddedResource Update="Resources\ResErrorMessages.resx">
       <Generator>PublicResXFileCodeGenerator</Generator>
       <LastGenOutput>ResErrorMessages.Designer.cs</LastGenOutput>
