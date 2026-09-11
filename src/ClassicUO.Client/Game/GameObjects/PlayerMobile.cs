@@ -84,18 +84,22 @@ namespace ClassicUO.Game.GameObjects
         /// Whether a spell cast is believed to be in progress.
         ///
         /// Written by SpellVisualRangeManager, which is the only thing that decides it, and
-        /// held here so anything outside that manager can read it - the assistant reaching in
-        /// by reflection included. Named to match upstream, where it sits on this class too.
+        /// held here so anything outside that manager can read it - an assistant reaching in
+        /// by reflection included. Same name and same place as upstream, and the same
+        /// behaviour: set on hearing the spell's power words, cleared on one of the stop
+        /// clilocs, on a new cast, and on any hit point packet for the player.
         ///
-        /// It is inference, not fact. The server never says "you are casting". The manager
-        /// starts it on hearing the spell's power words and ends it on one of a handful of
-        /// clilocs or on the spell's own duration running out. Two consequences worth knowing
-        /// before trusting an edge:
+        /// Two things to know rather than discover. A cast that succeeds has no signal of
+        /// its own - the server never says "you cast that" - so the flag is not cleared by
+        /// the cast finishing. And because a hit point packet clears it, taking damage
+        /// mid-cast reads as the cast ending whether or not it really was disturbed, which
+        /// it is not if Protection is up.
         ///
-        /// - It can be wrong about a cast that succeeded, because success has no signal; the
-        ///   flag simply times out.
-        /// - It drops to false on any HP change, so taking a hit mid-cast reads as the cast
-        ///   ending while it is in fact still going.
+        /// Both are upstream's behaviour, kept deliberately rather than corrected here, so
+        /// this reports the same thing the reference client does. Judging either is left to
+        /// whatever is reading: the player's buffs say whether Protection is up, and
+        /// CastTime, RecoveryTime, MaxFasterCasting and MaxFasterCastRecovery are on the
+        /// spell, alongside FasterCasting and FasterCastRecovery here.
         /// </summary>
         public bool IsCasting { get; set; }
 
