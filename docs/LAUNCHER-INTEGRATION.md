@@ -99,7 +99,7 @@ is the list to read (`/releases`, filter to tags matching `v<x>.<y>.<z>`).
 | API | `https://api.github.com/repos/jma251/TazUO-Holiday-Edition/releases/tags/dev-latest` |
 | Marked | **`prerelease: true`** |
 
-Replaced on every push to the `legacy-dev` branch, which can be several times a
+Replaced on every push to the `legacy` branch, which can be several times a
 day. It is a real, fully packaged client — same build, same native-library
 checks — it is just unproven.
 
@@ -178,7 +178,7 @@ Two reasons this is not just a preference:
   release plus untested commits, so `v.txt` still reads `4.5.2301` even when the
   build is hours old. Version comparison would miss nearly every dev update, and
   an auto-updater would either do nothing or thrash.
-- **Dev builds are replaced on every push to `legacy-dev`**, several times a day.
+- **Dev builds are replaced on every push to `legacy`**, several times a day.
   Nothing should be chasing that automatically.
 
 If the launcher wants to show whether an installed dev build is current, compare

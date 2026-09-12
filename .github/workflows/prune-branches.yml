@@ -2,8 +2,12 @@ name: Prune branches
 
 # Run from the Actions tab. Nothing here fires on a push or on a schedule.
 #
-# Removes every branch except the four that are kept: legacy, legacy-dev, main,
+# Removes every branch except the four that are kept: legacy, release, main,
 # dev. Merged or not - a branch that is not one of those four is a leftover.
+#
+# release was missing from this list until 2026-09-12. It did not exist when
+# this file was written, so a confirmed run would have deleted the branch
+# users download from.
 #
 # Tags are never touched. The h1..hN release tags are the rollback history and
 # nothing in this file can reach them.
@@ -39,10 +43,10 @@ jobs:
             | grep -v HEAD \
             | sed 's|origin/||' \
             | tr -d ' ' \
-            | grep -Ev '^(legacy|legacy-dev|main|dev)$' \
+            | grep -Ev '^(legacy|release|main|dev)$' \
             | sort > doomed.txt
 
-          echo "Keeping: legacy, legacy-dev, main, dev"
+          echo "Keeping: legacy, release, main, dev"
           echo
           echo "Would remove $(wc -l < doomed.txt) branches:"
           sed 's/^/  /' doomed.txt
@@ -52,7 +56,7 @@ jobs:
           echo "delete could cost. Empty is the usual answer:"
           git branch -r --no-merged origin/legacy \
             | grep -v HEAD | sed 's|origin/||' | tr -d ' ' \
-            | grep -Ev '^(legacy|legacy-dev|main|dev)$' \
+            | grep -Ev '^(legacy|release|main|dev)$' \
             | sed 's/^/  /' || true
 
       - name: Remove them

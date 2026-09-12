@@ -9,26 +9,33 @@ A personal fork of [TazUO](https://github.com/PlayTazUO/TazUO), which is
 itself a fork of ClassicUO — an open-source reimplementation of the Ultima
 Online Classic Client, written in C# on top of FNA (an XNA reimplementation).
 
-## Branches: `release` ships, `legacy-dev` develops
+## Branches: `legacy` develops, `release` ships
+
+Two branches, and both are this fork's. The other two came with it.
 
 | Branch | Framework | Version | Role |
 | --- | --- | --- | --- |
+| **`legacy`** | .NET Framework **4.7.2** (`net472`) | 4.5.2301 | **Development.** Where work goes. Also the default branch, and where the `v4.5.23-h1`…`h73` tags point. |
 | **`release`** | .NET Framework **4.7.2** (`net472`) | 4.5.2301 | **Release.** What other people download. Only tested, confirmed work lands here, and landing here *is* the release. |
-| **`legacy-dev`** | .NET Framework **4.7.2** (`net472`) | 4.5.2301 | **Development.** Where work goes first and is tested from. Everything lands here before it lands anywhere else. |
-| `main` | .NET **10** (`net10.0`) | 5.24.5 | Reference only — a mirror of upstream, kept so fixes can be read out of it. |
-| `legacy` | .NET Framework **4.7.2** (`net472`) | 4.5.23 | **Frozen.** The old single-branch line, kept because the `v4.5.23-h1`…`h73` tags point into its history. Not built, not developed, never deleted. |
-| `dev` | — | — | Inherited from upstream. Not used here, not built, not a release path. |
+| `main` | .NET **10** (`net10.0`) | 5.24.5 | Upstream's. Reference only — a mirror kept so fixes can be read out of it. |
+| `dev` | .NET **10** (`net10.0`) | 5.24.5 | Upstream's. Not used here, not built, not a release path. |
+
+There was briefly a third branch of ours, `legacy-dev`, created on 2026-09-10
+when `legacy` still shipped. `release` was added hours later and `legacy-dev`
+kept a name describing a branch it no longer fed. It was folded back into
+`legacy` on 2026-09-12 and removed. Nothing was lost: it was a fast-forward.
 
 **Rules:**
 
-- Feature branches are cut from **`legacy-dev`** and merged back into `legacy-dev`.
-- `legacy-dev` merges into `release` **only** when the work has been built, run,
+- Work goes on **`legacy`**, as commits. A separate branch per change is not
+  the convention here - it produced ninety-odd leftovers that nothing deleted.
+- `legacy` merges into `release` **only** when the work has been built, run,
   and confirmed good. That merge publishes to real users, so it is not a routine
   step — it is the decision to ship, and it needs a version bump to go with it.
 - **Never commit directly to `release`.** Everything reaches it through a merge
-  from `legacy-dev`.
-- **Never build, modify, or release `main`.** It exists to be read.
-- Keep `legacy-dev` current with `release` (merge `release` in) so the two do not
+  from `legacy`.
+- **Never build, modify, or release `main` or `dev`.** They exist to be read.
+- Keep `legacy` current with `release` (merge `release` in) so the two do not
   drift; a release cut from a stale dev branch silently reverts things.
 
 Dev-only work does **not** need holding back from `release` by hand. Anything
@@ -36,10 +43,10 @@ behind `HOLIDAY_DEV` is compiled out of the release build wherever it lands, so
 the branches stay mergeable rather than diverging. See the flag's description in
 `Directory.Build.props`.
 
-The one exception to going through `legacy-dev`: a fix for something that is
+The one exception to going through `legacy`: a fix for something that is
 broken *in the wild right now*. Those may go straight to a branch off `release`,
 because routing an emergency through a dev branch full of untested work would
-ship that work alongside it. Merge `release` back down into `legacy-dev`
+ship that work alongside it. Merge `release` back down into `legacy`
 afterwards.
 
 ### Porting a fix from `main` to the 4.7.2 branches
@@ -54,7 +61,7 @@ because the two branches have diverged structurally:
 - The two are ~1 major version apart (4.5.x vs 5.24.x), so surrounding code
   often differs.
 
-Expect to read the change on `main` and **re-apply it by hand** to `legacy-dev`,
+Expect to read the change on `main` and **re-apply it by hand** to `legacy`,
 rather than cherry-picking the commit.
 
 ## The .NET Framework 4.7.2 constraint
@@ -175,7 +182,7 @@ one that publishes a numbered version. It should stay that way.**
 
 `.github/workflows/build-legacy-dev.yml` — **the testing path**:
 
-- Triggers on push to `legacy-dev`, or manually.
+- Triggers on push to `legacy`, or manually.
 - Same build and the same hard-fail check on the natives, so a dev build is a
   real, launchable client and not a half-packaged one.
 - Publishes to a single **prerelease** tagged `dev-latest`, replaced every build.
