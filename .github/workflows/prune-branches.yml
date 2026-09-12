@@ -2,9 +2,9 @@ name: Prune branches
 
 # Run from the Actions tab. Nothing here fires on a push or on a schedule.
 #
-# Removes every branch except the four that are kept - legacy, release, main,
-# dev - and any branch with an open pull request. Merged or not, a branch that
-# is neither of those is a leftover.
+# Removes every branch except the ones listed in KEEP below and any branch
+# with an open pull request. Merged or not, a branch that is neither of those
+# is a leftover.
 #
 # release was missing from this list until 2026-09-12. It did not exist when
 # this file was written, so a confirmed run would have deleted the branch
@@ -50,17 +50,31 @@ jobs:
           echo "Open pull requests, held back: $(wc -l < protected.txt)"
           sed 's/^/  /' protected.txt
 
+          # The branches that stay. Four are the repository's own; the other
+          # three hold a commit that exists nowhere else and is wanted.
+          printf '%s\n' \
+            legacy \
+            release \
+            main \
+            dev \
+            add/artifact-names \
+            claude/draw-ceiling-gate \
+            claude/music-era-path-log \
+            | sort > keep.txt
+
+          echo "Kept by name:"
+          sed 's/^/  /' keep.txt
+
           git branch -r \
             | grep -v HEAD \
             | sed 's|origin/||' \
             | tr -d ' ' \
-            | grep -Ev '^(legacy|release|main|dev)$' \
-            | sort > candidates.txt
+            | sort > all.txt
 
-          comm -23 candidates.txt protected.txt > doomed.txt
+          comm -23 all.txt keep.txt | comm -23 - protected.txt > doomed.txt
 
           echo
-          echo "Keeping: legacy, release, main, dev - and anything above."
+          echo "Keeping: the names above, plus anything with an open pull request."
           echo
           echo "Would remove $(wc -l < doomed.txt) branches:"
           sed 's/^/  /' doomed.txt
@@ -70,7 +84,7 @@ jobs:
           echo "delete could cost. Empty is the usual answer:"
           git branch -r --no-merged origin/legacy \
             | grep -v HEAD | sed 's|origin/||' | tr -d ' ' \
-            | grep -Ev '^(legacy|release|main|dev)$' \
+            | sort | comm -12 - doomed.txt \
             | sed 's/^/  /' || true
 
       - name: Remove them
