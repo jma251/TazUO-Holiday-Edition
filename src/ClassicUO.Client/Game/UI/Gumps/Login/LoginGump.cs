@@ -163,25 +163,28 @@ namespace ClassicUO.Game.UI.Gumps.Login
                 offsetY = 343;
                 offtextY = 40;
 
+                // Both version lines sit at x=150 rather than x=286, which is where they were.
+                // The ClassicUO links start at x=505, so from 286 they had 219 pixels: enough
+                // for a release reading "4.5.2301", not enough for a dev build reading
+                // "4.5.2301-dev.bbe7343", which ran underneath them and lost the part that
+                // identifies it. Nothing else occupies these two rows - the nearest control is
+                // the autologin checkbox, 36 pixels higher and already at x=150 - so moving
+                // left costs nothing, lines the block up with the checkboxes above it, and
+                // leaves 355 pixels instead of 219.
                 Add
                 (
                     new Label($"UO Version {Settings.GlobalSettings.ClientVersion}.", false, 0x034E, font: 9)
                     {
-                        X = 286,
+                        X = 150,
                         Y = 453
                     }
                 );
 
-                // "Version" is dropped from this one on purpose. The label starts at x=286
-                // and the ClassicUO links start at x=505, so it has 219 pixels. A release
-                // reads "4.5.2301" and fits easily; a dev build reads "4.5.2301-dev.bbe7343"
-                // and ran underneath the links, which is the whole reason the stamp exists -
-                // to be read. The line above already says "UO Version", so nothing is lost.
                 Add
                 (
-                    new Label(string.Format("TazUO {0}", CUOEnviroment.DisplayVersion), false, 0x034E, font: 9)
+                    new Label(string.Format("TazUO Version {0}", CUOEnviroment.DisplayVersion), false, 0x034E, font: 9)
                     {
-                        X = 286,
+                        X = 150,
                         Y = 465
                     }
                 );
@@ -273,16 +276,16 @@ namespace ClassicUO.Game.UI.Gumps.Login
                 (
                     new Label($"UO Version {Settings.GlobalSettings.ClientVersion}.", false, 0x0481, font: 9)
                     {
-                        X = 286,
+                        X = 150,
                         Y = 453
                     }
                 );
 
                 Add
                 (
-                    new Label(string.Format("TazUO {0}", CUOEnviroment.DisplayVersion), false, 0x0481, font: 9)
+                    new Label(string.Format("TazUO Version {0}", CUOEnviroment.DisplayVersion), false, 0x0481, font: 9)
                     {
-                        X = 286,
+                        X = 150,
                         Y = 465
                     }
                 );
