@@ -144,6 +144,11 @@ namespace ClassicUO.Game.Managers
             BandageStockWarner.ResetForProfile();
             BandageScheduler.ResetForProfile();
             BandageSettings.ResetForProfile();
+            // ResetForProfile clears the loaded latch, so this reads bandage.tsv
+            // back over the defaults it just restored. Without it the file was
+            // written on every world exit and never read again, so nothing the
+            // bandage helpers persisted survived a restart.
+            BandageSettings.EnsureLoaded();
             UI.MobileCache.Clear();
             UI.Gumps.ToastManager.ResetForProfile();
 

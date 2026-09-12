@@ -74,6 +74,9 @@ namespace ClassicUO.Game.UI.Gumps
             MainContent.AddToLeft(CategoryButton(lang.ButtonNameplates, (int)PAGE.NameplateOptions, MainContent.LeftWidth));
             MainContent.AddToLeft(CategoryButton(lang.ButtonCooldowns, (int)PAGE.TUOCooldowns, MainContent.LeftWidth));
             MainContent.AddToLeft(CategoryButton(lang.ButtonTazUO, (int)PAGE.TUOOptions, MainContent.LeftWidth));
+            // Literal rather than a lang.* entry: this page is this fork's, and
+            // adding a key would mean editing every language file upstream ships.
+            MainContent.AddToLeft(CategoryButton("MW's Work", (int)PAGE.MWWork, MainContent.LeftWidth));
 
             BuildGeneral();
             BuildSound();
@@ -89,6 +92,7 @@ namespace ClassicUO.Game.UI.Gumps
             BuildNameplates();
             BuildCooldowns();
             BuildTazUO();
+            BuildMWWork();
 
             foreach (SettingsOption option in options)
             {
@@ -5587,6 +5591,101 @@ namespace ClassicUO.Game.UI.Gumps
             }
         }
 
+
+        /// <summary>
+        /// The helpers ported from MW Edition. They were ported without the
+        /// control surface that drove them there - his overlays and his
+        /// `-autobandage`-style chat commands - so before this page existed
+        /// eighteen of them had no setter anywhere in the client and could
+        /// never be switched on at all.
+        ///
+        /// Everything here is off by default. AutoFollow is deliberately absent:
+        /// its Active is computed from TargetSerial, not a flag to toggle.
+        /// </summary>
+        private void BuildMWWork()
+        {
+            PositionHelper.Reset();
+
+            void Header(string text)
+            {
+                SettingsOption o;
+                options.Add(o = new SettingsOption(text, new Area(false), MainContent.RightWidth, (int)PAGE.MWWork));
+                PositionHelper.PositionControl(o.FullControl);
+            }
+
+            void Toggle(string label, bool current, Action<bool> set)
+            {
+                SettingsOption o;
+                options.Add
+                (
+                    o = new SettingsOption
+                    (
+                        string.Empty,
+                        new CheckboxWithLabel(label, 0, current, (b) => { set(b); }),
+                        MainContent.RightWidth, (int)PAGE.MWWork
+                    )
+                );
+                PositionHelper.PositionControl(o.FullControl);
+            }
+
+            Header("Master switch");
+            PositionHelper.Indent();
+            // Sets both: the profile field is what survives a restart, and the
+            // coordinator is what the scheduler reads this session.
+            Toggle
+            (
+                "Enable automation", profile.AutomationEnabled, (b) =>
+                {
+                    profile.AutomationEnabled = b;
+                    AutomationCoordinator.SetEnabled(b, false);
+                }
+            );
+            PositionHelper.RemoveIndent();
+            PositionHelper.BlankLine();
+
+            Header("Healing and cures");
+            PositionHelper.Indent();
+            Toggle("Emergency heal", EmergencyHealManager.Enabled, (b) => { EmergencyHealManager.Enabled = b; });
+            Toggle("Cure potion", AutoCurePotionManager.Enabled, (b) => { AutoCurePotionManager.Enabled = b; });
+            Toggle("Heal potion", AutoHealPotionManager.Enabled, (b) => { AutoHealPotionManager.Enabled = b; });
+            Toggle("Refresh potion", AutoRefreshPotionManager.Enabled, (b) => { AutoRefreshPotionManager.Enabled = b; });
+            Toggle("Cure poison (spell)", PoisonCureManager.Enabled, (b) => { PoisonCureManager.Enabled = b; });
+            PositionHelper.RemoveIndent();
+            PositionHelper.BlankLine();
+
+            Header("Bandages");
+            PositionHelper.Indent();
+            // SetEnabledQuiet, because Enabled has a private setter and the loud
+            // SetEnabled also latches ManualOverride, which would stop the
+            // skill-based auto-toggle from ever running again.
+            Toggle("Bandage self", AutoBandageManager.Enabled, (b) => { AutoBandageManager.SetEnabledQuiet(b); });
+            Toggle("Bandage pet", PetBandageManager.Enabled, (b) => { PetBandageManager.Enabled = b; });
+            Toggle("Bandage others", ExternalBandageManager.Enabled, (b) => { ExternalBandageManager.Enabled = b; });
+            Toggle("Warn when low on bandages", BandageStockWarner.Enabled, (b) => { BandageStockWarner.Enabled = b; BandageSettings.MarkDirty(); });
+            PositionHelper.RemoveIndent();
+            PositionHelper.BlankLine();
+
+            Header("Combat");
+            PositionHelper.Indent();
+            Toggle("Auto buff", AutoBuffManager.Enabled, (b) => { AutoBuffManager.Enabled = b; });
+            Toggle("Auto stealth", AutoStealthManager.Enabled, (b) => { AutoStealthManager.Enabled = b; });
+            Toggle("Auto re-arm", AutoRearmManager.Enabled, (b) => { AutoRearmManager.Enabled = b; });
+            Toggle("Auto mount", AutoMountManager.Enabled, (b) => { AutoMountManager.Enabled = b; });
+            Toggle("Hit list", AutoHitListManager.Enabled, (b) => { AutoHitListManager.Enabled = b; });
+            Toggle("Re-target after a kill", AutoRespawnTargetManager.Enabled, (b) => { AutoRespawnTargetManager.Enabled = b; });
+            Toggle("Pause everything while dead", AutoStopOnDeathManager.Enabled, (b) => { AutoStopOnDeathManager.Enabled = b; });
+            PositionHelper.RemoveIndent();
+            PositionHelper.BlankLine();
+
+            Header("Convenience");
+            PositionHelper.Indent();
+            Toggle("Close empty corpses", AutoCloseEmptyCorpse.Enabled, (b) => { AutoCloseEmptyCorpse.Enabled = b; });
+            Toggle("Open backpack on login", AutoOpenBackpackManager.Enabled, (b) => { AutoOpenBackpackManager.Enabled = b; });
+            Toggle("Open paperdoll on login", AutoOpenPaperdollManager.Enabled, (b) => { AutoOpenPaperdollManager.Enabled = b; });
+            Toggle("Close vendor gumps on walk away", AutoVendorCloseManager.Enabled, (b) => { AutoVendorCloseManager.Enabled = b; });
+            PositionHelper.RemoveIndent();
+        }
+
         private enum PAGE
         {
             None,
@@ -5604,7 +5703,8 @@ namespace ClassicUO.Game.UI.Gumps
             IgnoreList,
             NameplateOptions,
             TUOCooldowns,
-            TUOOptions
+            TUOOptions,
+            MWWork
         }
     }
 }
