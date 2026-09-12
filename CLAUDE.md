@@ -9,26 +9,38 @@ A personal fork of [TazUO](https://github.com/PlayTazUO/TazUO), which is
 itself a fork of ClassicUO — an open-source reimplementation of the Ultima
 Online Classic Client, written in C# on top of FNA (an XNA reimplementation).
 
-## Branches: `release` ships, `legacy-dev` develops
+## Branches: `legacy` develops, `release` ships
+
+Two branches, and both are this fork's. The other two came with it.
 
 | Branch | Framework | Version | Role |
 | --- | --- | --- | --- |
-| **`release`** | .NET Framework **4.7.2** (`net472`) | 4.5.2301 | **Release.** What other people download. Only tested, confirmed work lands here, and landing here *is* the release. |
-| **`legacy-dev`** | .NET Framework **4.7.2** (`net472`) | 4.5.2301 | **Development.** Where work goes first and is tested from. Everything lands here before it lands anywhere else. |
-| `main` | .NET **10** (`net10.0`) | 5.24.5 | Reference only — a mirror of upstream, kept so fixes can be read out of it. |
-| `legacy` | .NET Framework **4.7.2** (`net472`) | 4.5.23 | **Frozen.** The old single-branch line, kept because the `v4.5.23-h1`…`h73` tags point into its history. Not built, not developed, never deleted. |
-| `dev` | — | — | Inherited from upstream. Not used here, not built, not a release path. |
+| **`legacy`** | .NET Framework **4.7.2** (`net472`) | 4.5.2301 | **Development.** Where work goes, and where the `v4.5.23-h1`…`h73` tags point. |
+| **`release`** | .NET Framework **4.7.2** (`net472`) | 4.5.2301 | **Release.** What other people download, and the repository's default branch. Only tested, confirmed work lands here, and landing here *is* the release. |
+| `main` | .NET **10** (`net10.0`) | 5.24.5 | Upstream's. Reference only — a mirror kept so fixes can be read out of it. |
+| `dev` | .NET **10** (`net10.0`) | 5.24.5 | Upstream's. Not used here, not built, not a release path. |
+
+There was briefly a third branch of ours, `legacy-dev`, created on 2026-09-10
+when `legacy` still shipped. `release` was added hours later and `legacy-dev`
+kept a name describing a branch it no longer fed. It was folded back into
+`legacy` on 2026-09-12 and removed. Nothing was lost: it was a fast-forward.
+
+`release` is the default branch, so a new pull request targets it unless told
+otherwise. Almost none should: **retarget to `legacy` before opening it.**
+"Automatically delete head branches" is on, so a merged pull request cleans up
+the branch it came from.
 
 **Rules:**
 
-- Feature branches are cut from **`legacy-dev`** and merged back into `legacy-dev`.
-- `legacy-dev` merges into `release` **only** when the work has been built, run,
+- Work goes on **`legacy`**, as commits. A separate branch per change is not
+  the convention here - it produced ninety-odd leftovers that nothing deleted.
+- `legacy` merges into `release` **only** when the work has been built, run,
   and confirmed good. That merge publishes to real users, so it is not a routine
   step — it is the decision to ship, and it needs a version bump to go with it.
 - **Never commit directly to `release`.** Everything reaches it through a merge
-  from `legacy-dev`.
-- **Never build, modify, or release `main`.** It exists to be read.
-- Keep `legacy-dev` current with `release` (merge `release` in) so the two do not
+  from `legacy`.
+- **Never build, modify, or release `main` or `dev`.** They exist to be read.
+- Keep `legacy` current with `release` (merge `release` in) so the two do not
   drift; a release cut from a stale dev branch silently reverts things.
 
 Dev-only work does **not** need holding back from `release` by hand. Anything
@@ -36,10 +48,10 @@ behind `HOLIDAY_DEV` is compiled out of the release build wherever it lands, so
 the branches stay mergeable rather than diverging. See the flag's description in
 `Directory.Build.props`.
 
-The one exception to going through `legacy-dev`: a fix for something that is
+The one exception to going through `legacy`: a fix for something that is
 broken *in the wild right now*. Those may go straight to a branch off `release`,
 because routing an emergency through a dev branch full of untested work would
-ship that work alongside it. Merge `release` back down into `legacy-dev`
+ship that work alongside it. Merge `release` back down into `legacy`
 afterwards.
 
 ### Porting a fix from `main` to the 4.7.2 branches
@@ -54,7 +66,7 @@ because the two branches have diverged structurally:
 - The two are ~1 major version apart (4.5.x vs 5.24.x), so surrounding code
   often differs.
 
-Expect to read the change on `main` and **re-apply it by hand** to `legacy-dev`,
+Expect to read the change on `main` and **re-apply it by hand** to `legacy`,
 rather than cherry-picking the commit.
 
 ## The .NET Framework 4.7.2 constraint
@@ -161,7 +173,7 @@ the build if any of the three is missing.
 Two workflows build this fork, one per branch. They are deliberately separate:
 the dev one must never be able to touch what users download.
 
-`.github/workflows/build-legacy.yml` — **the release path**:
+`.github/workflows/build-release.yml` — **the release path**:
 
 - Triggers on push to `release`, or manually from the Actions tab.
 - Builds on `windows-latest`, checks out submodules recursively, publishes the
@@ -173,9 +185,9 @@ the dev one must never be able to touch what users download.
 **It is the only workflow here that publishes a release to users, and the only
 one that publishes a numbered version. It should stay that way.**
 
-`.github/workflows/build-legacy-dev.yml` — **the testing path**:
+`.github/workflows/build-dev.yml` — **the testing path**:
 
-- Triggers on push to `legacy-dev`, or manually.
+- Triggers on push to `legacy`, or manually.
 - Same build and the same hard-fail check on the natives, so a dev build is a
   real, launchable client and not a half-packaged one.
 - Publishes to a single **prerelease** tagged `dev-latest`, replaced every build.
@@ -255,34 +267,34 @@ Only `latest` and `dev-latest` are ever deleted
 `makeLatest: false` on the permanent release keeps the "Latest" badge on
 `latest`.
 
-Both releases' notes carry the commit SHA and the commits since the previous
-release, so the releases page reads as a running changelog.
+Neither release carries a changelog. The notes are the download line and a
+footnote with the framework and the commit, and nothing else. They used to be
+`git log` over every commit since the previous tag, which ran to 175 lines on
+4.5.2301 - merge commits, a missing `using`, a change sitting directly above
+its own revert - and pushed the download link and the assets below the fold.
+The history, the pull requests and the tags are where that detail belongs.
 
-The other deploy workflows (`net472-deploy.yml`, `net9-deploy.yml`,
-`tuo-deploy.yml`, `tuo-dev-deploy.yml`) are inherited from upstream and target
-upstream's repo/Discord. They have been deliberately reduced to
-`workflow_dispatch:` only — **do not re-add their `workflow_run:` triggers.**
-They used to chain off `Build-Test` completing:
+Four inherited deploy workflows — `net472-deploy.yml`, `net9-deploy.yml`,
+`tuo-deploy.yml`, `tuo-dev-deploy.yml` — were **deleted**. They were upstream's
+publishing paths, aimed at upstream's repository and Discord, and had been
+sitting reduced to `workflow_dispatch:` since the fork. Three of them needed a
+`DISCORDWEBHOOK` secret that does not exist here and one built a framework this
+fork does not target, so every one of them would have failed if anyone had ever
+pressed the button.
 
-- `net472-deploy.yml` fired on `legacy`, which would double-build every push and
-  publish a competing `TazUO-Legacy` release alongside `latest`.
-- `tuo-deploy.yml` fired on `main` — the branch that must never be built — and
-  published with `makeLatest: true`, which would steal the "Latest" badge from
-  the legacy release.
-- `tuo-dev-deploy.yml` fired on `dev`, which is not a release path here.
+`Wiki-Updates.yml` was deleted with them. It fired on a wiki edit and opened a
+discussion; this repository has no wiki, and no matching discussion category,
+so it could only ever have exited with an error.
 
-`features-bot.yml` and its `FeaturesBot.py` were **deleted** rather than reduced.
-That one was not a deploy path at all — it posted feature advertisements to
-upstream's Discord on a twice-daily cron, so in this fork it woke up at 07:00 and
-19:00 to fail on a `DISCORD_WEBHOOK` secret that will never exist here. There is
-no Discord to announce to, so there is nothing to keep.
+`features-bot.yml` and its `FeaturesBot.py` went earlier, for the same reason:
+a twice-daily cron posting feature advertisements to upstream's Discord.
 
 `Build-Test` still runs on every push and PR. That is intentional: it only
 compiles and uploads artifacts, and never publishes a release.
 
 ### Zip layout — deliberately flat, do not "fix" it
 
-`build-legacy.yml` zips the **contents** of `bin/dist`, so `ClassicUO.exe` and
+`build-release.yml` zips the **contents** of `bin/dist`, so `ClassicUO.exe` and
 friends sit at the root of the zip with no containing folder. That is what the
 launcher expects: it unzips straight into `<launcher dir>/TazUO`. Adding a
 `TazUO/` folder inside the zip would produce `<launcher>/TazUO/TazUO/` and the
