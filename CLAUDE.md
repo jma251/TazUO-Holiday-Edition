@@ -179,7 +179,7 @@ the dev one must never be able to touch what users download.
 - Builds on `windows-latest`, checks out submodules recursively, publishes the
   client, verifies the natives are present, and zips `bin/dist` into
   `TazUO-Holiday-Edition.zip`.
-- Publishes the rolling `latest` release **and** a permanent `v<version>` one.
+- Publishes one release per version, `v<version>`, carrying the Latest badge.
 - Needs `permissions: contents: write` to manage releases and tags.
 
 **It is the only workflow here that publishes a release to users, and the only
@@ -250,47 +250,40 @@ what is installed against what is published. It follows `AssemblyVersion`
 automatically, so it needs no separate maintenance, but do not remove those two
 targets: a launcher depends on that file existing.
 
-#### Two releases per numbered build
+#### One release per version
 
-Every release build publishes the same zip twice:
+Every numbered build publishes once, to `v<version>`, with `makeLatest: true`.
+There is no rolling release beside it.
 
-| Release | Tag | Lifetime | Purpose |
-| --- | --- | --- | --- |
-| Rolling | **`latest`** | Deleted and recreated each build | Fixed download URL, carries the "Latest" badge |
-| Permanent | **`v<version>`** e.g. `v4.5.2301` | Never updated, never deleted | Rollback history |
+There was until 2026-09-12. A `latest` release was deleted and recreated on
+every build so its download URL would never move. That pattern broke badly:
+GitHub's immutable releases setting was switched on, which freezes a release
+the moment it is published - before the zip finishes uploading - so the
+release existed with no file attached and the download page served nothing
+while looking normal. Worse, a tag name used by an immutable release is
+reserved permanently. `latest` cannot be created in this repository again.
+Ordinary tags create fine; that one name is spent.
 
-Dev builds publish once, to the **`dev-latest`** prerelease, and are replaced
-every push. They are never numbered.
+The replacement was already the better form. GitHub resolves
+`/releases/latest/download/<file>` by following the Latest badge, with no tag
+involved:
 
-Only `latest` and `dev-latest` are ever deleted
-(`gh release delete <tag> --cleanup-tag`). Numbered releases are immutable.
-`makeLatest: false` on the permanent release keeps the "Latest" badge on
-`latest`.
+    https://github.com/jma251/TazUO-Holiday-Edition/releases/latest/download/TazUO-Holiday-Edition.zip
 
-Neither release carries a changelog. The notes are the download line and a
-footnote with the framework and the commit, and nothing else. They used to be
-`git log` over every commit since the previous tag, which ran to 175 lines on
-4.5.2301 - merge commits, a missing `using`, a change sitting directly above
-its own revert - and pushed the download link and the assets below the fold.
-The history, the pull requests and the tags are where that detail belongs.
+Nothing is deleted or recreated to move it, so there is no window in which it
+points at a release that has no file. The release step verifies the zip is
+attached and that the badge resolves to the version just built, and fails the
+run if either is untrue.
 
-Four inherited deploy workflows — `net472-deploy.yml`, `net9-deploy.yml`,
-`tuo-deploy.yml`, `tuo-dev-deploy.yml` — were **deleted**. They were upstream's
-publishing paths, aimed at upstream's repository and Discord, and had been
-sitting reduced to `workflow_dispatch:` since the fork. Three of them needed a
-`DISCORDWEBHOOK` secret that does not exist here and one built a framework this
-fork does not target, so every one of them would have failed if anyone had ever
-pressed the button.
+Dev builds still publish to a rolling **`dev-latest`** prerelease, replaced
+every push, because a prerelease cannot carry the Latest badge and so needs a
+tag. That tag is exposed to the same hazard: if immutable releases is ever
+switched on again, the first dev build afterwards will burn it. Leave the
+setting off.
 
-`Wiki-Updates.yml` was deleted with them. It fired on a wiki edit and opened a
-discussion; this repository has no wiki, and no matching discussion category,
-so it could only ever have exited with an error.
-
-`features-bot.yml` and its `FeaturesBot.py` went earlier, for the same reason:
-a twice-daily cron posting feature advertisements to upstream's Discord.
-
-`Build-Test` still runs on every push and PR. That is intentional: it only
-compiles and uploads artifacts, and never publishes a release.
+Numbered releases are never deleted. `allowUpdates: false` keeps their files
+fixed once published, and a separate step refreshes only their notes from
+CHANGELOG.md when the version already exists.
 
 ### Zip layout — deliberately flat, do not "fix" it
 

@@ -12,8 +12,8 @@ repository is **public**: no token, no auth, no rate-limit workaround needed.
 ### Stable channel — the one the launcher auto-updates
 
 ```
-Release JSON   https://api.github.com/repos/jma251/TazUO-Holiday-Edition/releases/tags/latest
-Download       https://github.com/jma251/TazUO-Holiday-Edition/releases/download/latest/TazUO-Holiday-Edition.zip
+Release JSON   https://api.github.com/repos/jma251/TazUO-Holiday-Edition/releases/latest
+Download       https://github.com/jma251/TazUO-Holiday-Edition/releases/latest/download/TazUO-Holiday-Edition.zip
 ```
 
 ### Dev channel — manual install only, never polled
@@ -31,12 +31,19 @@ All releases   https://api.github.com/repos/jma251/TazUO-Holiday-Edition/release
 
 Filter to tags matching `v<digits>.<digits>.<digits>`. **Reject anything ending
 `-h<number>`** — those are a retired scheme that cannot be version-compared, kept
-only as history. Also skip `latest` and `dev-latest`, which are rolling pointers
-rather than versions.
+only as history. Also skip `dev-latest`, which is a rolling pointer rather than
+a version.
 
-Both download URLs are stable and never change. The releases behind them are
-deleted and recreated on each build, so re-read the release rather than caching
-an asset id.
+Both download URLs are stable and never change.
+
+Note the shape of the stable URL: `/releases/latest/download/<file>`, not
+`/releases/download/latest/<file>`. The first follows GitHub's "Latest" badge
+and does not involve a tag at all. The second needs a tag literally named
+`latest`, and this repository can never have one again - a release using that
+name was published while immutable releases was switched on, and GitHub
+reserves such a name permanently. Ordinary tags create fine; that one is gone.
+The badge URL is the better form regardless, since nothing has to be deleted
+and recreated to move it.
 
 > ### One thing to know before wiring up the version check
 >
@@ -76,8 +83,8 @@ confirm this — `HTTP 200`, ~67 MB. Default branch is `release`.
 | --- | --- |
 | Release tag | `latest` |
 | Asset | `TazUO-Holiday-Edition.zip` |
-| Direct download | `https://github.com/jma251/TazUO-Holiday-Edition/releases/download/latest/TazUO-Holiday-Edition.zip` |
-| API | `https://api.github.com/repos/jma251/TazUO-Holiday-Edition/releases/tags/latest` |
+| Direct download | `https://github.com/jma251/TazUO-Holiday-Edition/releases/latest/download/TazUO-Holiday-Edition.zip` |
+| API | `https://api.github.com/repos/jma251/TazUO-Holiday-Edition/releases/latest` |
 | Marked | normal release, carries the "Latest" badge |
 
 The `latest` release is **deleted and recreated** on every release build, so the
