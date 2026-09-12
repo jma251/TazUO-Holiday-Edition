@@ -161,13 +161,33 @@ namespace ClassicUO.Game.Managers
         public uint TargetSerial { get; set; }
         public TargetType ExpectedTargetType { get; set; }
         public CursorTarget ExpectedCursorTarget { get; set; }
-        public bool IsSet => TargetSerial != 0;
+        public long ExpiresAt { get; private set; }
 
-        public void Set(uint serial, TargetType targetType, CursorTarget cursorTarget)
+        /// <summary>
+        /// A queued automatic target used to wait forever. If the cursor it was
+        /// queued for never arrived - the cast fizzled, the server refused, the
+        /// item was gone - the entry stayed set and the next unrelated target
+        /// cursor consumed it. It now lapses on its own.
+        /// </summary>
+        public bool IsSet
+        {
+            get
+            {
+                if (TargetSerial != 0 && IsExpired((long) Time.Ticks, ExpiresAt))
+                {
+                    Clear();
+                }
+
+                return TargetSerial != 0;
+            }
+        }
+
+        public void Set(uint serial, TargetType targetType, CursorTarget cursorTarget, int timeoutMs = 5000)
         {
             TargetSerial = serial;
             ExpectedTargetType = targetType;
             ExpectedCursorTarget = cursorTarget;
+            ExpiresAt = (long) Time.Ticks + Math.Max(250, timeoutMs);
         }
 
         public void Clear()
@@ -175,7 +195,10 @@ namespace ClassicUO.Game.Managers
             TargetSerial = 0;
             ExpectedTargetType = TargetType.Cancel;
             ExpectedCursorTarget = CursorTarget.Invalid;
+            ExpiresAt = 0;
         }
+
+        internal static bool IsExpired(long now, long expiresAt) => expiresAt > 0 && now >= expiresAt;
     }
 
     public static class TargetManager
@@ -285,9 +308,9 @@ namespace ClassicUO.Game.Managers
             _targetCursorId = cursorID;
         }
 
-        public static void SetAutoTarget(uint serial, TargetType targetType, CursorTarget cursorTarget)
+        public static void SetAutoTarget(uint serial, TargetType targetType, CursorTarget cursorTarget, int timeoutMs = 5000)
         {
-            NextAutoTarget.Set(serial, targetType, cursorTarget);
+            NextAutoTarget.Set(serial, targetType, cursorTarget, timeoutMs);
         }
 
         public static void CancelTarget()
