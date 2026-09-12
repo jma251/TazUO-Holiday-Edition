@@ -625,6 +625,12 @@ namespace ClassicUO.Configuration
         /// </summary>
         public bool AutomationEnabled { get; set; } = true;
 
+        /// <summary>
+        /// Hue of the path preview tiles. Kept on the profile so the choice
+        /// survives a relog.
+        /// </summary>
+        public ushort PathPreviewHue { get; set; } = 0x0035;
+
         public bool UseOneHPBarForLastAttack { get; set; } = true;
 
         public bool DisableMouseInteractionOverheadText { get; set; } = false;
