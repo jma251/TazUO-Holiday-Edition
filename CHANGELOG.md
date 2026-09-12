@@ -2,16 +2,6 @@
 
 Notable changes to TazUO Holiday Edition.
 
-**This file is the release notes.** The release workflow publishes the section
-matching the version being released and nothing else, so what is written here
-is what people read on the download page.
-
-Write it for someone playing the game, not for someone reading the repository.
-What behaves differently, what stopped crashing, what is new. Work that
-cancels out - something tried and turned off again, a fix for a fix, a
-diagnostic added and removed - belongs in the history and not here. A release
-with three real lines is a better page than one with a hundred and seventy.
-
 Entries below 4.5.23xx are inherited from upstream TazUO.
 
 ---
