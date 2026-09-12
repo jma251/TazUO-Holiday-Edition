@@ -85,17 +85,32 @@ jobs:
           # every dev build said there was nothing in it.
           git fetch origin release --quiet || true
 
-          LOG=$(git log --no-merges --pretty=format:'- %s (%h)' origin/release..HEAD 2>/dev/null || true)
+          # Capped. This was the whole list, which is fifty-odd entries a few days
+          # after a release and only grows until the next one - a wall of text
+          # nobody reads, on the page someone lands on to fetch a test build.
+          # The most recent dozen, then a count and a link for anyone who wants
+          # the rest.
+          LIMIT=12
 
-          if [ -z "$LOG" ]; then
-            LOG="- Nothing here that is not already released."
+          ALL=$(git log --no-merges --pretty=format:'- %s (%h)' origin/release..HEAD 2>/dev/null || true)
+          COUNT=$(printf '%s' "$ALL" | grep -c '^- ' || true)
+
+          if [ -z "$ALL" ]; then
+            BODY="Nothing here that is not already released."
+          else
+            BODY=$(printf '%s\n' "$ALL" | head -n "$LIMIT")
+            if [ "$COUNT" -gt "$LIMIT" ]; then
+              REST=$((COUNT - LIMIT))
+              MORE="...and $REST more. [Full comparison](https://github.com/${{ github.repository }}/compare/release...dev)"
+              BODY="$BODY"$'\n\n'"$MORE"
+            fi
           fi
 
           {
             echo "NOTES<<HOLIDAY_NOTES_EOF"
-            echo "Ahead of \`release\` (not yet released):"
+            echo "### $COUNT change(s) ahead of \`release\`"
             echo ""
-            echo "$LOG"
+            echo "$BODY"
             echo "HOLIDAY_NOTES_EOF"
           } >> $GITHUB_ENV
 
