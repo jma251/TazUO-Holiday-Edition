@@ -186,10 +186,24 @@ jobs:
             <sub>.NET Framework 4.7.2 &middot; commit ${{ env.RELEASE_SHA }}</sub>
           tag: ${{ env.HOLIDAY_TAG }}
           commit: ${{ env.RELEASE_SHA }}
-          allowUpdates: false   # these are immutable once published
+          allowUpdates: false   # a numbered release is written once
           makeLatest: false     # the "latest" release keeps the badge
           prerelease: false
+          # Created as a draft and published a step later. A release that is
+          # published on creation is frozen by GitHub's immutable releases
+          # setting before its files finish uploading, and the upload is then
+          # refused - which is how the "latest" release came to exist on
+          # 2026-09-12 carrying no zip at all. A draft is not frozen, so the
+          # files land first and publishing comes after.
+          draft: true
           token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish the permanent release
+        if: env.SKIP_PERMANENT == 'false'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release edit "${{ env.HOLIDAY_TAG }}" --draft=false
 
       # Remove the previous "latest" release and its tag so the new one is
       # created fresh against this commit. Ignored if there isn't one yet.
@@ -221,7 +235,31 @@ jobs:
           allowUpdates: true      # reuse the existing "latest" release
           removeArtifacts: true   # drop the old zip before attaching the new one
           makeLatest: true
+          draft: true             # see the note above - upload, then publish
           token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish the "latest" release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release edit "${{ env.TAG_NAME }}" --draft=false
+
+      # The whole point of the release is the file. If it is not attached, the
+      # run must not report success - the download page looked fine on
+      # 2026-09-12 while serving nothing.
+      - name: Verify the zip is attached
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          for tag in "${{ env.TAG_NAME }}" "${{ env.HOLIDAY_TAG }}"; do
+            if ! gh release view "$tag" --json assets --jq '.assets[].name' 2>/dev/null | grep -qx "${{ env.CUO_ZIP_NAME }}"; then
+              echo "::error::${tag} has no ${{ env.CUO_ZIP_NAME }} attached."
+              exit 1
+            fi
+            echo "$tag: ${{ env.CUO_ZIP_NAME }} attached"
+          done
 
       # A numbered release is published once and its files never change. Its
       # notes can still be wrong - a typo, or a line that should not have been
