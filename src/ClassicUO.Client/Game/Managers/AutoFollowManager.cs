@@ -1,4 +1,4 @@
-#region license
+﻿#region license
 
 // Copyright (c) 2021, andreakarasho
 // All rights reserved.
@@ -29,6 +29,8 @@
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #endregion
+
+using ClassicUO.Game.GameObjects;
 
 namespace ClassicUO.Game.Managers
 {
