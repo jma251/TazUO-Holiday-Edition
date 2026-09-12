@@ -66,6 +66,11 @@ jobs:
           echo "VERSION=$(grep -oP '<AssemblyVersion>\K\d+\.\d+\.\d+' src/ClassicUO.Client/ClassicUO.Client.csproj | head -1)" >> $GITHUB_ENV
           echo "DEV_SHA=$(git rev-parse HEAD)" >> $GITHUB_ENV
           echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+          # The release is updated in place rather than recreated, so GitHub's
+          # "released this N hours ago" is the date it was first made and never
+          # moves. Without this there is nothing on the page that says when the
+          # build you are about to download was actually produced.
+          echo "BUILT_AT=$(date -u '+%Y-%m-%d %H:%M UTC')" >> $GITHUB_ENV
 
       # What is on legacy that has not been released yet. This is the useful
       # thing to read on a dev build: it is the list of what is being tested.
@@ -145,7 +150,7 @@ jobs:
         uses: ncipollo/release-action@v1.16.0
         with:
           artifacts: "${{ env.CUO_OUTPUT_PATH }}/${{ env.CUO_ZIP_NAME }}"
-          name: "TazUO Holiday Edition (dev) - v${{ env.VERSION }}"
+          name: "TazUO Holiday Edition (dev) - v${{ env.VERSION }} - ${{ env.BUILT_AT }} - ${{ env.SHORT_SHA }}"
           body: |
             **Testing build off the `legacy` branch. Not a release.**
 
@@ -166,3 +171,23 @@ jobs:
           makeLatest: false
           prerelease: true
           token: ${{ secrets.GITHUB_TOKEN }}
+
+      # allowUpdates rewrites the release and swaps the zip, but it will not
+      # repoint a tag that already exists - so the tag stayed on the commit it
+      # was first created from while the release moved on, and the release page
+      # showed a commit that had nothing to do with the download.
+      #
+      # This is a ref move, not a release publish. A tag name is reserved
+      # permanently by being PUBLISHED under an immutable release, which is what
+      # the old delete-and-recreate step did and what burned "latest" and
+      # "dev-latest". Moving a ref cannot do that, so this is safe to keep.
+      - name: Point the dev-build tag at the commit that was built
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api --method PATCH \
+            "repos/${{ github.repository }}/git/refs/tags/${{ env.TAG_NAME }}" \
+            -f sha='${{ env.DEV_SHA }}' -F force=true \
+            && echo "tag now at ${{ env.SHORT_SHA }}" \
+            || echo "::warning::could not move ${{ env.TAG_NAME }}; the zip is still correct."
