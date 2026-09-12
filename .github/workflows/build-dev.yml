@@ -59,6 +59,23 @@ jobs:
           git config --global url."https://".insteadOf git://
           git submodule update --init --recursive
 
+      # TEMPORARY probe - remove after reading the result. Tries to recreate the
+      # tag name "latest" now that release immutability is off and no draft or
+      # release holds it. Never fails the build.
+      - name: Probe whether the latest tag can be created
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "::group::probe: create refs/tags/latest"
+          gh api --method POST "repos/${{ github.repository }}/git/refs" \
+            -f ref='refs/tags/latest' \
+            -f sha="$(git rev-parse HEAD)" \
+            && echo "PROBE_RESULT=CREATED" \
+            || echo "PROBE_RESULT=REFUSED"
+          echo "::endgroup::"
+
       - name: Extract version and commit
         shell: bash
         run: |
