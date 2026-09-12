@@ -1,4 +1,4 @@
-#region license
+﻿#region license
 
 // Copyright (c) 2021, andreakarasho
 // All rights reserved.
@@ -88,6 +88,18 @@ namespace ClassicUO.Network
         private readonly CircularBuffer _buffer = new CircularBuffer();
         private readonly CircularBuffer _pluginsBuffer = new CircularBuffer();
 
+        /// <summary>
+        /// Whether the front of the buffer holds a packet that can be read now,
+        /// the start of one whose remaining bytes have not arrived, or something
+        /// that cannot be a packet at all.
+        /// </summary>
+        internal enum PacketReadStatus
+        {
+            Complete,
+            Incomplete,
+            Malformed
+        }
+
         public int ParsePackets(Span<byte> data)
         {
             Append(data, false);
@@ -105,30 +117,40 @@ namespace ClassicUO.Network
 
                 while (stream.Length > 0)
                 {
-                    if (
-                        !GetPacketInfo(
-                            stream,
-                            stream.Length,
-                            out var packetID,
-                            out int offset,
-                            out int packetlength
-                        )
-                    )
+                    PacketReadStatus status = GetPacketInfo(
+                        stream,
+                        stream.Length,
+                        out var packetID,
+                        out int offset,
+                        out int packetlength
+                    );
+
+                    if (status == PacketReadStatus.Incomplete)
                     {
+                        // The rest of the header has not arrived. Normal for TCP,
+                        // and not worth a line in the log on every partial read.
+                        break;
+                    }
+
+                    if (status == PacketReadStatus.Malformed)
+                    {
+                        // The length came off the wire and is smaller than the
+                        // header it follows, so the stream is no longer aligned to
+                        // packet boundaries. Waiting cannot fix that: the bad bytes
+                        // stay at the front and everything behind them queues up
+                        // forever. Drop what is buffered and resynchronise.
                         Log.Warn(
-                            $"Invalid ID: {packetID:X2} | off: {offset} | len: {packetlength} | stream.pos: {stream.Length}"
+                            $"Malformed packet, resynchronising. ID: {packetID:X2} | off: {offset} | len: {packetlength} | stream.pos: {stream.Length}"
                         );
+
+                        stream.Clear();
 
                         break;
                     }
 
                     if (stream.Length < packetlength)
                     {
-                        Log.Warn(
-                            $"need more data ID: {packetID:X2} | off: {offset} | len: {packetlength} | stream.pos: {stream.Length}"
-                        );
-
-                        // need more data
+                        // Header read, body still arriving.
                         break;
                     }
 
@@ -194,7 +216,7 @@ namespace ClassicUO.Network
             }
         }
 
-        private static bool GetPacketInfo(
+        internal static PacketReadStatus GetPacketInfo(
             CircularBuffer buffer,
             int bufferLen,
             out byte packetID,
@@ -208,7 +230,7 @@ namespace ClassicUO.Network
                 packetLen = 0;
                 packetOffset = 0;
 
-                return false;
+                return PacketReadStatus.Incomplete;
             }
 
             packetLen = PacketsTable.GetPacketLength(packetID = buffer[0]);
@@ -218,7 +240,7 @@ namespace ClassicUO.Network
             {
                 if (bufferLen < 3)
                 {
-                    return false;
+                    return PacketReadStatus.Incomplete;
                 }
 
                 var b0 = buffer[1];
@@ -228,7 +250,13 @@ namespace ClassicUO.Network
                 packetOffset = 3;
             }
 
-            return true;
+            // A packet cannot be shorter than the header it just declared. Nothing
+            // in PacketsTable is, but a variable-length packet takes its length
+            // from the wire, so this is the one number here that a desynchronised
+            // or hostile stream controls.
+            return packetLen < packetOffset
+                ? PacketReadStatus.Malformed
+                : PacketReadStatus.Complete;
         }
 
         static PacketHandlers()
