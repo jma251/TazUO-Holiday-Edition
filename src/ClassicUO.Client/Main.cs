@@ -106,7 +106,14 @@ namespace ClassicUO
 
                 using (LogFile crashfile = new LogFile(path, "crash.txt"))
                 {
-                    crashfile.WriteAsync(sb.ToString()).RunSynchronously();
+                    // Write, not WriteAsync().RunSynchronously(). RunSynchronously is only
+                    // valid on a task built from a delegate and not yet started; the task an
+                    // async method hands back is already running, so the call threw
+                    // InvalidOperationException instead of writing anything - inside the
+                    // unhandled-exception handler, where there is nothing left to catch it.
+                    // crash.txt was never produced. The synchronous overload is what this
+                    // wanted: the process is ending, so there is nothing to await on.
+                    crashfile.Write(sb.ToString());
                 }
             };
 
