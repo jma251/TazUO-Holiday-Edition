@@ -55,7 +55,14 @@ namespace ClassicUO.Game.Managers
             new Feature("AutoCloseEmptyCorpse", AutoCloseEmptyCorpse.Tick, () => AutoCloseEmptyCorpse.Enabled),
             new Feature("AutoOpenBackpack", AutoOpenBackpackManager.Tick, () => AutoOpenBackpackManager.Enabled),
             new Feature("AutoVendorClose", AutoVendorCloseManager.Tick, () => AutoVendorCloseManager.Enabled),
-            new Feature("AutoOpenPaperdoll", AutoOpenPaperdollManager.Tick, () => AutoOpenPaperdollManager.Enabled)
+            new Feature("AutoOpenPaperdoll", AutoOpenPaperdollManager.Tick, () => AutoOpenPaperdollManager.Enabled),
+            new Feature("BandageSettings", BandageSettings.Tick),
+            // These two keep polling while off: a skill threshold can switch them
+            // on by itself once the server has sent skill values.
+            new Feature("AutoBandage", AutoBandageManager.Tick),
+            new Feature("PetBandage", PetBandageManager.Tick),
+            new Feature("ExternalBandage", ExternalBandageManager.Tick, () => ExternalBandageManager.Enabled),
+            new Feature("BandageStockWarn", BandageStockWarner.Tick, () => BandageStockWarner.Enabled)
         };
 
         private static long _nextTick;
@@ -68,6 +75,20 @@ namespace ClassicUO.Game.Managers
             }
 
             _nextTick = (long) Time.Ticks + INTERVAL_MS;
+
+            // The pet snapshot is rebuilt here rather than on its own timer.
+            // MW Edition rebuilds at 20Hz because a dozen of his overlays read
+            // it between frames; the only readers here are the bandage helpers
+            // below, which run at this rate, so a fresher copy would be three
+            // passes over every mobile that nothing looks at.
+            if (UI.MobileCache.IsNeeded)
+            {
+                FeatureDiagnostics.Guard("MobileCache", UI.MobileCache.Rebuild);
+            }
+            else
+            {
+                UI.MobileCache.Clear();
+            }
 
             foreach (Feature feature in _features)
             {
@@ -90,6 +111,7 @@ namespace ClassicUO.Game.Managers
         {
             FeatureDiagnostics.Guard("AutoHitList:Save", AutoHitListManager.Save);
             FeatureDiagnostics.Guard("Toast:Save", UI.Gumps.ToastManager.Save);
+            FeatureDiagnostics.Guard("Bandage:Save", BandageSettings.Save);
         }
 
         /// <summary>
@@ -105,6 +127,13 @@ namespace ClassicUO.Game.Managers
             FeatureDiagnostics.ResetSession();
 
             AutoHitListManager.ResetForProfile();
+            AutoBandageManager.ResetForProfile();
+            PetBandageManager.ResetForProfile();
+            ExternalBandageManager.ResetForProfile();
+            BandageStockWarner.ResetForProfile();
+            BandageScheduler.ResetForProfile();
+            BandageSettings.ResetForProfile();
+            UI.MobileCache.Clear();
             UI.Gumps.ToastManager.ResetForProfile();
 
             AfkReplyManager.ResetSession();
