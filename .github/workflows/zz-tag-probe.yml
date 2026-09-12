@@ -39,6 +39,19 @@ jobs:
           }
 
           echo "=================================================="
+          echo "Clearing every release that claims the tag 'latest':"
+          gh api "repos/$R/releases" --paginate \
+            --jq '.[] | select(.tag_name=="latest") | .id' \
+            | while read -r id; do
+                [ -z "$id" ] && continue
+                gh api --method DELETE "repos/$R/releases/$id" && echo "  deleted release $id"
+              done
+          echo "  remaining:"
+          gh api "repos/$R/releases" --paginate \
+            --jq '.[] | select(.tag_name=="latest") | "    id=\(.id) draft=\(.draft)"' || true
+
+          echo
+          echo "=================================================="
           echo "Can this repo create tags at all?"
           probe_tag "zz-probe-ordinary"
 
