@@ -920,6 +920,7 @@ namespace ClassicUO.Game.Managers
         }
 
         private static StreamWriter _log;
+        private static string _logPath;
         private static bool _logResolved;
 
         /// <summary>
@@ -964,6 +965,7 @@ namespace ClassicUO.Game.Managers
                     );
 
                     _log = new StreamWriter(stream) { AutoFlush = false };
+                    _logPath = path;
 
                     if (fresh)
                     {
@@ -1013,6 +1015,47 @@ namespace ClassicUO.Game.Managers
             log.Flush();
 
             _buffer.Clear();
+
+            RollLocked(log);
+        }
+
+        private const long MaxBytes = 25 * 1024 * 1024;
+
+        /// <summary>
+        /// The cap is checked after every flush, rather than when the file is opened.
+        ///
+        /// Checking it at open meant checking it once a session, so the limit held across
+        /// restarts and did nothing at all while playing - one session reached five
+        /// hundred megabytes against this same twenty-five. The rewrite that split the
+        /// writer out then dropped the check altogether, so there has been no cap since.
+        ///
+        /// One generation is kept. A house log gets read while the problem is still on
+        /// screen, so the previous file is worth having and the one before it is not.
+        /// </summary>
+        private static void RollLocked(StreamWriter log)
+        {
+            if (_logPath == null || log.BaseStream.Length <= MaxBytes)
+            {
+                return;
+            }
+
+            string previous = _logPath + ".1";
+
+            log.Dispose();
+
+            _log = null;
+            _logResolved = false;
+
+            try
+            {
+                File.Delete(previous);
+                File.Move(_logPath, previous);
+            }
+            catch (IOException)
+            {
+                // Held open by something else - a tail, an editor. The next flush
+                // reopens the same name and appends, and tries the roll again.
+            }
         }
 
     }
