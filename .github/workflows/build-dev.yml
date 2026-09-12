@@ -30,7 +30,12 @@ env:
   CUO_ZIP_NAME: 'HolidayEdition-Dev.zip'
   # Not "dev": a tag by that name would collide with the inherited dev branch and
   # make "git checkout dev" ambiguous.
-  TAG_NAME: 'dev-latest'
+  # Never reuse a tag name a release has already published under. GitHub
+  # reserves such a name permanently - "tag_name was used by an immutable
+  # release" - and no setting undoes it. "latest" and "dev-latest" are both
+  # spent. This one is created once, below, and then never deleted, so it
+  # cannot be spent in turn.
+  TAG_NAME: 'dev-build'
 
   DOTNET_NOLOGO: true
   DOTNET_CLI_TELEMETRY_OPTOUT: 1
@@ -69,9 +74,12 @@ jobs:
         run: |
           export LC_ALL=C.UTF-8
 
-          git fetch origin legacy --quiet || true
+          # Against release, not legacy. This ran as origin/legacy..HEAD, which
+          # on a legacy build is the branch against itself - always empty, so
+          # every dev build said there was nothing in it.
+          git fetch origin release --quiet || true
 
-          LOG=$(git log --no-merges --pretty=format:'- %s (%h)' origin/legacy..HEAD 2>/dev/null || true)
+          LOG=$(git log --no-merges --pretty=format:'- %s (%h)' origin/release..HEAD 2>/dev/null || true)
 
           if [ -z "$LOG" ]; then
             LOG="- Nothing here that is not already released."
@@ -79,7 +87,7 @@ jobs:
 
           {
             echo "NOTES<<HOLIDAY_NOTES_EOF"
-            echo "Ahead of \`legacy\` (not yet released):"
+            echo "Ahead of \`release\` (not yet released):"
             echo ""
             echo "$LOG"
             echo "HOLIDAY_NOTES_EOF"
@@ -125,16 +133,12 @@ jobs:
           filename: ${{ env.CUO_ZIP_NAME }}
           exclusions: '*.zip'
 
-      # Replaced every build, same as "latest" is on the release side. Only the
-      # dev-latest tag is ever touched here; Holiday tags are never deleted, and
-      # neither is the "latest" release.
-      - name: Delete previous dev release
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release delete "${{ env.TAG_NAME }}" --yes --cleanup-tag || echo "No previous dev release to delete."
-
+      # There is deliberately no delete step here. Deleting and recreating a
+      # release under a fixed tag is what burned "latest" and then "dev-latest":
+      # each recreate publishes the name afresh, and one of those publishes
+      # reserves it forever. allowUpdates edits the release that is already
+      # there, and removeArtifacts drops the previous zip off it, which gets the
+      # same rolling download without ever republishing the tag.
       # prerelease + makeLatest:false keep the "Latest" badge on the release
       # download, so nobody grabs a dev build by accident.
       - name: Publish dev release
