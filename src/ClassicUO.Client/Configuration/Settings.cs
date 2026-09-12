@@ -1,4 +1,4 @@
-﻿#region license
+#region license
 
 // Copyright (c) 2021, andreakarasho
 // All rights reserved.
@@ -129,6 +129,7 @@ namespace ClassicUO.Configuration
         // Data/houselog.txt. Global rather than per-profile so it applies to every
         // character. Remove with HouseDiagnostics once the cause is known.
         [JsonPropertyName("log_house_diagnostics")] public bool LogHouseDiagnostics { get; set; } = false;
+        [JsonPropertyName("log_packets")] public bool LogPackets { get; set; } = false;
 
         // What the client asks the server to send, and what it keeps. Held at what the
         // server actually maintains: measured on this shard at 24, mobiles entering and

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Text;
 using System.Text.Json;
@@ -465,6 +465,7 @@ namespace ClassicUO.Configuration
             public string DisableCtrlQWMessageHistory { get; set; } = "Disable Ctrl + Q/W (message history)";
             public string DisableRightLeftClickAutoMove { get; set; } = "Disable right + left click auto move";
             public string LogHouseDiagnostics { get; set; } = "Log house loading diagnostics to Data/houselog.txt";
+            public string LogPackets { get; set; } = "Log every network packet to Logs/Network/packets.log (large, and it grows without a cap)";
             public string ClientViewRange { get; set; } = "View range - how far the client keeps what the server sent (match your shard, 24 is typical)";
             public string RecoverHouseContents { get; set; } = "Auto-resync a house that comes back empty (off = use a Resync macro by hand)";
             public string HouseLoadRange { get; set; } = "House keep range - how far away a loaded house is held before it is dropped (the server decides how early one arrives)";

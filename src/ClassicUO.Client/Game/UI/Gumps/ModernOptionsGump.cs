@@ -1,4 +1,4 @@
-﻿using ClassicUO.Assets;
+using ClassicUO.Assets;
 using ClassicUO.Configuration;
 using ClassicUO.Game.Data;
 using ClassicUO.Game.Managers;
@@ -2367,6 +2367,34 @@ namespace ClassicUO.Game.UI.Gumps
                 (s = new SettingsOption
                 (
                     "", new CheckboxWithLabel(lang.GetExperimental.LogHouseDiagnostics, 0, Settings.GlobalSettings.LogHouseDiagnostics, (b) => { Settings.GlobalSettings.LogHouseDiagnostics = b; }),
+                    MainContent.RightWidth, (int)PAGE.Experimental
+                )
+            ).FullControl);
+
+            PositionHelper.PositionControl(s.FullControl);
+            PositionHelper.BlankLine();
+
+            // Dev-only: writes Logs/Network/packets.log, both directions. Until now it
+            // could only be switched on with a -packetlog command line argument, which
+            // is no use when the thing to capture has already started happening.
+            //
+            // Enabling opens the file immediately so a capture can begin mid-session.
+            // There is no size cap on it, unlike houselog.txt - leaving it on will fill
+            // a disk, so it is worth switching off once a capture is taken.
+            scroll.Add
+            (
+                (s = new SettingsOption
+                (
+                    "", new CheckboxWithLabel(lang.GetExperimental.LogPackets, 0, Settings.GlobalSettings.LogPackets, (b) =>
+                    {
+                        Settings.GlobalSettings.LogPackets = b;
+                        PacketLogger.Default.Enabled = b;
+
+                        if (b)
+                        {
+                            PacketLogger.Default.CreateFile();
+                        }
+                    }),
                     MainContent.RightWidth, (int)PAGE.Experimental
                 )
             ).FullControl);

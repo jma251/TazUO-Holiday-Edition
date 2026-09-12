@@ -130,6 +130,18 @@ namespace ClassicUO
             _filter = HandleSdlEvent;
             SDL_SetEventFilter(_filter, IntPtr.Zero);
 
+#if HOLIDAY_DEV
+            // Carry the saved packet-log setting into this session. Without this the
+            // option in Experimental would only last until the client was closed,
+            // because -packetlog on the command line was the only thing that ever set
+            // PacketLogger.Enabled.
+            if (Settings.GlobalSettings.LogPackets)
+            {
+                Network.PacketLogger.Default.Enabled = true;
+                Network.PacketLogger.Default.CreateFile();
+            }
+#endif
+
             base.Initialize();
         }
 
