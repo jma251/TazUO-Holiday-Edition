@@ -173,6 +173,7 @@ jobs:
       # accumulate to form the rollback history. makeLatest is false so the
       # "Latest" badge stays on the "latest" release below.
       - name: Publish permanent Holiday release
+        id: permanent_release
         if: env.SKIP_PERMANENT == 'false'
         uses: ncipollo/release-action@v1.16.0
         with:
@@ -203,20 +204,37 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release edit "${{ env.HOLIDAY_TAG }}" --draft=false
+        run: |
+          gh api --method PATCH \
+            "repos/${{ github.repository }}/releases/${{ steps.permanent_release.outputs.id }}" \
+            -F draft=false --jq '.html_url'
 
       # Remove the previous "latest" release and its tag so the new one is
       # created fresh against this commit. Ignored if there isn't one yet.
       # Only the "latest" tag is touched - Holiday tags are never deleted.
+      # By id, not by tag. A draft release has no tag yet, so `gh release
+      # delete latest` walks straight past one and the next run adds a second.
       - name: Delete previous "latest" release
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release delete "${{ env.TAG_NAME }}" --yes --cleanup-tag || echo "No previous release to delete."
+          set -euo pipefail
+
+          gh api "repos/${{ github.repository }}/releases" --paginate \
+            --jq '.[] | select(.tag_name=="${{ env.TAG_NAME }}") | .id' \
+            | while read -r id; do
+                [ -z "$id" ] && continue
+                gh api --method DELETE "repos/${{ github.repository }}/releases/$id"
+                echo "deleted release $id"
+              done
+
+          git push origin --delete "${{ env.TAG_NAME }}" 2>/dev/null \
+            || echo "No ${{ env.TAG_NAME }} tag to remove."
 
       # Create the single "latest" release with the freshly built zip.
       - name: Publish "latest" release
+        id: latest_release
         uses: ncipollo/release-action@v1.16.0
         with:
           artifacts: "${{ env.CUO_OUTPUT_PATH }}/${{ env.CUO_ZIP_NAME }}"
@@ -238,11 +256,18 @@ jobs:
           draft: true             # see the note above - upload, then publish
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      # By id for the same reason the delete is: `gh release edit <tag>`
+      # cannot find a draft, because the tag does not exist until it is
+      # published. That is what failed on 2026-09-12 and left the zip sitting
+      # in an unpublished draft.
       - name: Publish the "latest" release
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release edit "${{ env.TAG_NAME }}" --draft=false
+        run: |
+          gh api --method PATCH \
+            "repos/${{ github.repository }}/releases/${{ steps.latest_release.outputs.id }}" \
+            -F draft=false --jq '.html_url'
 
       # The whole point of the release is the file. If it is not attached, the
       # run must not report success - the download page looked fine on
