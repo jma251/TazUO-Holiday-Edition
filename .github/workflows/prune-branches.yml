@@ -53,10 +53,10 @@ jobs:
           # The branches that stay. Four are the repository's own; the other
           # three hold a commit that exists nowhere else and is wanted.
           printf '%s\n' \
-            legacy \
-            release \
-            main \
             dev \
+            release \
+            upstream-main \
+            upstream-dev \
             add/artifact-names \
             claude/draw-ceiling-gate \
             claude/music-era-path-log \
@@ -82,7 +82,7 @@ jobs:
           echo
           echo "Commits unique to these branches, if any - the only thing a"
           echo "delete could cost. Empty is the usual answer:"
-          git branch -r --no-merged origin/legacy \
+          git branch -r --no-merged origin/dev \
             | grep -v HEAD | sed 's|origin/||' | tr -d ' ' \
             | sort | comm -12 - doomed.txt \
             | sed 's/^/  /' || true

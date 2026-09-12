@@ -1,6 +1,6 @@
 name: Build Dev
 
-# Builds the development branch, legacy, and publishes it as a separate,
+# Builds the development branch, dev, and publishes it as a separate,
 # disposable download for testing. It is deliberately kept away from the
 # release path: it never touches the "latest" release and never mints a
 # numbered version. Only build-release.yml, running off release, does either.
@@ -8,14 +8,14 @@ name: Build Dev
 on:
   # Every push to the development branch produces a fresh testable client.
   push:
-    branches: [legacy]
+    branches: [dev]
   # Allow starting a dev build by hand from the Actions tab.
   workflow_dispatch:
 
-# Separate from build-legacy's group on purpose: a dev build must never cancel
+# Separate from build-release's group on purpose: a dev build must never cancel
 # a release build, or the other way round.
 concurrency:
-  group: build-legacy
+  group: build-holiday-dev
   cancel-in-progress: true
 
 permissions:
@@ -47,11 +47,11 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      # Always build legacy, whether triggered by push or by hand.
-      - name: Check out legacy branch
+      # Always build dev, whether triggered by push or by hand.
+      - name: Check out dev branch
         uses: actions/checkout@v4
         with:
-          ref: legacy
+          ref: dev
           fetch-depth: 0
 
       - name: Check out submodules (recursive)
@@ -72,15 +72,16 @@ jobs:
           # build you are about to download was actually produced.
           echo "BUILT_AT=$(date -u '+%Y-%m-%d %H:%M UTC')" >> $GITHUB_ENV
 
-      # What is on legacy that has not been released yet. This is the useful
+      # What is on dev that has not been released yet. This is the useful
       # thing to read on a dev build: it is the list of what is being tested.
       - name: Build release notes
         shell: bash
         run: |
           export LC_ALL=C.UTF-8
 
-          # Against release, not legacy. This ran as origin/legacy..HEAD, which
-          # on a legacy build is the branch against itself - always empty, so
+          # Against release, not the dev branch. This ran as origin/legacy..HEAD
+          # back when dev was called legacy - the branch against itself, always
+          # empty, so
           # every dev build said there was nothing in it.
           git fetch origin release --quiet || true
 
@@ -152,7 +153,7 @@ jobs:
           artifacts: "${{ env.CUO_OUTPUT_PATH }}/${{ env.CUO_ZIP_NAME }}"
           name: "TazUO Holiday Edition (dev) - v${{ env.VERSION }} - ${{ env.BUILT_AT }} - ${{ env.SHORT_SHA }}"
           body: |
-            **Testing build off the `legacy` branch. Not a release.**
+            **Testing build off the `dev` branch. Not a release.**
 
             Unfinished and unconfirmed work lands here first. If you want the
             stable client, use the `latest` release instead.

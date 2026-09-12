@@ -11,9 +11,12 @@ on:
   # Allow starting a build by hand from the Actions tab.
   workflow_dispatch:
 
-# Only one legacy build at a time; a newer push cancels an in-progress one.
+# Only one release build at a time; a newer push cancels an in-progress one.
+# This group is deliberately not the dev build's. Both workflows used to say
+# "build-legacy", so despite a comment on each claiming they were separate, a
+# dev build and a release build shared a group and could cancel one another.
 concurrency:
-  group: build-legacy
+  group: build-holiday-release
   cancel-in-progress: true
 
 # Needed so the workflow can create/replace the "latest" release and tag.
