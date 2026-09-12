@@ -86,6 +86,43 @@ jobs:
 
           echo "HOLIDAY_TAG=v${VERSION}" >> $GITHUB_ENV
 
+      # The notes are whatever CHANGELOG.md holds under the heading for this
+      # version, and nothing else.
+      #
+      # They used to be `git log` over every commit since the previous tag. On
+      # 4.5.2301 that was 175 lines and included a change sitting directly
+      # above the commit reverting it, which is exactly the work a release page
+      # should not show. A person decides what is notable; this only publishes
+      # the decision.
+      #
+      # No section means no notes. The workflow says so in its log and carries
+      # on - an empty release page beats an accurate list of churn.
+      - name: Read the release notes from CHANGELOG.md
+        shell: bash
+        run: |
+          export LC_ALL=C.UTF-8
+
+          NOTES=""
+
+          if [ -f CHANGELOG.md ]; then
+            NOTES=$(awk -v ver="$VERSION" '
+              $0 ~ ("^## \\[" ver "\\]") { grab = 1; next }
+              grab && /^## \[/ { exit }
+              grab && /^---[ \t]*$/ { next }
+              grab { print }
+            ' CHANGELOG.md | sed -e '/./,$!d')
+          fi
+
+          if [ -z "$NOTES" ]; then
+            echo "::notice::No CHANGELOG.md section for ${VERSION}; publishing without notes."
+          fi
+
+          {
+            echo "NOTES<<HOLIDAY_NOTES_EOF"
+            echo "$NOTES"
+            echo "HOLIDAY_NOTES_EOF"
+          } >> $GITHUB_ENV
+
       # The .NET 8 SDK can build/publish the net472 target on Windows.
       - name: Setup .NET SDK
         uses: actions/setup-dotnet@v4
@@ -144,6 +181,8 @@ jobs:
           body: |
             Download `${{ env.CUO_ZIP_NAME }}` below, unzip it, and run `ClassicUO.exe`.
 
+            ${{ env.NOTES }}
+
             <sub>.NET Framework 4.7.2 &middot; commit ${{ env.RELEASE_SHA }}</sub>
           tag: ${{ env.HOLIDAY_TAG }}
           commit: ${{ env.RELEASE_SHA }}
@@ -174,6 +213,8 @@ jobs:
             This release always points at the newest build, so its download URL never
             changes. For a fixed copy of this version, use [`${{ env.HOLIDAY_TAG }}`](../../releases/tag/${{ env.HOLIDAY_TAG }}).
 
+            ${{ env.NOTES }}
+
             <sub>.NET Framework 4.7.2 &middot; commit ${{ env.RELEASE_SHA }}</sub>
           tag: ${{ env.TAG_NAME }}
           commit: ${{ env.RELEASE_SHA }}
@@ -181,3 +222,22 @@ jobs:
           removeArtifacts: true   # drop the old zip before attaching the new one
           makeLatest: true
           token: ${{ secrets.GITHUB_TOKEN }}
+
+      # A numbered release is published once and its files never change. Its
+      # notes can still be wrong - a typo, or a line that should not have been
+      # there - and rewriting CHANGELOG.md should be enough to correct it
+      # without cutting a new version. This touches the body only; the assets
+      # and the tag are not involved.
+      - name: Refresh the notes on an already-published version
+        if: env.SKIP_PERMANENT == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          printf '%s\n\n%s\n\n%s\n' \
+            "Download \`${{ env.CUO_ZIP_NAME }}\` below, unzip it, and run \`ClassicUO.exe\`." \
+            "${{ env.NOTES }}" \
+            "<sub>.NET Framework 4.7.2 &middot; commit ${{ env.RELEASE_SHA }}</sub>" \
+            | gh release edit "${{ env.HOLIDAY_TAG }}" --notes-file -
+
+          echo "::notice::Refreshed the notes on ${{ env.HOLIDAY_TAG }}."
