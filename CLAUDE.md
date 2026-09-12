@@ -152,6 +152,20 @@ Notes:
   hardcoded `HintPath`s into `Program Files (x86)\Reference Assemblies` for
   `System.Net.Http` and `System.Windows.Forms`. Build on Windows.
 
+### What ships in the zip
+
+A Windows client and nothing else, since 2026-09-12. It used to carry the
+macOS and Linux runtimes too - `osx/`, `lib64/`, and the Mono launchers in
+`tools/monokickstart` including 22 MB of Linux debug symbols, the largest
+single file in the download. That was 110 MB of 176 MB uncompressed, for
+platforms this cannot be built for: the client csproj has hardcoded HintPaths
+into `Program Files (x86)`, and both workflows run on `windows-latest`.
+
+Build with `-p:IncludeNonWindowsRuntimes=true` to put them back.
+
+`x64/` is never conditional. The FNA natives live there and the client exits
+on launch without them.
+
 ### Native libraries — the thing that breaks launches
 
 The client is useless without the FNA natives: **SDL2, FNA3D, and FAudio**.
