@@ -3,7 +3,7 @@ name: Build Dev
 # Builds the development branch, legacy, and publishes it as a separate,
 # disposable download for testing. It is deliberately kept away from the
 # release path: it never touches the "latest" release and never mints a
-# numbered version. Only build-legacy.yml, running off release, does either.
+# numbered version. Only build-release.yml, running off release, does either.
 
 on:
   # Every push to the development branch produces a fresh testable client.

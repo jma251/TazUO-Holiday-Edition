@@ -37,9 +37,8 @@ jobs:
 
     steps:
       # Always build the release branch, whether triggered by push or by hand.
-      # fetch-depth: 0 pulls full history and all tags. Both are required: the
-      # Holiday increment is derived from existing tags, and the release notes
-      # need the commit range since the previous Holiday tag.
+      # fetch-depth: 0 pulls full history and all tags, which the tag check
+      # below needs to tell an already-released version from a new one.
       - name: Check out release branch
         uses: actions/checkout@v4
         with:
@@ -77,11 +76,6 @@ jobs:
         run: |
           export LC_ALL=C.UTF-8
 
-          # Highest existing release tag, semver-ordered, ignoring the rolling
-          # "latest"/"dev-latest" tags and the retired v<base>-hN series.
-          PREV=$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' | grep -Ev -- '-h[0-9]+$' | sort -V | tail -1)
-          echo "PREV_TAG=$PREV" >> $GITHUB_ENV
-
           if git rev-parse -q --verify "refs/tags/v${VERSION}" >/dev/null; then
             echo "::notice::v${VERSION} is already released. Refreshing 'latest' only."
             echo "::notice::To publish a new numbered release, raise <AssemblyVersion> in src/ClassicUO.Client/ClassicUO.Client.csproj."
@@ -91,33 +85,6 @@ jobs:
           fi
 
           echo "HOLIDAY_TAG=v${VERSION}" >> $GITHUB_ENV
-
-      # Collect the commits since the previous Holiday build so each release's
-      # notes read as a running list of what changed.
-      - name: Build release notes
-        shell: bash
-        run: |
-          export LC_ALL=C.UTF-8
-
-          if [ -n "$PREV_TAG" ]; then
-            HEADER="Changes since \`${PREV_TAG}\`:"
-            LOG=$(git log --no-merges --pretty=format:'- %s (%h)' "${PREV_TAG}..HEAD")
-          else
-            HEADER="Recent changes (first release of v${VERSION}):"
-            LOG=$(git log --no-merges -20 --pretty=format:'- %s (%h)')
-          fi
-
-          if [ -z "$LOG" ]; then
-            LOG="- No new commits since the previous build."
-          fi
-
-          {
-            echo "NOTES<<HOLIDAY_NOTES_EOF"
-            echo "$HEADER"
-            echo ""
-            echo "$LOG"
-            echo "HOLIDAY_NOTES_EOF"
-          } >> $GITHUB_ENV
 
       # The .NET 8 SDK can build/publish the net472 target on Windows.
       - name: Setup .NET SDK
@@ -175,14 +142,9 @@ jobs:
           artifacts: "${{ env.CUO_OUTPUT_PATH }}/${{ env.CUO_ZIP_NAME }}"
           name: "TazUO Holiday Edition ${{ env.HOLIDAY_TAG }}"
           body: |
-            Permanent release off the `release` branch (.NET Framework 4.7.2).
-
-            - Version: `${{ env.HOLIDAY_TAG }}`
-            - Commit: ${{ env.RELEASE_SHA }}
-
             Download `${{ env.CUO_ZIP_NAME }}` below, unzip it, and run `ClassicUO.exe`.
 
-            ${{ env.NOTES }}
+            <sub>.NET Framework 4.7.2 &middot; commit ${{ env.RELEASE_SHA }}</sub>
           tag: ${{ env.HOLIDAY_TAG }}
           commit: ${{ env.RELEASE_SHA }}
           allowUpdates: false   # these are immutable once published
@@ -207,16 +169,12 @@ jobs:
           artifacts: "${{ env.CUO_OUTPUT_PATH }}/${{ env.CUO_ZIP_NAME }}"
           name: "TazUO Holiday Edition (latest) - ${{ env.HOLIDAY_TAG }}"
           body: |
-            Automated build of the `release` branch (.NET Framework 4.7.2).
-            This release always points at the newest build; its download URL never changes.
-
-            - Version: `${{ env.HOLIDAY_TAG }}`
-            - Permanent copy, for rollback: `${{ env.HOLIDAY_TAG }}`
-            - Commit: ${{ env.RELEASE_SHA }}
-
             Download `${{ env.CUO_ZIP_NAME }}` below, unzip it, and run `ClassicUO.exe`.
 
-            ${{ env.NOTES }}
+            This release always points at the newest build, so its download URL never
+            changes. For a fixed copy of this version, use [`${{ env.HOLIDAY_TAG }}`](../../releases/tag/${{ env.HOLIDAY_TAG }}).
+
+            <sub>.NET Framework 4.7.2 &middot; commit ${{ env.RELEASE_SHA }}</sub>
           tag: ${{ env.TAG_NAME }}
           commit: ${{ env.RELEASE_SHA }}
           allowUpdates: true      # reuse the existing "latest" release

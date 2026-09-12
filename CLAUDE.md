@@ -173,7 +173,7 @@ the build if any of the three is missing.
 Two workflows build this fork, one per branch. They are deliberately separate:
 the dev one must never be able to touch what users download.
 
-`.github/workflows/build-legacy.yml` — **the release path**:
+`.github/workflows/build-release.yml` — **the release path**:
 
 - Triggers on push to `release`, or manually from the Actions tab.
 - Builds on `windows-latest`, checks out submodules recursively, publishes the
@@ -185,7 +185,7 @@ the dev one must never be able to touch what users download.
 **It is the only workflow here that publishes a release to users, and the only
 one that publishes a numbered version. It should stay that way.**
 
-`.github/workflows/build-legacy-dev.yml` — **the testing path**:
+`.github/workflows/build-dev.yml` — **the testing path**:
 
 - Triggers on push to `legacy`, or manually.
 - Same build and the same hard-fail check on the natives, so a dev build is a
@@ -267,34 +267,34 @@ Only `latest` and `dev-latest` are ever deleted
 `makeLatest: false` on the permanent release keeps the "Latest" badge on
 `latest`.
 
-Both releases' notes carry the commit SHA and the commits since the previous
-release, so the releases page reads as a running changelog.
+Neither release carries a changelog. The notes are the download line and a
+footnote with the framework and the commit, and nothing else. They used to be
+`git log` over every commit since the previous tag, which ran to 175 lines on
+4.5.2301 - merge commits, a missing `using`, a change sitting directly above
+its own revert - and pushed the download link and the assets below the fold.
+The history, the pull requests and the tags are where that detail belongs.
 
-The other deploy workflows (`net472-deploy.yml`, `net9-deploy.yml`,
-`tuo-deploy.yml`, `tuo-dev-deploy.yml`) are inherited from upstream and target
-upstream's repo/Discord. They have been deliberately reduced to
-`workflow_dispatch:` only — **do not re-add their `workflow_run:` triggers.**
-They used to chain off `Build-Test` completing:
+Four inherited deploy workflows — `net472-deploy.yml`, `net9-deploy.yml`,
+`tuo-deploy.yml`, `tuo-dev-deploy.yml` — were **deleted**. They were upstream's
+publishing paths, aimed at upstream's repository and Discord, and had been
+sitting reduced to `workflow_dispatch:` since the fork. Three of them needed a
+`DISCORDWEBHOOK` secret that does not exist here and one built a framework this
+fork does not target, so every one of them would have failed if anyone had ever
+pressed the button.
 
-- `net472-deploy.yml` fired on `legacy`, which would double-build every push and
-  publish a competing `TazUO-Legacy` release alongside `latest`.
-- `tuo-deploy.yml` fired on `main` — the branch that must never be built — and
-  published with `makeLatest: true`, which would steal the "Latest" badge from
-  the legacy release.
-- `tuo-dev-deploy.yml` fired on `dev`, which is not a release path here.
+`Wiki-Updates.yml` was deleted with them. It fired on a wiki edit and opened a
+discussion; this repository has no wiki, and no matching discussion category,
+so it could only ever have exited with an error.
 
-`features-bot.yml` and its `FeaturesBot.py` were **deleted** rather than reduced.
-That one was not a deploy path at all — it posted feature advertisements to
-upstream's Discord on a twice-daily cron, so in this fork it woke up at 07:00 and
-19:00 to fail on a `DISCORD_WEBHOOK` secret that will never exist here. There is
-no Discord to announce to, so there is nothing to keep.
+`features-bot.yml` and its `FeaturesBot.py` went earlier, for the same reason:
+a twice-daily cron posting feature advertisements to upstream's Discord.
 
 `Build-Test` still runs on every push and PR. That is intentional: it only
 compiles and uploads artifacts, and never publishes a release.
 
 ### Zip layout — deliberately flat, do not "fix" it
 
-`build-legacy.yml` zips the **contents** of `bin/dist`, so `ClassicUO.exe` and
+`build-release.yml` zips the **contents** of `bin/dist`, so `ClassicUO.exe` and
 friends sit at the root of the zip with no containing folder. That is what the
 launcher expects: it unzips straight into `<launcher dir>/TazUO`. Adding a
 `TazUO/` folder inside the zip would produce `<launcher>/TazUO/TazUO/` and the
