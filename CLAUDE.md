@@ -15,8 +15,8 @@ Two branches, and both are this fork's. The other two came with it.
 
 | Branch | Framework | Version | Role |
 | --- | --- | --- | --- |
-| **`legacy`** | .NET Framework **4.7.2** (`net472`) | 4.5.2301 | **Development.** Where work goes. Also the default branch, and where the `v4.5.23-h1`…`h73` tags point. |
-| **`release`** | .NET Framework **4.7.2** (`net472`) | 4.5.2301 | **Release.** What other people download. Only tested, confirmed work lands here, and landing here *is* the release. |
+| **`legacy`** | .NET Framework **4.7.2** (`net472`) | 4.5.2301 | **Development.** Where work goes, and where the `v4.5.23-h1`…`h73` tags point. |
+| **`release`** | .NET Framework **4.7.2** (`net472`) | 4.5.2301 | **Release.** What other people download, and the repository's default branch. Only tested, confirmed work lands here, and landing here *is* the release. |
 | `main` | .NET **10** (`net10.0`) | 5.24.5 | Upstream's. Reference only — a mirror kept so fixes can be read out of it. |
 | `dev` | .NET **10** (`net10.0`) | 5.24.5 | Upstream's. Not used here, not built, not a release path. |
 
@@ -24,6 +24,11 @@ There was briefly a third branch of ours, `legacy-dev`, created on 2026-09-10
 when `legacy` still shipped. `release` was added hours later and `legacy-dev`
 kept a name describing a branch it no longer fed. It was folded back into
 `legacy` on 2026-09-12 and removed. Nothing was lost: it was a fast-forward.
+
+`release` is the default branch, so a new pull request targets it unless told
+otherwise. Almost none should: **retarget to `legacy` before opening it.**
+"Automatically delete head branches" is on, so a merged pull request cleans up
+the branch it came from.
 
 **Rules:**
 

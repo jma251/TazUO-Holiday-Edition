@@ -2,8 +2,9 @@ name: Prune branches
 
 # Run from the Actions tab. Nothing here fires on a push or on a schedule.
 #
-# Removes every branch except the four that are kept: legacy, release, main,
-# dev. Merged or not - a branch that is not one of those four is a leftover.
+# Removes every branch except the four that are kept - legacy, release, main,
+# dev - and any branch with an open pull request. Merged or not, a branch that
+# is neither of those is a leftover.
 #
 # release was missing from this list until 2026-09-12. It did not exist when
 # this file was written, so a confirmed run would have deleted the branch
@@ -36,17 +37,30 @@ jobs:
           fetch-depth: 0
 
       - name: List what would go
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git fetch --prune origin
+
+          # A branch with a pull request still open is in use, whatever its
+          # name. Deleting one closes the pull request and takes its review
+          # with it, so those are held back as well as the four kept branches.
+          gh pr list --state open --limit 300 --json headRefName \
+            --jq '.[].headRefName' | sort -u > protected.txt
+          echo "Open pull requests, held back: $(wc -l < protected.txt)"
+          sed 's/^/  /' protected.txt
 
           git branch -r \
             | grep -v HEAD \
             | sed 's|origin/||' \
             | tr -d ' ' \
             | grep -Ev '^(legacy|release|main|dev)$' \
-            | sort > doomed.txt
+            | sort > candidates.txt
 
-          echo "Keeping: legacy, release, main, dev"
+          comm -23 candidates.txt protected.txt > doomed.txt
+
+          echo
+          echo "Keeping: legacy, release, main, dev - and anything above."
           echo
           echo "Would remove $(wc -l < doomed.txt) branches:"
           sed 's/^/  /' doomed.txt
