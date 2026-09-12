@@ -172,9 +172,14 @@ namespace ClassicUO.Game.UI.Gumps.Login
                     }
                 );
 
+                // "Version" is dropped from this one on purpose. The label starts at x=286
+                // and the ClassicUO links start at x=505, so it has 219 pixels. A release
+                // reads "4.5.2301" and fits easily; a dev build reads "4.5.2301-dev.bbe7343"
+                // and ran underneath the links, which is the whole reason the stamp exists -
+                // to be read. The line above already says "UO Version", so nothing is lost.
                 Add
                 (
-                    new Label(string.Format("TazUO Version {0}", CUOEnviroment.DisplayVersion), false, 0x034E, font: 9)
+                    new Label(string.Format("TazUO {0}", CUOEnviroment.DisplayVersion), false, 0x034E, font: 9)
                     {
                         X = 286,
                         Y = 465
@@ -275,7 +280,7 @@ namespace ClassicUO.Game.UI.Gumps.Login
 
                 Add
                 (
-                    new Label(string.Format("TazUO Version {0}", CUOEnviroment.DisplayVersion), false, 0x0481, font: 9)
+                    new Label(string.Format("TazUO {0}", CUOEnviroment.DisplayVersion), false, 0x0481, font: 9)
                     {
                         X = 286,
                         Y = 465
