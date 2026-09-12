@@ -72,7 +72,7 @@ namespace ClassicUO.Game.Managers
             }
             else if (!d && _wasDead)
             {
-                bool profileAllowsAutomation = ClassicUO.Configuration.ProfileManager.CurrentProfile?.AutomationEnabled ?? true;
+                bool profileAllowsAutomation = ClassicUO.Configuration.ProfileManager.CurrentProfile?.AutomationEnabled ?? false;
                 if (ShouldResumeAutomation(_resumeAfterDeath, profileAllowsAutomation))
                 {
                     AutomationCoordinator.SetEnabled(true, announce: false);

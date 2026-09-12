@@ -623,7 +623,10 @@ namespace ClassicUO.Configuration
         /// them at the lease, so a single setting disarms the lot without
         /// touching their individual states.
         /// </summary>
-        public bool AutomationEnabled { get; set; } = true;
+        // Off until the helpers it gates have something to drive them. The ported
+        // automation code stays in place for future work; this only stops it
+        // running. MW Edition drove all of it from overlays that are not here.
+        public bool AutomationEnabled { get; set; } = false;
 
         public bool UseOneHPBarForLastAttack { get; set; } = true;
 

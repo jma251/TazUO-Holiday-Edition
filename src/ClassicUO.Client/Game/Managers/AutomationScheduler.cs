@@ -76,6 +76,17 @@ namespace ClassicUO.Game.Managers
 
             _nextTick = (long) Time.Ticks + INTERVAL_MS;
 
+            // The master switch has to be checked here, not only in
+            // AutomationCoordinator. That gates TryAcquire, which stops helpers
+            // that consume, cast, equip or target - but a helper that only reads
+            // state and warns never calls it, so it would keep running and keep
+            // toasting with automation switched off.
+            if (!AutomationCoordinator.Enabled)
+            {
+                UI.MobileCache.Clear();
+                return;
+            }
+
             // The pet snapshot is rebuilt here rather than on its own timer.
             // MW Edition rebuilds at 20Hz because a dozen of his overlays read
             // it between frames; the only readers here are the bandage helpers
@@ -123,7 +134,7 @@ namespace ClassicUO.Game.Managers
         {
             _nextTick = 0;
 
-            AutomationCoordinator.ResetForProfile(ProfileManager.CurrentProfile?.AutomationEnabled ?? true);
+            AutomationCoordinator.ResetForProfile(ProfileManager.CurrentProfile?.AutomationEnabled ?? false);
             FeatureDiagnostics.ResetSession();
 
             AutoHitListManager.ResetForProfile();

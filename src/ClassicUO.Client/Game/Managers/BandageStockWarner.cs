@@ -14,7 +14,12 @@ namespace ClassicUO.Game.Managers
     /// </summary>
     public static class BandageStockWarner
     {
-        public static bool Enabled = true;
+        // Off by default. Nothing calls SetEnabled or SetThreshold - there is no
+        // options entry, command, macro or scripting hook for either - so with
+        // this on there is no way to stop it warning, and BandageSettings is
+        // written but never read back, so the saved value would not be honoured
+        // either. Left switched off until something can drive it.
+        public static bool Enabled = false;
         public static int Threshold = 100;
 
         private const long POLL_INTERVAL_MS = 4000;
@@ -79,7 +84,7 @@ namespace ClassicUO.Game.Managers
 
         public static void ResetForProfile()
         {
-            Enabled = true;
+            Enabled = false;
             Threshold = 100;
             _nextPoll = 0;
             _alerted = false;
