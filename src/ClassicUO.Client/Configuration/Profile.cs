@@ -1,4 +1,4 @@
-#region license
+﻿#region license
 
 // Copyright (c) 2021, andreakarasho
 // All rights reserved.
@@ -617,6 +617,13 @@ namespace ClassicUO.Configuration
         public Point SkillProgressBarPosition { get; set; } = Point.Zero;
 
         public bool ForceResyncOnHang { get; set; } = false;
+
+        /// <summary>
+        /// Master switch for the automatic helpers. Off here stops every one of
+        /// them at the lease, so a single setting disarms the lot without
+        /// touching their individual states.
+        /// </summary>
+        public bool AutomationEnabled { get; set; } = true;
 
         public bool UseOneHPBarForLastAttack { get; set; } = true;
 
