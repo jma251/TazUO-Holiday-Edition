@@ -102,7 +102,7 @@ namespace ClassicUO.Game.Managers
             for (int i = 0; i < files.Length - keep; i++)
             {
                 try { File.Delete(files[i]); }
-                catch (Exception ex) { Log.Error("CrashRecovery prune delete: " + ex); }
+                catch (Exception ex) { FeatureDiagnostics.RecordFailure("CrashRecovery", ex); }
             }
         }
     }
