@@ -37,9 +37,8 @@ jobs:
 
     steps:
       # Always build the release branch, whether triggered by push or by hand.
-      # fetch-depth: 0 pulls full history and all tags. Both are required: the
-      # Holiday increment is derived from existing tags, and the release notes
-      # need the commit range since the previous Holiday tag.
+      # fetch-depth: 0 pulls full history and all tags, which the tag check
+      # below needs to tell an already-released version from a new one.
       - name: Check out release branch
         uses: actions/checkout@v4
         with:
@@ -77,11 +76,6 @@ jobs:
         run: |
           export LC_ALL=C.UTF-8
 
-          # Highest existing release tag, semver-ordered, ignoring the rolling
-          # "latest"/"dev-latest" tags and the retired v<base>-hN series.
-          PREV=$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' | grep -Ev -- '-h[0-9]+$' | sort -V | tail -1)
-          echo "PREV_TAG=$PREV" >> $GITHUB_ENV
-
           if git rev-parse -q --verify "refs/tags/v${VERSION}" >/dev/null; then
             echo "::notice::v${VERSION} is already released. Refreshing 'latest' only."
             echo "::notice::To publish a new numbered release, raise <AssemblyVersion> in src/ClassicUO.Client/ClassicUO.Client.csproj."
@@ -91,45 +85,6 @@ jobs:
           fi
 
           echo "HOLIDAY_TAG=v${VERSION}" >> $GITHUB_ENV
-
-      # Read this version's section out of CHANGELOG.md.
-      #
-      # This used to be `git log` over every commit since the previous tag, which
-      # made the notes long enough to push the download link off the screen and
-      # filled them with work nobody outside the repository needs to read: merge
-      # noise, a missing using statement, a fix and the revert of that fix sitting
-      # next to each other. What belongs in a release note is what changed for the
-      # person downloading it, and only a person can decide that.
-      #
-      # So the notes are whatever CHANGELOG.md says under "## [<version>]", and
-      # nothing else. No entry means no notes - an empty section is a better
-      # release page than an accurate list of churn.
-      - name: Build release notes
-        shell: bash
-        run: |
-          export LC_ALL=C.UTF-8
-
-          NOTES=""
-
-          if [ -f CHANGELOG.md ]; then
-            NOTES=$(awk -v ver="$VERSION" '
-              $0 ~ ("^## \\[" ver "\\]") { grab = 1; next }
-              grab && /^## \[/ { exit }
-              grab && /^---[ \t]*$/ { next }
-              grab { print }
-            ' CHANGELOG.md | sed -e '/./,$!d')
-          fi
-
-          if [ -z "$NOTES" ]; then
-            echo "::notice::No CHANGELOG.md section for ${VERSION}; publishing without release notes."
-            echo "::notice::Add a '## [${VERSION}]' section to CHANGELOG.md to describe this release."
-          fi
-
-          {
-            echo "NOTES<<HOLIDAY_NOTES_EOF"
-            echo "$NOTES"
-            echo "HOLIDAY_NOTES_EOF"
-          } >> $GITHUB_ENV
 
       # The .NET 8 SDK can build/publish the net472 target on Windows.
       - name: Setup .NET SDK
@@ -189,8 +144,6 @@ jobs:
           body: |
             Download `${{ env.CUO_ZIP_NAME }}` below, unzip it, and run `ClassicUO.exe`.
 
-            ${{ env.NOTES }}
-
             <sub>.NET Framework 4.7.2 &middot; commit ${{ env.RELEASE_SHA }}</sub>
           tag: ${{ env.HOLIDAY_TAG }}
           commit: ${{ env.RELEASE_SHA }}
@@ -220,8 +173,6 @@ jobs:
 
             This release always points at the newest build, so its download URL never
             changes. For a fixed copy of this version, use [`${{ env.HOLIDAY_TAG }}`](../../releases/tag/${{ env.HOLIDAY_TAG }}).
-
-            ${{ env.NOTES }}
 
             <sub>.NET Framework 4.7.2 &middot; commit ${{ env.RELEASE_SHA }}</sub>
           tag: ${{ env.TAG_NAME }}
