@@ -192,3 +192,31 @@ jobs:
             -f sha='${{ env.DEV_SHA }}' -F force=true \
             && echo "tag now at ${{ env.SHORT_SHA }}" \
             || echo "::warning::could not move ${{ env.TAG_NAME }}; the zip is still correct."
+
+      # The run's own page, in the Actions tab, is the one place a dev build is
+      # visible without knowing where to look. Watching the repository for
+      # Releases does not help: the release is updated rather than created, so
+      # the "released" event never fires again. Watch Actions instead, and this
+      # summary is what that notification leads to.
+      - name: Write the download into the run summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## TazUO Holiday Edition — dev build"
+            echo
+            if [ "${{ job.status }}" = "success" ]; then
+              echo "**[Download HolidayEdition-Dev.zip](https://github.com/${{ github.repository }}/releases/download/${{ env.TAG_NAME }}/${{ env.CUO_ZIP_NAME }})**"
+              echo
+              echo "Unzip it over your \`TazUO\` folder and run \`ClassicUO.exe\`."
+            else
+              echo "**Build ${{ job.status }} — the download below is from the previous successful build.**"
+            fi
+            echo
+            echo "| | |"
+            echo "| --- | --- |"
+            echo "| Built | ${{ env.BUILT_AT }} |"
+            echo "| Commit | \`${{ env.SHORT_SHA }}\` |"
+            echo "| Build stamp | \`v${{ env.VERSION }}-dev.${{ env.SHORT_SHA }}\` |"
+            echo "| Release page | [${{ env.TAG_NAME }}](https://github.com/${{ github.repository }}/releases/tag/${{ env.TAG_NAME }}) |"
+          } >> "$GITHUB_STEP_SUMMARY"
