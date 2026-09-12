@@ -69,17 +69,26 @@ jobs:
         run: |
           export LC_ALL=C.UTF-8
 
-          git fetch origin legacy --quiet || true
+          # Against release, not legacy. legacy is the frozen branch the old
+          # single-branch line stopped on, so diffing against it listed every
+          # commit since the fork split - hundreds of them, on every dev build.
+          # release is the line users are actually on, so this answers the only
+          # question a dev build raises: what is in here that is not out yet.
+          git fetch origin release --quiet || true
 
-          LOG=$(git log --no-merges --pretty=format:'- %s (%h)' origin/legacy..HEAD 2>/dev/null || true)
+          LOG=$(git log --no-merges -25 --pretty=format:'- %s (%h)' origin/release..HEAD 2>/dev/null || true)
+          COUNT=$(git rev-list --no-merges --count origin/release..HEAD 2>/dev/null || echo 0)
 
           if [ -z "$LOG" ]; then
             LOG="- Nothing here that is not already released."
+          elif [ "$COUNT" -gt 25 ]; then
+            LOG="${LOG}
+          - ...and $((COUNT - 25)) earlier commits."
           fi
 
           {
             echo "NOTES<<HOLIDAY_NOTES_EOF"
-            echo "Ahead of \`legacy\` (not yet released):"
+            echo "Ahead of \`release\` (not yet released):"
             echo ""
             echo "$LOG"
             echo "HOLIDAY_NOTES_EOF"

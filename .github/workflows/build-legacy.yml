@@ -92,30 +92,42 @@ jobs:
 
           echo "HOLIDAY_TAG=v${VERSION}" >> $GITHUB_ENV
 
-      # Collect the commits since the previous Holiday build so each release's
-      # notes read as a running list of what changed.
+      # Read this version's section out of CHANGELOG.md.
+      #
+      # This used to be `git log` over every commit since the previous tag, which
+      # made the notes long enough to push the download link off the screen and
+      # filled them with work nobody outside the repository needs to read: merge
+      # noise, a missing using statement, a fix and the revert of that fix sitting
+      # next to each other. What belongs in a release note is what changed for the
+      # person downloading it, and only a person can decide that.
+      #
+      # So the notes are whatever CHANGELOG.md says under "## [<version>]", and
+      # nothing else. No entry means no notes - an empty section is a better
+      # release page than an accurate list of churn.
       - name: Build release notes
         shell: bash
         run: |
           export LC_ALL=C.UTF-8
 
-          if [ -n "$PREV_TAG" ]; then
-            HEADER="Changes since \`${PREV_TAG}\`:"
-            LOG=$(git log --no-merges --pretty=format:'- %s (%h)' "${PREV_TAG}..HEAD")
-          else
-            HEADER="Recent changes (first release of v${VERSION}):"
-            LOG=$(git log --no-merges -20 --pretty=format:'- %s (%h)')
+          NOTES=""
+
+          if [ -f CHANGELOG.md ]; then
+            NOTES=$(awk -v ver="$VERSION" '
+              $0 ~ ("^## \\[" ver "\\]") { grab = 1; next }
+              grab && /^## \[/ { exit }
+              grab && /^---[ \t]*$/ { next }
+              grab { print }
+            ' CHANGELOG.md | sed -e '/./,$!d')
           fi
 
-          if [ -z "$LOG" ]; then
-            LOG="- No new commits since the previous build."
+          if [ -z "$NOTES" ]; then
+            echo "::notice::No CHANGELOG.md section for ${VERSION}; publishing without release notes."
+            echo "::notice::Add a '## [${VERSION}]' section to CHANGELOG.md to describe this release."
           fi
 
           {
             echo "NOTES<<HOLIDAY_NOTES_EOF"
-            echo "$HEADER"
-            echo ""
-            echo "$LOG"
+            echo "$NOTES"
             echo "HOLIDAY_NOTES_EOF"
           } >> $GITHUB_ENV
 
@@ -175,14 +187,11 @@ jobs:
           artifacts: "${{ env.CUO_OUTPUT_PATH }}/${{ env.CUO_ZIP_NAME }}"
           name: "TazUO Holiday Edition ${{ env.HOLIDAY_TAG }}"
           body: |
-            Permanent release off the `release` branch (.NET Framework 4.7.2).
-
-            - Version: `${{ env.HOLIDAY_TAG }}`
-            - Commit: ${{ env.RELEASE_SHA }}
-
             Download `${{ env.CUO_ZIP_NAME }}` below, unzip it, and run `ClassicUO.exe`.
 
             ${{ env.NOTES }}
+
+            <sub>.NET Framework 4.7.2 &middot; commit ${{ env.RELEASE_SHA }}</sub>
           tag: ${{ env.HOLIDAY_TAG }}
           commit: ${{ env.RELEASE_SHA }}
           allowUpdates: false   # these are immutable once published
@@ -207,16 +216,14 @@ jobs:
           artifacts: "${{ env.CUO_OUTPUT_PATH }}/${{ env.CUO_ZIP_NAME }}"
           name: "TazUO Holiday Edition (latest) - ${{ env.HOLIDAY_TAG }}"
           body: |
-            Automated build of the `release` branch (.NET Framework 4.7.2).
-            This release always points at the newest build; its download URL never changes.
-
-            - Version: `${{ env.HOLIDAY_TAG }}`
-            - Permanent copy, for rollback: `${{ env.HOLIDAY_TAG }}`
-            - Commit: ${{ env.RELEASE_SHA }}
-
             Download `${{ env.CUO_ZIP_NAME }}` below, unzip it, and run `ClassicUO.exe`.
 
+            This release always points at the newest build, so its download URL never
+            changes. For a fixed copy of this version, use [`${{ env.HOLIDAY_TAG }}`](../../releases/tag/${{ env.HOLIDAY_TAG }}).
+
             ${{ env.NOTES }}
+
+            <sub>.NET Framework 4.7.2 &middot; commit ${{ env.RELEASE_SHA }}</sub>
           tag: ${{ env.TAG_NAME }}
           commit: ${{ env.RELEASE_SHA }}
           allowUpdates: true      # reuse the existing "latest" release
