@@ -76,5 +76,45 @@ namespace ClassicUO.UnitTests.Utility.LogFile
                 Directory.Delete(directory, true);
             }
         }
+
+        [Fact]
+        public void A_Capped_Log_Should_Not_Grow_Past_Its_Limit()
+        {
+            // The session log is written to for the life of the client, so the cap
+            // is what stops it growing without bound. On reaching the limit the file
+            // restarts from empty with a marker rather than rolling over, which keeps
+            // the most recent history and leaves no second file to find.
+            const long cap = 400;
+
+            string directory = Path.Combine(Path.GetTempPath(), nameof(A_Capped_Log_Should_Not_Grow_Past_Its_Limit) + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(directory);
+
+            try
+            {
+                string path;
+
+                using (var log = new ClassicUO.Utility.Logging.LogFile(directory, "test.log", cap))
+                {
+                    path = log.ToString();
+
+                    for (int i = 0; i < 200; i++)
+                    {
+                        log.Write($"line {i} of a log that would otherwise run to kilobytes");
+                    }
+                }
+
+                new FileInfo(path).Length
+                    .Should()
+                    .BeLessOrEqualTo(cap);
+
+                File.ReadAllText(path, Encoding.UTF8)
+                    .Should()
+                    .Contain("restarted");
+            }
+            finally
+            {
+                Directory.Delete(directory, true);
+            }
+        }
     }
 }

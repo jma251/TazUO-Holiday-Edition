@@ -40,18 +40,17 @@ namespace ClassicUO.Utility.Logging
     public sealed class LogFile : IDisposable
     {
         private readonly FileStream logStream;
+        private readonly long _maximumLength;
+        private readonly object _syncObject = new object();
 
-        public LogFile(string directory, string file)
+        public LogFile(string directory, string file, long maximumLength = 0)
         {
+            Directory.CreateDirectory(directory);
+            _maximumLength = maximumLength;
             logStream = new FileStream
             (
-                // HH, not hh. The lowercase form is the 12-hour clock, and nothing here
-                // printed AM/PM, so a session started at 14:30 produced the same filename
-                // as one started at 02:30 - and FileMode.Append then merged an afternoon
-                // log into the morning's. Milliseconds separate two files opened in the
-                // same second.
                 $"{directory}/{DateTime.Now:yyyy-MM-dd_HH-mm-ss-fff}_{file}",
-                FileMode.Append,
+                maximumLength > 0 ? FileMode.Create : FileMode.Append,
                 FileAccess.Write,
                 FileShare.ReadWrite,
                 4096,
@@ -61,36 +60,71 @@ namespace ClassicUO.Utility.Logging
 
         public void Dispose()
         {
-            logStream.Close();
+            lock (_syncObject)
+            {
+                logStream.Dispose();
+            }
         }
 
 
-        public void Write(string message)
+        public void Write(string message, bool flush = true)
         {
-            // Characters and bytes are not the same count. UTF-8 spends one byte on ASCII
-            // but two or three on anything else, so a message with a single accented
-            // character, a box-drawing glyph or a non-Latin name encodes longer than it
-            // reads. Sizing the buffer by message.Length under-allocates for those, and
-            // writing message.Length bytes back out then cut the line short - mid-character,
-            // so the tail arrived as mojibake or vanished. Crash logs are the place this
-            // hurt: the truncated part is the end of the stack trace.
+            const string TRUNCATED_MESSAGE = "[Oversized log entry truncated to its most recent text.]\n";
             int byteCount = Encoding.UTF8.GetByteCount(message);
+
+            if (_maximumLength > 0 && byteCount + 1 > _maximumLength)
+            {
+                int markerBytes = Encoding.UTF8.GetByteCount(TRUNCATED_MESSAGE);
+                string prefix = markerBytes + 1 <= _maximumLength ? TRUNCATED_MESSAGE : string.Empty;
+                int prefixBytes = prefix.Length == 0 ? 0 : markerBytes;
+                int byteBudget = (int)Math.Max(0, Math.Min(int.MaxValue, _maximumLength - prefixBytes - 1));
+                char[] characters = message.ToCharArray();
+                int low = 0;
+                int high = characters.Length;
+
+                while (low < high)
+                {
+                    int middle = low + (high - low) / 2;
+                    if (Encoding.UTF8.GetByteCount(characters, middle, characters.Length - middle) > byteBudget)
+                    {
+                        low = middle + 1;
+                    }
+                    else
+                    {
+                        high = middle;
+                    }
+                }
+
+                message = prefix + message.Substring(low);
+                byteCount = Encoding.UTF8.GetByteCount(message);
+            }
+
             byte[] buffer = System.Buffers.ArrayPool<byte>.Shared.Rent(byteCount);
 
             try
             {
-                int written = Encoding.UTF8.GetBytes
-                (
-                    message,
-                    0,
-                    message.Length,
-                    buffer,
-                    0
-                );
+                int bytesWritten = Encoding.UTF8.GetBytes(message, 0, message.Length, buffer, 0);
 
-                logStream.Write(buffer, 0, written);
-                logStream.WriteByte((byte) '\n');
-                logStream.Flush();
+                lock (_syncObject)
+                {
+                    if (_maximumLength > 0 && logStream.Length + bytesWritten + 1 > _maximumLength)
+                    {
+                        logStream.SetLength(0);
+                        logStream.Position = 0;
+                        byte[] marker = Encoding.UTF8.GetBytes("[Session log restarted after reaching its size limit.]\n");
+                        if (marker.Length + bytesWritten + 1 <= _maximumLength)
+                        {
+                            logStream.Write(marker, 0, marker.Length);
+                        }
+                    }
+
+                    logStream.Write(buffer, 0, bytesWritten);
+                    logStream.WriteByte((byte) '\n');
+                    if (flush)
+                    {
+                        logStream.Flush();
+                    }
+                }
             }
             finally
             {
@@ -105,22 +139,30 @@ namespace ClassicUO.Utility.Logging
 
             try
             {
-                int written = Encoding.UTF8.GetBytes
-                (
-                    message,
-                    0,
-                    message.Length,
-                    buffer,
-                    0
-                );
+                int bytesWritten = Encoding.UTF8.GetBytes(message, 0, message.Length, buffer, 0);
 
-                await logStream.WriteAsync(buffer, 0, written);
+                // Async writes are serialized by callers; LogFile.Write is used by the
+                // background session-log writer when concurrent producers are possible.
+                if (_maximumLength > 0 && logStream.Length + bytesWritten + 1 > _maximumLength)
+                {
+                    return;
+                }
+
+                await logStream.WriteAsync(buffer, 0, bytesWritten);
                 logStream.WriteByte((byte) '\n');
                 await logStream.FlushAsync();
             }
             finally
             {
                 System.Buffers.ArrayPool<byte>.Shared.Return(buffer);
+            }
+        }
+
+        public void Flush()
+        {
+            lock (_syncObject)
+            {
+                logStream.Flush();
             }
         }
 
