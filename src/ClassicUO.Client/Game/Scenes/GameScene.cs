@@ -215,6 +215,10 @@ namespace ClassicUO.Game.Scenes
             // ticked again every session.
             UI.Gumps.MusicInfoGump.Toggle(Settings.GlobalSettings.MusicOverlay);
 
+            // Snapshot on the way in as well as on the timer, so the very first
+            // copy predates anything this session changes.
+            CrashRecoveryManager.ResetForProfile();
+
             Hotkeys = new HotkeysManager();
             Macros = new MacroManager();
             Macros.Load();
@@ -930,6 +934,7 @@ namespace ClassicUO.Game.Scenes
             _useItemQueue.Update();
 
             AutoLootManager.Instance.Update();
+            CrashRecoveryManager.Tick();
             _moveItemQueue.ProcessQueue();
             GridHighlightData.ProcessQueue();
 
