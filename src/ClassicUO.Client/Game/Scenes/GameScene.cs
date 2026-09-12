@@ -221,6 +221,10 @@ namespace ClassicUO.Game.Scenes
             // stale timing, so the set is cleared on the way in as well as out.
             AutomationScheduler.ResetSession();
 
+            // Snapshot on the way in as well as on the timer, so the very first
+            // copy predates anything this session changes.
+            CrashRecoveryManager.ResetForProfile();
+
             Hotkeys = new HotkeysManager();
             Macros = new MacroManager();
             Macros.Load();
@@ -939,6 +943,7 @@ namespace ClassicUO.Game.Scenes
 
             AutoLootManager.Instance.Update();
             AutomationScheduler.Tick();
+            CrashRecoveryManager.Tick();
             _moveItemQueue.ProcessQueue();
             GridHighlightData.ProcessQueue();
 
