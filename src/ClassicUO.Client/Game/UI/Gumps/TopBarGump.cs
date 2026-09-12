@@ -270,8 +270,6 @@ namespace ClassicUO.Game.UI.Gumps
 
             moreMenu.ContextMenu.Add(new ContextMenuItemEntry("Toggle nameplates", () => { NameOverHeadManager.ToggleOverheads(); }));
 
-            moreMenu.ContextMenu.Add(new ContextMenuItemEntry("Discord", () => { UIManager.Add(new DiscordGump()); }));
-
             var submenu = new ContextMenuItemEntry("Tools");
             submenu.Add(new ContextMenuItemEntry("Spell quick cast", () => { UIManager.Add(new SpellQuickSearch(200, 200, (sp) => {if (sp != null) GameActions.CastSpell(sp.ID);})); }));
             submenu.Add(new ContextMenuItemEntry("Open boat control", () => { UIManager.Add(new BoatControl() { X = 200, Y = 200 }); }));
