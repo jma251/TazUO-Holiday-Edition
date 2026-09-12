@@ -230,12 +230,10 @@ namespace ClassicUO
             loadResourceAssets.Wait(10000);
             SetScene(new LoginScene());
             SetWindowPositionBySettings();
-            DiscordManager.Instance.FromSavedToken();
         }
 
         protected override void UnloadContent()
         {
-            DiscordManager.Instance.BeginDisconnect();
             SDL_GetWindowBordersSize(Window.Handle, out int top, out int left, out _, out _);
 
             Settings.GlobalSettings.WindowPosition = new Point(
@@ -266,7 +264,6 @@ namespace ClassicUO
             SpeechesLoader.Instance.Dispose();
             Verdata.File?.Dispose();
             World.Map?.Destroy();
-            DiscordManager.Instance.FinalizeDisconnect();
 
             base.UnloadContent();
         }
@@ -540,8 +537,6 @@ namespace ClassicUO
 
             GameCursor?.Update();
             Audio?.Update();
-
-            DiscordManager.Instance.Update();
 
             base.Update(gameTime);
         }
