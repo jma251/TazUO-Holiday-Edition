@@ -269,6 +269,15 @@ namespace ClassicUO.Game.Managers
             TargetingState = targeting;
             TargetingType = cursorType;
 
+            // A targeted spell finishing is the one completion the server does announce,
+            // just not in words: the cast ends and the cursor arrives. Eighty-two of the
+            // spells in the indicator data are marked as expecting one, so for those this
+            // is an observed end rather than a timer running out.
+            if (IsTargeting && !lastTargetting)
+            {
+                SpellVisualRangeManager.Instance.OnTargetCursorReceived();
+            }
+
             if (IsTargeting)
             {
                 //UIManager.RemoveTargetLineGump(LastTarget);

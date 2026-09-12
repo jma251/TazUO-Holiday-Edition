@@ -3730,7 +3730,14 @@ namespace ClassicUO.Network
             if (entity == World.Player)
             {
                 UoAssist.SignalHits();
-                SpellVisualRangeManager.Instance.ClearCasting();
+
+                // Losing hit points is not what ends a cast, and this used to end one here
+                // on every hit point packet - healing, regeneration and a bandage finishing
+                // included. Whether a hit disturbed a cast is the server's to say, and it
+                // does say it, as cliloc 500641; SpellVisualRangeManager listens for that.
+                // It matters because damage does not disturb at all under Protection, so no
+                // amount of reading hit points can get this right.
+
                 TitleBarStatsManager.UpdateTitleBar();
             }
         }

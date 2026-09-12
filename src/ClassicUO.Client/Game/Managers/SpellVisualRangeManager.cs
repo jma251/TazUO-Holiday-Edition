@@ -138,6 +138,51 @@ namespace ClassicUO.Game.Managers
             }
         }
 
+        /// <summary>
+        /// A target cursor has arrived. For a spell that was waiting for one, that is the
+        /// cast finishing - the server does announce completion, it just does it by asking
+        /// where to aim rather than in words.
+        ///
+        /// Only for spells marked ExpectTargetCursor, which is most of them: eighty-two of
+        /// the hundred and thirty-five in the shipped data. A cursor arriving for anything
+        /// else - a skill, a context menu, a tool - is not this cast ending and is ignored.
+        /// </summary>
+        public void OnTargetCursorReceived()
+        {
+            if (isCasting && currentSpell != null && currentSpell.ExpectTargetCursor)
+            {
+                ClearCasting();
+            }
+        }
+
+        /// <summary>
+        /// Ends a cast nothing was ever said about.
+        ///
+        /// The stop clilocs cover a cast the server refused or disturbed, and the target
+        /// cursor covers one that finished and wants aiming. What is left is a spell that
+        /// needs no target and simply worked - it has no signal at all, so it is let go
+        /// after the spell's own MaxDuration.
+        ///
+        /// That field is what the data uses to say how long to allow, it is per spell and
+        /// editable, and no arithmetic is done on it here. Faster Casting is not applied:
+        /// this errs late, which is the right way round for a backstop, and precise timing
+        /// belongs to whoever is reading the state.
+        ///
+        /// Called once a tick from World.Update. One comparison unless a cast is live.
+        /// </summary>
+        public void CheckCastExpiry()
+        {
+            if (!isCasting || currentSpell == null)
+            {
+                return;
+            }
+
+            if (LastSpellTime + TimeSpan.FromSeconds(currentSpell.MaxDuration) <= DateTime.Now)
+            {
+                ClearCasting();
+            }
+        }
+
         public SpellRangeInfo GetCurrentSpell()
         {
             return currentSpell;
