@@ -38,6 +38,8 @@ namespace ClassicUO.Game.Managers
         // can wait a frame.
         private static readonly Feature[] _features =
         {
+            // Death pauses the rest, so it is asked first.
+            new Feature("AutoStopOnDeath", AutoStopOnDeathManager.Tick, () => AutoStopOnDeathManager.Enabled),
             new Feature("EmergencyHeal", EmergencyHealManager.Tick, () => EmergencyHealManager.Enabled),
             new Feature("AutoCurePotion", AutoCurePotionManager.Tick, () => AutoCurePotionManager.Enabled),
             new Feature("AutoHealPotion", AutoHealPotionManager.Tick, () => AutoHealPotionManager.Enabled),
@@ -48,6 +50,8 @@ namespace ClassicUO.Game.Managers
             new Feature("AutoMount", AutoMountManager.Tick, () => AutoMountManager.Enabled),
             new Feature("AutoRearm", AutoRearmManager.Tick, () => AutoRearmManager.Enabled),
             new Feature("AutoFollow", AutoFollowManager.Tick, () => AutoFollowManager.Active),
+            new Feature("AutoHitList", AutoHitListManager.Tick, () => AutoHitListManager.Enabled),
+            new Feature("AutoRespawnTarget", AutoRespawnTargetManager.Tick, () => AutoRespawnTargetManager.Enabled),
             new Feature("AutoCloseEmptyCorpse", AutoCloseEmptyCorpse.Tick, () => AutoCloseEmptyCorpse.Enabled),
             new Feature("AutoOpenBackpack", AutoOpenBackpackManager.Tick, () => AutoOpenBackpackManager.Enabled),
             new Feature("AutoVendorClose", AutoVendorCloseManager.Tick, () => AutoVendorCloseManager.Enabled),
@@ -77,6 +81,18 @@ namespace ClassicUO.Game.Managers
         }
 
         /// <summary>
+        /// Persist what the helpers keep across sessions. Called on the way out
+        /// of a world, before the reset clears it - ResetSession also runs on the
+        /// way in, where saving would write the incoming profile's blank state
+        /// over the outgoing one's.
+        /// </summary>
+        public static void Save()
+        {
+            FeatureDiagnostics.Guard("AutoHitList:Save", AutoHitListManager.Save);
+            FeatureDiagnostics.Guard("Toast:Save", UI.Gumps.ToastManager.Save);
+        }
+
+        /// <summary>
         /// AfkReply and AutoSayThanks are driven by EventSink rather than polled,
         /// so they are not in the list above and only their session state resets
         /// here.
@@ -88,6 +104,9 @@ namespace ClassicUO.Game.Managers
             AutomationCoordinator.ResetForProfile(ProfileManager.CurrentProfile?.AutomationEnabled ?? true);
             FeatureDiagnostics.ResetSession();
 
+            AutoHitListManager.ResetForProfile();
+            UI.Gumps.ToastManager.ResetForProfile();
+
             AfkReplyManager.ResetSession();
             AutoCloseEmptyCorpse.ResetSession();
             AutoFollowManager.ResetSession();
@@ -95,7 +114,9 @@ namespace ClassicUO.Game.Managers
             AutoOpenBackpackManager.ResetSession();
             AutoOpenPaperdollManager.ResetSession();
             AutoRearmManager.ResetSession();
+            AutoRespawnTargetManager.ResetSession();
             AutoSayThanksManager.ResetSession();
+            AutoStopOnDeathManager.ResetSession();
             AutoStealthManager.ResetSession();
             AutoVendorCloseManager.ResetSession();
         }

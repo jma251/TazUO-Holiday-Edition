@@ -34,5 +34,20 @@ namespace ClassicUO.UnitTests.Game.Automation
                 .Should()
                 .Be(expected);
         }
+
+        [Theory]
+        [InlineData(true, true, true)]
+        [InlineData(true, false, false)]
+        [InlineData(false, true, false)]
+        [InlineData(false, false, false)]
+        public void Death_Pause_Should_Only_Resume_Automation_That_Was_Running(bool pausedForDeath, bool profileAllowsAutomation, bool expected)
+        {
+            // Dying pauses the helpers; resurrecting must not switch them back on
+            // for a profile that had them off to begin with, nor resume a pause
+            // that was never taken.
+            AutoStopOnDeathManager.ShouldResumeAutomation(pausedForDeath, profileAllowsAutomation)
+                .Should()
+                .Be(expected);
+        }
     }
 }

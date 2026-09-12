@@ -428,6 +428,7 @@ namespace ClassicUO.Game.Scenes
             JournalFilterManager.Instance.Save();
 
             SpellBarManager.Unload();
+            AutomationScheduler.Save();
             AutomationScheduler.ResetSession();
             _moveItemQueue.Clear();
 
