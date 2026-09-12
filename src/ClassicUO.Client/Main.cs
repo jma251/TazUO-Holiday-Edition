@@ -62,7 +62,7 @@ namespace ClassicUO
             DllMap.Initialise();
 #endif
 
-            Log.Start(LogTypes.All);
+            StartLogging();
 
             CUOEnviroment.GameThread = Thread.CurrentThread;
             CUOEnviroment.GameThread.Name = "CUO_MAIN_THREAD";
@@ -106,7 +106,14 @@ namespace ClassicUO
 
                 using (LogFile crashfile = new LogFile(path, "crash.txt"))
                 {
-                    crashfile.WriteAsync(sb.ToString()).RunSynchronously();
+                    // Write, not WriteAsync().RunSynchronously(). RunSynchronously is only
+                    // valid on a task built from a delegate and not yet started; the task an
+                    // async method hands back is already running, so the call threw
+                    // InvalidOperationException instead of writing anything - inside the
+                    // unhandled-exception handler, where there is nothing left to catch it.
+                    // crash.txt was never produced. The synchronous overload is what this
+                    // wanted: the process is ending, so there is nothing to await on.
+                    crashfile.Write(sb.ToString());
                 }
             };
 
@@ -281,6 +288,51 @@ namespace ClassicUO
             }
 
             Log.Trace("Closing...");
+
+            // Drains the writer queues and closes the file. Without it the last
+            // second or so of the session never reaches disk, since the file
+            // writer flushes on a timer.
+            Log.Stop();
+        }
+
+        private const long MAX_SESSION_LOG_BYTES = 5 * 1024 * 1024;
+        private const int SESSION_LOG_RETENTION = 5;
+
+        /// <summary>
+        /// Sends the log to a file as well as the console.
+        ///
+        /// It only went to the console before, and Logger dropped the LogFile it was
+        /// handed without storing it - so Log.Info, Log.Warn, Log.Error and Log.Panic
+        /// had nowhere to go. Both workflows build with IS_DEV_BUILD, which makes a
+        /// WinExe with no console attached, so in every build anyone actually runs
+        /// the entire log was being written to a handle that goes nowhere.
+        ///
+        /// The file is capped and the older ones pruned, because unlike the console
+        /// a file keeps what it is given.
+        /// </summary>
+        private static void StartLogging()
+        {
+            try
+            {
+                string directory = Path.Combine(CUOEnviroment.ExecutablePath, "Logs");
+                Directory.CreateDirectory(directory);
+
+                FileInfo[] oldLogs = new DirectoryInfo(directory).GetFiles("*_session.log");
+                Array.Sort(oldLogs, (left, right) => right.CreationTimeUtc.CompareTo(left.CreationTimeUtc));
+
+                for (int i = SESSION_LOG_RETENTION - 1; i < oldLogs.Length; i++)
+                {
+                    try { oldLogs[i].Delete(); } catch { }
+                }
+
+                Log.Start(LogTypes.All, new LogFile(directory, "session.log", MAX_SESSION_LOG_BYTES));
+            }
+            catch (Exception ex)
+            {
+                // A log that cannot be opened must not stop the client starting.
+                Log.Start(LogTypes.All);
+                try { Console.Error.WriteLine($"Unable to create session log: {ex}"); } catch { }
+            }
         }
 
         private static void ReadSettingsFromArgs(string[] args)
@@ -571,11 +623,6 @@ namespace ClassicUO
 
                         CUOEnviroment.NoServerPing = true;
 
-                        break;
-                    
-                    case "nometrics":
-                        AnonMetrics.MetricsEnabled = false;
-                        Log.Info("Disabling anonymous metrics");
                         break;
                 }
             }

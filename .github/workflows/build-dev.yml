@@ -1,0 +1,164 @@
+name: Build Dev
+
+# Builds the development branch, legacy, and publishes it as a separate,
+# disposable download for testing. It is deliberately kept away from the
+# release path: it never touches the "latest" release and never mints a
+# numbered version. Only build-release.yml, running off release, does either.
+
+on:
+  # Every push to the development branch produces a fresh testable client.
+  push:
+    branches: [legacy]
+  # Allow starting a dev build by hand from the Actions tab.
+  workflow_dispatch:
+
+# Separate from build-legacy's group on purpose: a dev build must never cancel
+# a release build, or the other way round.
+concurrency:
+  group: build-legacy
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+env:
+  CUO_PROJECT_PATH: 'src/ClassicUO.Client/ClassicUO.Client.csproj'
+  CUO_OUTPUT_PATH: 'bin/dist'
+  # Deliberately does not start with "TazUO". The launcher falls back to picking
+  # any asset whose filename starts with that, so keeping the dev zip out of that
+  # namespace means it can never be mistaken for a release download.
+  CUO_ZIP_NAME: 'HolidayEdition-Dev.zip'
+  # Not "dev": a tag by that name would collide with the inherited dev branch and
+  # make "git checkout dev" ambiguous.
+  TAG_NAME: 'dev-latest'
+
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: 1
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
+  NUGET_XMLDOC_MODE: skip
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      # Always build legacy, whether triggered by push or by hand.
+      - name: Check out legacy branch
+        uses: actions/checkout@v4
+        with:
+          ref: legacy
+          fetch-depth: 0
+
+      - name: Check out submodules (recursive)
+        run: |
+          git config --global url."https://".insteadOf git://
+          git submodule update --init --recursive
+
+      - name: Extract version and commit
+        shell: bash
+        run: |
+          export LC_ALL=C.UTF-8
+          echo "VERSION=$(grep -oP '<AssemblyVersion>\K\d+\.\d+\.\d+' src/ClassicUO.Client/ClassicUO.Client.csproj | head -1)" >> $GITHUB_ENV
+          echo "DEV_SHA=$(git rev-parse HEAD)" >> $GITHUB_ENV
+          echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
+      # What is on legacy that has not been released yet. This is the useful
+      # thing to read on a dev build: it is the list of what is being tested.
+      - name: Build release notes
+        shell: bash
+        run: |
+          export LC_ALL=C.UTF-8
+
+          git fetch origin legacy --quiet || true
+
+          LOG=$(git log --no-merges --pretty=format:'- %s (%h)' origin/legacy..HEAD 2>/dev/null || true)
+
+          if [ -z "$LOG" ]; then
+            LOG="- Nothing here that is not already released."
+          fi
+
+          {
+            echo "NOTES<<HOLIDAY_NOTES_EOF"
+            echo "Ahead of \`legacy\` (not yet released):"
+            echo ""
+            echo "$LOG"
+            echo "HOLIDAY_NOTES_EOF"
+          } >> $GITHUB_ENV
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      # The commit is stamped into the binary so a crash log from a dev build says
+      # which dev build. CUOEnviroment.ReadBuildTag keys off the leading "v" to tell a
+      # stamped build from an unstamped one, so the "v" is load-bearing; it displays
+      # as e.g. 4.5.2301-dev.a1b2c3d.
+      - name: Publish client
+        run: dotnet publish ${{ env.CUO_PROJECT_PATH }} -c Release -o ${{ env.CUO_OUTPUT_PATH }} -p:IS_DEV_BUILD=true -p:HOLIDAY_DEV_BUILD=true -p:InformationalVersion=v${{ env.VERSION }}-dev.${{ env.SHORT_SHA }}
+
+      - name: Place FNA native libraries next to the exe
+        shell: pwsh
+        run: |
+          $dist = "${{ env.CUO_OUTPUT_PATH }}"
+          $x64  = Join-Path $dist "x64"
+          if (Test-Path $x64) {
+            Copy-Item -Path (Join-Path $x64 '*') -Destination $dist -Force -Recurse
+          }
+          foreach ($dll in @('SDL2.dll', 'FNA3D.dll', 'FAudio.dll')) {
+            if (-not (Test-Path (Join-Path $dist $dll))) {
+              Write-Error "Required native library missing next to the exe: $dll"
+              exit 1
+            }
+            Write-Host "Found native library: $dll"
+          }
+          if (-not (Test-Path (Join-Path $dist 'ClassicUO.exe'))) {
+            Write-Error "ClassicUO.exe was not produced by the publish step."
+            exit 1
+          }
+
+      - name: Create zip
+        uses: thedoctor0/zip-release@master
+        with:
+          type: 'zip'
+          directory: ${{ env.CUO_OUTPUT_PATH }}
+          filename: ${{ env.CUO_ZIP_NAME }}
+          exclusions: '*.zip'
+
+      # Replaced every build, same as "latest" is on the release side. Only the
+      # dev-latest tag is ever touched here; Holiday tags are never deleted, and
+      # neither is the "latest" release.
+      - name: Delete previous dev release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete "${{ env.TAG_NAME }}" --yes --cleanup-tag || echo "No previous dev release to delete."
+
+      # prerelease + makeLatest:false keep the "Latest" badge on the release
+      # download, so nobody grabs a dev build by accident.
+      - name: Publish dev release
+        uses: ncipollo/release-action@v1.16.0
+        with:
+          artifacts: "${{ env.CUO_OUTPUT_PATH }}/${{ env.CUO_ZIP_NAME }}"
+          name: "TazUO Holiday Edition (dev) - v${{ env.VERSION }}"
+          body: |
+            **Testing build off the `legacy` branch. Not a release.**
+
+            Unfinished and unconfirmed work lands here first. If you want the
+            stable client, use the `latest` release instead.
+
+            - Release this was cut from: `v${{ env.VERSION }}`
+            - Build stamp: `v${{ env.VERSION }}-dev.${{ env.SHORT_SHA }}` (shown in-client and in crash logs)
+            - Commit: ${{ env.DEV_SHA }}
+
+            Download `${{ env.CUO_ZIP_NAME }}` below, unzip it, and run `ClassicUO.exe`.
+
+            ${{ env.NOTES }}
+          tag: ${{ env.TAG_NAME }}
+          commit: ${{ env.DEV_SHA }}
+          allowUpdates: true
+          removeArtifacts: true
+          makeLatest: false
+          prerelease: true
+          token: ${{ secrets.GITHUB_TOKEN }}

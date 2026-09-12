@@ -1,0 +1,257 @@
+name: Build Release
+
+# Builds the legacy (.NET Framework 4.7.2) client on a Windows runner and
+# publishes the result as a downloadable zip attached to a GitHub release
+# tagged "latest". Each run replaces the previous "latest" release and zip.
+
+on:
+  # Run automatically whenever the release branch is updated.
+  push:
+    branches: [release]
+  # Allow starting a build by hand from the Actions tab.
+  workflow_dispatch:
+
+# Only one legacy build at a time; a newer push cancels an in-progress one.
+concurrency:
+  group: build-legacy
+  cancel-in-progress: true
+
+# Needed so the workflow can create/replace the "latest" release and tag.
+permissions:
+  contents: write
+
+env:
+  CUO_PROJECT_PATH: 'src/ClassicUO.Client/ClassicUO.Client.csproj'
+  CUO_OUTPUT_PATH: 'bin/dist'
+  CUO_ZIP_NAME: 'TazUO-Holiday-Edition.zip'
+
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: 1
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
+  NUGET_XMLDOC_MODE: skip
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      # Always build the release branch, whether triggered by push or by hand.
+      # fetch-depth: 0 pulls full history and all tags, which the tag check
+      # below needs to tell an already-released version from a new one.
+      - name: Check out release branch
+        uses: actions/checkout@v4
+        with:
+          ref: release
+          fetch-depth: 0
+
+      # Pull in FNA, MP3Sharp, etc. (and anything nested inside them).
+      # The insteadOf rewrite lets old git:// submodule URLs clone over https.
+      - name: Check out submodules (recursive)
+        run: |
+          git config --global url."https://".insteadOf git://
+          git submodule update --init --recursive
+
+      # Read the client version (e.g. 4.5.23) so we can label the release, and
+      # record the exact legacy commit we built (a manual run may be dispatched
+      # from a different branch, so github.sha is not reliable here).
+      - name: Extract version and commit
+        shell: bash
+        run: |
+          export LC_ALL=C.UTF-8
+          echo "VERSION=$(grep -oP '<AssemblyVersion>\K\d+\.\d+\.\d+' src/ClassicUO.Client/ClassicUO.Client.csproj | head -1)" >> $GITHUB_ENV
+          echo "RELEASE_SHA=$(git rev-parse HEAD)" >> $GITHUB_ENV
+
+      # The release version IS the assembly version in ClassicUO.Client.csproj.
+      # Bumping that file is how a release is cut - nothing here auto-increments, so
+      # merging to legacy without a bump refreshes "latest" and publishes no new
+      # numbered release. That is deliberate: a release should be a decision.
+      #
+      # The scheme continues TazUO's numbering rather than restarting. Taz is on
+      # 4.5.23; Holiday builds on top of that base read 4.5.23xx, so 4.5.2301 is the
+      # first. Taz would have to reach patch 2301 to collide, and the base version
+      # stays legible inside the number.
+      - name: Resolve release tag
+        shell: bash
+        run: |
+          export LC_ALL=C.UTF-8
+
+          if git rev-parse -q --verify "refs/tags/v${VERSION}" >/dev/null; then
+            echo "::notice::v${VERSION} is already released. Refreshing 'latest' only."
+            echo "::notice::To publish a new numbered release, raise <AssemblyVersion> in src/ClassicUO.Client/ClassicUO.Client.csproj."
+            echo "SKIP_PERMANENT=true" >> $GITHUB_ENV
+          else
+            echo "SKIP_PERMANENT=false" >> $GITHUB_ENV
+          fi
+
+          echo "HOLIDAY_TAG=v${VERSION}" >> $GITHUB_ENV
+
+      # The notes are whatever CHANGELOG.md holds under the heading for this
+      # version, and nothing else.
+      #
+      # They used to be `git log` over every commit since the previous tag. On
+      # 4.5.2301 that was 175 lines and included a change sitting directly
+      # above the commit reverting it, which is exactly the work a release page
+      # should not show. A person decides what is notable; this only publishes
+      # the decision.
+      #
+      # No section means no notes. The workflow says so in its log and carries
+      # on - an empty release page beats an accurate list of churn.
+      - name: Read the release notes from CHANGELOG.md
+        shell: bash
+        run: |
+          export LC_ALL=C.UTF-8
+
+          NOTES=""
+
+          if [ -f CHANGELOG.md ]; then
+            NOTES=$(awk -v ver="$VERSION" '
+              $0 ~ ("^## \\[" ver "\\]") { grab = 1; next }
+              grab && /^## \[/ { exit }
+              grab && /^---[ \t]*$/ { next }
+              grab { print }
+            ' CHANGELOG.md | sed -e '/./,$!d')
+          fi
+
+          if [ -z "$NOTES" ]; then
+            echo "::notice::No CHANGELOG.md section for ${VERSION}; publishing without notes."
+          fi
+
+          {
+            echo "NOTES<<HOLIDAY_NOTES_EOF"
+            echo "$NOTES"
+            echo "HOLIDAY_NOTES_EOF"
+          } >> $GITHUB_ENV
+
+      # The .NET 8 SDK can build/publish the net472 target on Windows.
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      # Publish the client. IS_DEV_BUILD=true produces a windowed (WinExe) build.
+      # The csproj's post-publish targets copy the native libs into bin/dist/x64.
+      - name: Publish client
+        # InformationalVersion carries the Holiday tag into the binary. The assembly
+        # version is TazUO's and is identical in every Holiday build, so without this
+        # a log or a screenshot cannot say which build produced it.
+        run: dotnet publish ${{ env.CUO_PROJECT_PATH }} -c Release -o ${{ env.CUO_OUTPUT_PATH }} -p:IS_DEV_BUILD=true -p:InformationalVersion=${{ env.HOLIDAY_TAG }}
+
+      # The client can load natives from the x64 subfolder, but to be safe we
+      # also place SDL2/FNA3D/FAudio (and the rest) right next to ClassicUO.exe,
+      # then fail the build if any of the three required natives is missing.
+      - name: Place FNA native libraries next to the exe
+        shell: pwsh
+        run: |
+          $dist = "${{ env.CUO_OUTPUT_PATH }}"
+          $x64  = Join-Path $dist "x64"
+          if (Test-Path $x64) {
+            Copy-Item -Path (Join-Path $x64 '*') -Destination $dist -Force -Recurse
+          }
+          foreach ($dll in @('SDL2.dll', 'FNA3D.dll', 'FAudio.dll')) {
+            if (-not (Test-Path (Join-Path $dist $dll))) {
+              Write-Error "Required native library missing next to the exe: $dll"
+              exit 1
+            }
+            Write-Host "Found native library: $dll"
+          }
+          if (-not (Test-Path (Join-Path $dist 'ClassicUO.exe'))) {
+            Write-Error "ClassicUO.exe was not produced by the publish step."
+            exit 1
+          }
+
+      # Zip everything in bin/dist (exe, dlls, natives, data) into one archive.
+      - name: Create zip
+        uses: thedoctor0/zip-release@master
+        with:
+          type: 'zip'
+          directory: ${{ env.CUO_OUTPUT_PATH }}
+          filename: ${{ env.CUO_ZIP_NAME }}
+          exclusions: '*.zip'
+
+      # Permanent, numbered release. Never updated, never deleted - these
+      # accumulate to form the rollback history. makeLatest is false so the
+      # "Latest" badge stays on the "latest" release below.
+      - name: Publish permanent Holiday release
+        id: permanent_release
+        if: env.SKIP_PERMANENT == 'false'
+        uses: ncipollo/release-action@v1.16.0
+        with:
+          artifacts: "${{ env.CUO_OUTPUT_PATH }}/${{ env.CUO_ZIP_NAME }}"
+          name: "TazUO Holiday Edition ${{ env.HOLIDAY_TAG }}"
+          body: |
+            Download `${{ env.CUO_ZIP_NAME }}` below, unzip it, and run `ClassicUO.exe`.
+
+            ${{ env.NOTES }}
+
+            <sub>.NET Framework 4.7.2 &middot; commit ${{ env.RELEASE_SHA }}</sub>
+          tag: ${{ env.HOLIDAY_TAG }}
+          commit: ${{ env.RELEASE_SHA }}
+          allowUpdates: false   # a numbered release is written once
+          makeLatest: true      # this is what /releases/latest resolves to
+          prerelease: false
+          # Created as a draft and published a step later. A release that is
+          # published on creation is frozen by GitHub's immutable releases
+          # setting before its files finish uploading, and the upload is then
+          # refused - which is how the "latest" release came to exist on
+          # 2026-09-12 carrying no zip at all. A draft is not frozen, so the
+          # files land first and publishing comes after.
+          draft: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish the permanent release
+        if: env.SKIP_PERMANENT == 'false'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api --method PATCH \
+            "repos/${{ github.repository }}/releases/${{ steps.permanent_release.outputs.id }}" \
+            -F draft=false --jq '.html_url'
+
+      # Remove the previous "latest" release and its tag so the new one is
+      # created fresh against this commit. Ignored if there isn't one yet.
+      # Only the "latest" tag is touched - Holiday tags are never deleted.
+      # The whole point of the release is the file. If it is not attached, the
+      # run must not report success - the download page looked fine on
+      # 2026-09-12 while serving nothing.
+      - name: Verify the zip is attached
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          if ! gh release view "${{ env.HOLIDAY_TAG }}" --json assets \
+               --jq '.assets[].name' 2>/dev/null | grep -qx "${{ env.CUO_ZIP_NAME }}"; then
+            echo "::error::${{ env.HOLIDAY_TAG }} has no ${{ env.CUO_ZIP_NAME }} attached."
+            exit 1
+          fi
+
+          # The download URL people actually use follows the Latest badge
+          # rather than any tag, so check that it lands on this release.
+          resolved=$(gh api "repos/${{ github.repository }}/releases/latest" --jq '.tag_name')
+          echo "/releases/latest resolves to $resolved"
+
+          if [ "$resolved" != "${{ env.HOLIDAY_TAG }}" ] && [ "${{ env.SKIP_PERMANENT }}" = "false" ]; then
+            echo "::error::/releases/latest points at $resolved, not ${{ env.HOLIDAY_TAG }}."
+            exit 1
+          fi
+
+      # A numbered release is published once and its files never change. Its
+      # notes can still be wrong - a typo, or a line that should not have been
+      # there - and rewriting CHANGELOG.md should be enough to correct it
+      # without cutting a new version. This touches the body only; the assets
+      # and the tag are not involved.
+      - name: Refresh the notes on an already-published version
+        if: env.SKIP_PERMANENT == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          printf '%s\n\n%s\n\n%s\n' \
+            "Download \`${{ env.CUO_ZIP_NAME }}\` below, unzip it, and run \`ClassicUO.exe\`." \
+            "${{ env.NOTES }}" \
+            "<sub>.NET Framework 4.7.2 &middot; commit ${{ env.RELEASE_SHA }}</sub>" \
+            | gh release edit "${{ env.HOLIDAY_TAG }}" --notes-file -
+
+          echo "::notice::Refreshed the notes on ${{ env.HOLIDAY_TAG }}."

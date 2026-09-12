@@ -40,7 +40,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\external\DiscordSocialSDK.Wrapper\DiscordSocialSDK.Wrapper\DiscordSocialSDK.Wrapper.csproj" />
     <ProjectReference Include="..\..\external\FNA\FNA.Core.csproj" />
     <ProjectReference Include="..\ClassicUO.Assets\ClassicUO.Assets.csproj" />
     <ProjectReference Include="..\ClassicUO.Renderer\ClassicUO.Renderer.csproj" />
@@ -135,6 +134,21 @@
     <WriteLinesToFile File="$(TargetDir)v.txt" Lines="$(AssemblyVersion)" Overwrite="true" />
   </Target>
 
+  <!--
+    The download is a Windows client. It was also carrying the macOS and Linux
+    runtimes - 110 MB of 176 MB uncompressed, 63% of what people waited for -
+    for platforms this project cannot even be built for: ClassicUO.Client.csproj
+    has hardcoded HintPaths into Program Files, and both workflows run on
+    windows-latest.
+
+    Set IncludeNonWindowsRuntimes=true to put them back, for anyone who gets a
+    non-Windows build working. x64/ is never conditional: losing it produces a
+    client that exits on launch with no error.
+  -->
+  <PropertyGroup Condition="'$(IncludeNonWindowsRuntimes)' == ''">
+    <IncludeNonWindowsRuntimes>false</IncludeNonWindowsRuntimes>
+  </PropertyGroup>
+
   <Target Name="CopyExternalDeps_build" AfterTargets="Build">
     <ItemGroup>
       <MonockickstartPath Include="$(ProjectDir)..\..\tools\monokickstart\*.*" />
@@ -147,11 +161,13 @@
 
     <Copy SourceFiles="@(DataFiles_iplib)" DestinationFiles="@(DataFiles_iplib -> '$(TargetDir)\iplib\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
     <Copy SourceFiles="@(DataFiles_x64)" DestinationFolder="$(TargetDir)\x64\" SkipUnchangedFiles="true" />
-    <Copy SourceFiles="@(DataFiles_lib64)" DestinationFolder="$(TargetDir)\lib64\" SkipUnchangedFiles="true" />
-    <Copy SourceFiles="@(DataFiles_osx)" DestinationFolder="$(TargetDir)\osx\" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(DataFiles_lib64)" DestinationFolder="$(TargetDir)\lib64\" SkipUnchangedFiles="true" Condition="'$(IncludeNonWindowsRuntimes)' == 'true'" />
+    <Copy SourceFiles="@(DataFiles_osx)" DestinationFolder="$(TargetDir)\osx\" SkipUnchangedFiles="true" Condition="'$(IncludeNonWindowsRuntimes)' == 'true'" />
     <Copy SourceFiles="@(DataFiles_vulkan)" DestinationFolder="$(TargetDir)\vulkan\icd.d\" SkipUnchangedFiles="true" />
 
-    <Copy SourceFiles="@(MonockickstartPath)" DestinationFolder="$(TargetDir)\" SkipUnchangedFiles="true" Condition="$(TargetFramework.StartsWith('net4'))" />
+    <!-- The Mono launchers for Linux and macOS, ClassicUO.bin.* - including
+         22 MB of debug symbols, the largest single file in the download. -->
+    <Copy SourceFiles="@(MonockickstartPath)" DestinationFolder="$(TargetDir)\" SkipUnchangedFiles="true" Condition="$(TargetFramework.StartsWith('net4')) AND '$(IncludeNonWindowsRuntimes)' == 'true'" />
   </Target>
 
   <Target Name="CreateVersionFile_publish" AfterTargets="Publish">
@@ -168,11 +184,13 @@
 
     <Copy SourceFiles="@(DataFiles_iplib)" DestinationFiles="@(DataFiles_iplib -> '$(PublishDir)\iplib\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
     <Copy SourceFiles="@(DataFiles_x64)" DestinationFolder="$(PublishDir)\x64\" SkipUnchangedFiles="true" />
-    <Copy SourceFiles="@(DataFiles_lib64)" DestinationFolder="$(PublishDir)\lib64\" SkipUnchangedFiles="true" />
-    <Copy SourceFiles="@(DataFiles_osx)" DestinationFolder="$(PublishDir)\osx\" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(DataFiles_lib64)" DestinationFolder="$(PublishDir)\lib64\" SkipUnchangedFiles="true" Condition="'$(IncludeNonWindowsRuntimes)' == 'true'" />
+    <Copy SourceFiles="@(DataFiles_osx)" DestinationFolder="$(PublishDir)\osx\" SkipUnchangedFiles="true" Condition="'$(IncludeNonWindowsRuntimes)' == 'true'" />
     <Copy SourceFiles="@(DataFiles_vulkan)" DestinationFolder="$(PublishDir)\vulkan\icd.d\" SkipUnchangedFiles="true" />
 
-    <Copy SourceFiles="@(MonockickstartPath)" DestinationFolder="$(PublishDir)\" SkipUnchangedFiles="true" Condition="$(TargetFramework.StartsWith('net4'))" />
+    <!-- The Mono launchers for Linux and macOS, ClassicUO.bin.* - including
+         22 MB of debug symbols, the largest single file in the download. -->
+    <Copy SourceFiles="@(MonockickstartPath)" DestinationFolder="$(PublishDir)\" SkipUnchangedFiles="true" Condition="$(TargetFramework.StartsWith('net4')) AND '$(IncludeNonWindowsRuntimes)' == 'true'" />
   </Target>
 
 </Project>

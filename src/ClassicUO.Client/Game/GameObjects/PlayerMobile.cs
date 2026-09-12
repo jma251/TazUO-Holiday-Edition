@@ -81,25 +81,29 @@ namespace ClassicUO.Game.GameObjects
         public override bool IsWalking => LastStepTime > Time.Ticks - Constants.PLAYER_WALKING_DELAY;
 
         /// <summary>
-        /// Whether a spell cast is believed to be in progress.
+        /// Whether a spell cast is in progress.
         ///
-        /// Written by SpellVisualRangeManager, which is the only thing that decides it, and
-        /// held here so anything outside that manager can read it - an assistant reaching in
-        /// by reflection included. Same name and same place as upstream, and the same
-        /// behaviour: set on hearing the spell's power words, cleared on one of the stop
-        /// clilocs, on a new cast, and on any hit point packet for the player.
+        /// Decided by SpellVisualRangeManager and held here so anything outside it can read
+        /// the answer. Each edge is something observed rather than guessed at:
         ///
-        /// Two things to know rather than discover. A cast that succeeds has no signal of
-        /// its own - the server never says "you cast that" - so the flag is not cleared by
-        /// the cast finishing. And because a hit point packet clears it, taking damage
-        /// mid-cast reads as the cast ending whether or not it really was disturbed, which
-        /// it is not if Protection is up.
+        /// - Starts on hearing the spell's own power words.
+        /// - Ends when the server says the cast stopped - concentration disturbed, out of
+        ///   mana, out of reagents and the rest, each a cliloc it sends.
+        /// - Ends when a target cursor arrives for a spell that was waiting for one. That is
+        ///   the server announcing completion; it just asks where to aim instead of saying so.
         ///
-        /// Both are upstream's behaviour, kept deliberately rather than corrected here, so
-        /// this reports the same thing the reference client does. Judging either is left to
-        /// whatever is reading: the player's buffs say whether Protection is up, and
-        /// CastTime, RecoveryTime, MaxFasterCasting and MaxFasterCastRecovery are on the
-        /// spell, alongside FasterCasting and FasterCastRecovery here.
+        /// Note what is deliberately absent: taking damage does not end a cast here. Whether
+        /// a hit disturbed one is the server's to decide and it does say, and under Protection
+        /// a hit does not disturb at all - so no amount of watching hit points gets it right.
+        ///
+        /// The one case with no signal is a spell that needs no target and simply worked. The
+        /// server never comments, so the flag is let go after that spell's configured maximum
+        /// duration. A backstop, not a measurement - it errs late by design, and no Faster
+        /// Casting arithmetic is applied to it.
+        ///
+        /// Precise timing is the caller's, and every figure it needs is exposed: CastTime,
+        /// RecoveryTime, MaxFasterCasting and MaxFasterCastRecovery on the spell,
+        /// FasterCasting and FasterCastRecovery here.
         /// </summary>
         public bool IsCasting { get; set; }
 
