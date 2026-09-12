@@ -9,38 +9,47 @@ A personal fork of [TazUO](https://github.com/PlayTazUO/TazUO), which is
 itself a fork of ClassicUO — an open-source reimplementation of the Ultima
 Online Classic Client, written in C# on top of FNA (an XNA reimplementation).
 
-## Branches: `legacy` develops, `release` ships
+## Branches: `dev` develops, `release` ships
 
 Two branches, and both are this fork's. The other two came with it.
 
 | Branch | Framework | Version | Role |
 | --- | --- | --- | --- |
-| **`legacy`** | .NET Framework **4.7.2** (`net472`) | 4.5.2301 | **Development.** Where work goes, and where the `v4.5.23-h1`…`h73` tags point. |
+| **`dev`** | .NET Framework **4.7.2** (`net472`) | 4.5.2301 | **Development.** Where work goes, and where the `v4.5.23-h1`…`h73` tags point. |
 | **`release`** | .NET Framework **4.7.2** (`net472`) | 4.5.2301 | **Release.** What other people download, and the repository's default branch. Only tested, confirmed work lands here, and landing here *is* the release. |
-| `main` | .NET **10** (`net10.0`) | 5.24.5 | Upstream's. Reference only — a mirror kept so fixes can be read out of it. |
-| `dev` | .NET **10** (`net10.0`) | 5.24.5 | Upstream's. Not used here, not built, not a release path. |
+| `upstream-main` | .NET **10** (`net10.0`) | 5.24.5 | Upstream's. Reference only — a mirror kept so fixes can be read out of it. |
+| `upstream-dev` | .NET **10** (`net10.0`) | 5.24.5 | Upstream's. Not used here, not built, not a release path. |
 
-There was briefly a third branch of ours, `legacy-dev`, created on 2026-09-10
-when `legacy` still shipped. `release` was added hours later and `legacy-dev`
-kept a name describing a branch it no longer fed. It was folded back into
-`legacy` on 2026-09-12 and removed. Nothing was lost: it was a fast-forward.
+These names are from 2026-09-12. The development branch was called `legacy`,
+which read as something retired, while upstream's two mirrors held the obvious
+names `main` and `dev`. So the mirrors moved aside and the development branch
+took the name that describes it. `legacy` and the old `main`/`dev` are gone;
+nothing was lost, the mirrors were copied before their old names were removed.
+
+The name `legacy` still appears in this repository meaning **the .NET Framework
+4.7.2 client**, which is what upstream calls it. That is a different thing from
+the branch that used to carry the name. Read it as the framework, not a branch.
+
+There was also briefly a `legacy-dev`, created on 2026-09-10 when `legacy` still
+shipped, folded back in on 2026-09-12 and removed.
 
 `release` is the default branch, so a new pull request targets it unless told
-otherwise. Almost none should: **retarget to `legacy` before opening it.**
+otherwise. Almost none should: **retarget to `dev` before opening it.**
 "Automatically delete head branches" is on, so a merged pull request cleans up
 the branch it came from.
 
 **Rules:**
 
-- Work goes on **`legacy`**, as commits. A separate branch per change is not
+- Work goes on **`dev`**, as commits. A separate branch per change is not
   the convention here - it produced ninety-odd leftovers that nothing deleted.
-- `legacy` merges into `release` **only** when the work has been built, run,
+- `dev` merges into `release` **only** when the work has been built, run,
   and confirmed good. That merge publishes to real users, so it is not a routine
   step — it is the decision to ship, and it needs a version bump to go with it.
 - **Never commit directly to `release`.** Everything reaches it through a merge
-  from `legacy`.
-- **Never build, modify, or release `main` or `dev`.** They exist to be read.
-- Keep `legacy` current with `release` (merge `release` in) so the two do not
+  from `dev`.
+- **Never build, modify, or release `upstream-main` or `upstream-dev`.** They
+  exist to be read.
+- Keep `dev` current with `release` (merge `release` in) so the two do not
   drift; a release cut from a stale dev branch silently reverts things.
 
 Dev-only work does **not** need holding back from `release` by hand. Anything
@@ -48,10 +57,10 @@ behind `HOLIDAY_DEV` is compiled out of the release build wherever it lands, so
 the branches stay mergeable rather than diverging. See the flag's description in
 `Directory.Build.props`.
 
-The one exception to going through `legacy`: a fix for something that is
+The one exception to going through `dev`: a fix for something that is
 broken *in the wild right now*. Those may go straight to a branch off `release`,
 because routing an emergency through a dev branch full of untested work would
-ship that work alongside it. Merge `release` back down into `legacy`
+ship that work alongside it. Merge `release` back down into `dev`
 afterwards.
 
 ### Porting a fix from `main` to the 4.7.2 branches
@@ -66,8 +75,8 @@ because the two branches have diverged structurally:
 - The two are ~1 major version apart (4.5.x vs 5.24.x), so surrounding code
   often differs.
 
-Expect to read the change on `main` and **re-apply it by hand** to `legacy`,
-rather than cherry-picking the commit.
+Expect to read the change on `upstream-main` and **re-apply it by hand** to
+`dev`, rather than cherry-picking the commit.
 
 ## The .NET Framework 4.7.2 constraint
 
@@ -201,17 +210,27 @@ one that publishes a numbered version. It should stay that way.**
 
 `.github/workflows/build-dev.yml` — **the testing path**:
 
-- Triggers on push to `legacy`, or manually.
+- Triggers on push to `dev`, or manually.
 - Same build and the same hard-fail check on the natives, so a dev build is a
   real, launchable client and not a half-packaged one.
-- Publishes to a single **prerelease** tagged `dev-latest`, replaced every build.
-  It does **not** touch `latest` and is **never numbered**, so the version line
-  only ever moves when a release is cut.
+- Publishes to a single **prerelease** tagged `dev-build`, updated in place every
+  build. It is **never numbered**, so the version line only ever moves when a
+  release is cut.
 - The zip is `HolidayEdition-Dev.zip`. The name deliberately avoids the `TazUO`
   prefix — the launcher falls back to picking any asset starting with that, and
   a dev zip must never be selectable as a release download.
-- The tag is `dev-latest`, not `dev`, because a tag named `dev` would collide
-  with the inherited `dev` branch and make `git checkout dev` ambiguous.
+- The tag is `dev-build`. It was `dev-latest` until that name was burned - see
+  "One release per version" below - and it must not be `dev`, which would
+  collide with the branch and make `git checkout dev` ambiguous.
+- The release is **updated in place**, never deleted and recreated. A step after
+  publishing force-moves the tag to the commit that was built, because
+  `allowUpdates` will not repoint an existing tag and the release page otherwise
+  shows a commit with nothing to do with the download. Moving a ref is not
+  publishing a release, so it cannot burn the name.
+- The release **name** carries the build time and short sha. GitHub's "released
+  this N hours ago" is `published_at` and never moves for a release that is
+  updated rather than recreated, so the name is the only place that says when
+  the zip was actually made.
 - Stamps the commit into the binary as `v<version>-dev.<short sha>`, so a crash
   log from a dev build says which dev build. The leading `v` is load-bearing:
   `CUOEnviroment.ReadBuildTag` uses it to tell a stamped build from an unstamped
@@ -289,11 +308,16 @@ points at a release that has no file. The release step verifies the zip is
 attached and that the badge resolves to the version just built, and fails the
 run if either is untrue.
 
-Dev builds still publish to a rolling **`dev-latest`** prerelease, replaced
-every push, because a prerelease cannot carry the Latest badge and so needs a
-tag. That tag is exposed to the same hazard: if immutable releases is ever
-switched on again, the first dev build afterwards will burn it. Leave the
-setting off.
+Dev builds publish to a rolling **`dev-build`** prerelease, because a prerelease
+cannot carry the Latest badge and so needs a tag. `dev-latest` was the name
+until it was burned the same way `latest` was.
+
+It is **updated in place** now rather than deleted and recreated, which is what
+spent both previous names: each recreate publishes the name afresh. Nothing in
+either workflow deletes a release any more, and nothing should be added that
+does. `allowUpdates` plus `removeArtifacts` gives the same rolling download with
+the tag never republished, so no further name can be lost - with immutable
+releases off, and if it is ever switched on again.
 
 Numbered releases are never deleted. `allowUpdates: false` keeps their files
 fixed once published, and a separate step refreshes only their notes from
