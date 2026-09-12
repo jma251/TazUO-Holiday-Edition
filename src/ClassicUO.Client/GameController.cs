@@ -142,7 +142,13 @@ namespace ClassicUO
             {
                 var c = PacketHandlers.Handler.ParsePackets(message);
                 AsyncNetClient.Socket.Statistics.TotalPacketsReceived += (uint)c;
-                packetsProcessed++;
+
+                // Count the packets, not the reads. ParsePackets returns how many
+                // game packets were in this message, and it drains the whole
+                // accumulated buffer per call - so incrementing by one made the
+                // budget twenty-five reads rather than twenty-five packets, and a
+                // burst could do the entire backlog twenty-five times in a frame.
+                packetsProcessed += c > 0 ? c : 1;
             }
         }
 
