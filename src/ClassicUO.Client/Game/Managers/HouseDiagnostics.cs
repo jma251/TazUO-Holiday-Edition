@@ -67,18 +67,31 @@ namespace ClassicUO.Game.Managers
                 return;
             }
 
-            if (!TryGetHouseContainingPlayer(out uint houseSerial))
+            // Gated on where the ITEM is, not where the player is. It used to return
+            // here unless the player was standing in a house, which meant the one
+            // moment that matters went unrecorded: walking out, when the contents pass
+            // beyond ClientViewRange and are culled. A capture showed 242 house items
+            // destroyed against 6 cull lines - the other 236 were culled from outside
+            // and written nowhere, so the destroys had no visible cause.
+            //
+            // LogHouseItemDestroyed already gates this way, so cull and destroy counts
+            // are now directly comparable. It is also less noise than before, not more:
+            // culls out in the open world are still skipped.
+            if (!InAnyKnownHouse(item.X, item.Y, out uint houseSerial))
             {
                 return;
             }
+
+            bool playerInside = TryGetHouseContainingPlayer(out uint playerHouse);
 
             Write(
                 $"cull\tserial=0x{item.Serial:X8}\tgraphic=0x{item.Graphic:X4}"
                 + $"\titem=({item.X},{item.Y},{item.Z})"
                 + $"\tcentre=({World.RangeSize.X},{World.RangeSize.Y})"
                 + $"\tdistance={item.Distance}\tviewrange={World.ClientViewRange}"
-                + $"\tinhouse=0x{houseSerial:X8}"
-                + $"\titeminhouse={World.HouseManager.EntityIntoHouse(houseSerial, item)}"
+                + $"\titemhouse=0x{houseSerial:X8}"
+                + $"\tplayerhouse={(playerInside ? $"0x{playerHouse:X8}" : "none")}"
+                + $"\titeminhouse=True"
             );
         }
 
