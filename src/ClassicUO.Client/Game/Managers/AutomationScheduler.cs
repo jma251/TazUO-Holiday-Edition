@@ -76,20 +76,6 @@ namespace ClassicUO.Game.Managers
 
             _nextTick = (long) Time.Ticks + INTERVAL_MS;
 
-            // The pet snapshot is rebuilt here rather than on its own timer.
-            // MW Edition rebuilds at 20Hz because a dozen of his overlays read
-            // it between frames; the only readers here are the bandage helpers
-            // below, which run at this rate, so a fresher copy would be three
-            // passes over every mobile that nothing looks at.
-            if (UI.MobileCache.IsNeeded)
-            {
-                FeatureDiagnostics.Guard("MobileCache", UI.MobileCache.Rebuild);
-            }
-            else
-            {
-                UI.MobileCache.Clear();
-            }
-
             foreach (Feature feature in _features)
             {
                 if (feature.IsActive != null && !feature.IsActive())
@@ -134,6 +120,8 @@ namespace ClassicUO.Game.Managers
             BandageScheduler.ResetForProfile();
             BandageSettings.ResetForProfile();
             UI.MobileCache.Clear();
+            UI.CorpseFadeOverlay.ResetSession();
+            UI.PathPreview.Clear();
             UI.Gumps.ToastManager.ResetForProfile();
 
             AfkReplyManager.ResetSession();

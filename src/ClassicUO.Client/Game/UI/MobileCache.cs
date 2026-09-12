@@ -6,49 +6,87 @@ using ClassicUO.Game.Managers;
 namespace ClassicUO.Game.UI
 {
     /// <summary>
-    /// A shared snapshot of world entities, rebuilt at 20Hz, for the helpers that
-    /// would otherwise scan every mobile on every frame. Walking a List is cheaper
-    /// than the dictionary's value enumerator, and one snapshot serves all of them.
+    /// A shared snapshot of world entities for the overlays and helpers that would
+    /// otherwise scan every mobile on every frame. Walking a List is cheaper than
+    /// the dictionary's value enumerator, and one snapshot serves all of them.
     ///
-    /// Only the pet list is here. MW Edition's version also caches all mobiles,
-    /// hostiles and ground items, but every switch that turns those on is one of
-    /// his overlays - hostile edge highlight, the offscreen enemy arrow, the
-    /// ambience and corpse-fade overlays - and none of those are in this fork.
-    /// Caching lists nothing reads would be cost without a reader. The remaining
-    /// collections belong with the features that want them.
+    /// Each list is built only while something is asking for it, so a snapshot
+    /// costs nothing for features that are switched off.
+    ///
+    /// MW Edition also caches a list of every mobile. Nothing here reads it - the
+    /// overlays that do are his ambience, blood and notoriety-dot effects, which
+    /// are not in this fork - so it is left out rather than built for no one.
     /// </summary>
     public static class MobileCache
     {
-        // Rebuilt at 20Hz. Consumers must still check IsDestroyed - an entity can
-        // be destroyed between snapshots.
+        // Rebuilt on each pass. Consumers must still check IsDestroyed - an entity
+        // can be destroyed between snapshots.
+        public static readonly List<Mobile> Hostiles = new List<Mobile>(32);
         public static readonly List<Mobile> Pets = new List<Mobile>(16);
+        public static readonly List<Item> GroundItems = new List<Item>(128);
 
-        public static bool IsNeeded => NeedsPets;
+        public static bool IsNeeded => NeedsHostiles || NeedsPets || NeedsGroundItems;
+
+        private static bool NeedsHostiles =>
+            HostileEdgeHighlight.Enabled
+            || OffscreenEnemyArrow.Enabled
+            || NearestHostileLine.Enabled
+            || CombatMobHpBars.Range > 0;
 
         private static bool NeedsPets =>
             AutoBandageManager.Enabled
             || PetBandageManager.Enabled
-            || ExternalBandageManager.Enabled;
+            || ExternalBandageManager.Enabled
+            || PetHpBarsOverlay.Enabled;
+
+        private static bool NeedsGroundItems =>
+            GroundLootFinder.Range > 0
+            || CorpseFadeOverlay.Enabled;
 
         public static void Rebuild()
         {
-            Pets.Clear();
+            bool needHostiles = NeedsHostiles;
+            bool needPets = NeedsPets;
+            bool needGroundItems = NeedsGroundItems;
 
-            if (!NeedsPets)
+            Hostiles.Clear();
+            Pets.Clear();
+            GroundItems.Clear();
+
+            if (needHostiles || needPets)
             {
-                return;
+                foreach (Mobile m in World.Mobiles.Values)
+                {
+                    if (m == null || m.IsDestroyed || m == World.Player)
+                    {
+                        continue;
+                    }
+
+                    NotorietyFlag notoriety = m.NotorietyFlag;
+
+                    if (needHostiles && !m.IsDead
+                        && notoriety != NotorietyFlag.Innocent
+                        && notoriety != NotorietyFlag.Invulnerable
+                        && notoriety != NotorietyFlag.Ally)
+                    {
+                        Hostiles.Add(m);
+                    }
+
+                    if (needPets && ShouldCachePet(false, m.IsDead, m.IsRenamable, notoriety))
+                    {
+                        Pets.Add(m);
+                    }
+                }
             }
 
-            foreach (Mobile m in World.Mobiles.Values)
+            if (needGroundItems)
             {
-                if (m == null || m.IsDestroyed || m == World.Player)
+                foreach (Item item in World.Items.Values)
                 {
-                    continue;
-                }
-
-                if (ShouldCachePet(false, m.IsDead, m.IsRenamable, m.NotorietyFlag))
-                {
-                    Pets.Add(m);
+                    if (item != null && !item.IsDestroyed && item.OnGround)
+                    {
+                        GroundItems.Add(item);
+                    }
                 }
             }
         }
@@ -64,7 +102,9 @@ namespace ClassicUO.Game.UI
 
         public static void Clear()
         {
+            Hostiles.Clear();
             Pets.Clear();
+            GroundItems.Clear();
         }
     }
 }

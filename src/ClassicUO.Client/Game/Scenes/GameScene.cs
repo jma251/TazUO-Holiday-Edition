@@ -109,6 +109,7 @@ namespace ClassicUO.Game.Scenes
             _light_render_target;
         private AnimatedStaticsManager _animatedStaticsManager;
         private long _nextProfileSave;
+        private long _nextCacheRebuild;
 
         public MoveItemQueue MoveItemQueue => _moveItemQueue;
         public bool UpdateDrawPosition { get; set; }
@@ -938,6 +939,25 @@ namespace ClassicUO.Game.Scenes
             _useItemQueue.Update();
 
             AutoLootManager.Instance.Update();
+
+            // The entity snapshot is rebuilt at 20Hz because the overlays below
+            // draw from it every frame, and a stale list puts a highlight where
+            // the mobile no longer is. The bandage helpers read the same snapshot
+            // at their own slower rate; they are not what sets this interval.
+            if (Time.Ticks >= _nextCacheRebuild)
+            {
+                _nextCacheRebuild = (long) Time.Ticks + 50;
+
+                if (UI.MobileCache.IsNeeded)
+                {
+                    FeatureDiagnostics.Guard("MobileCache", UI.MobileCache.Rebuild);
+                }
+                else
+                {
+                    UI.MobileCache.Clear();
+                }
+            }
+
             AutomationScheduler.Tick();
             _moveItemQueue.ProcessQueue();
             GridHighlightData.ProcessQueue();
@@ -1490,6 +1510,19 @@ namespace ClassicUO.Game.Scenes
         public void DrawOverheads(UltimaBatcher2D batcher)
         {
             _healthLinesManager.Draw(batcher);
+
+            // World overlays share the health bars' batcher state. Each is behind
+            // FeatureDiagnostics.Guard, so one that throws is isolated after a few
+            // failures instead of taking the frame down every frame.
+            FeatureDiagnostics.Guard("PathPreview", batcher, UI.PathPreview.DrawWorld);
+            FeatureDiagnostics.Guard("CombatMobHpBars", batcher, UI.CombatMobHpBars.DrawWorld);
+            FeatureDiagnostics.Guard("PetHpBars", batcher, UI.PetHpBarsOverlay.DrawWorld);
+            FeatureDiagnostics.Guard("NearestHostileLine", batcher, UI.NearestHostileLine.DrawWorld);
+            FeatureDiagnostics.Guard("HostileEdgeHighlight", batcher, UI.HostileEdgeHighlight.DrawWorld);
+            FeatureDiagnostics.Guard("OffscreenEnemyArrow", batcher, Camera.Bounds, UI.OffscreenEnemyArrow.DrawWorld);
+            FeatureDiagnostics.Guard("LastTargetHighlight", batcher, UI.LastTargetHighlight.DrawWorld);
+            FeatureDiagnostics.Guard("GroundLootFinder", batcher, UI.GroundLootFinder.DrawWorld);
+            FeatureDiagnostics.Guard("CorpseFade", batcher, UI.CorpseFadeOverlay.DrawWorld);
 
             if (!UIManager.IsMouseOverWorld)
             {
