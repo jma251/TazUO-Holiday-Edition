@@ -45,7 +45,12 @@ namespace ClassicUO.Utility.Logging
         {
             logStream = new FileStream
             (
-                $"{directory}/{DateTime.Now:yyyy-MM-dd_hh-mm-ss}_{file}",
+                // HH, not hh. The lowercase form is the 12-hour clock, and nothing here
+                // printed AM/PM, so a session started at 14:30 produced the same filename
+                // as one started at 02:30 - and FileMode.Append then merged an afternoon
+                // log into the morning's. Milliseconds separate two files opened in the
+                // same second.
+                $"{directory}/{DateTime.Now:yyyy-MM-dd_HH-mm-ss-fff}_{file}",
                 FileMode.Append,
                 FileAccess.Write,
                 FileShare.ReadWrite,
@@ -62,11 +67,19 @@ namespace ClassicUO.Utility.Logging
 
         public void Write(string message)
         {
-            byte[] buffer = System.Buffers.ArrayPool<byte>.Shared.Rent(message.Length);
+            // Characters and bytes are not the same count. UTF-8 spends one byte on ASCII
+            // but two or three on anything else, so a message with a single accented
+            // character, a box-drawing glyph or a non-Latin name encodes longer than it
+            // reads. Sizing the buffer by message.Length under-allocates for those, and
+            // writing message.Length bytes back out then cut the line short - mid-character,
+            // so the tail arrived as mojibake or vanished. Crash logs are the place this
+            // hurt: the truncated part is the end of the stack trace.
+            int byteCount = Encoding.UTF8.GetByteCount(message);
+            byte[] buffer = System.Buffers.ArrayPool<byte>.Shared.Rent(byteCount);
 
             try
             {
-                Encoding.UTF8.GetBytes
+                int written = Encoding.UTF8.GetBytes
                 (
                     message,
                     0,
@@ -75,7 +88,7 @@ namespace ClassicUO.Utility.Logging
                     0
                 );
 
-                logStream.Write(buffer, 0, message.Length);
+                logStream.Write(buffer, 0, written);
                 logStream.WriteByte((byte) '\n');
                 logStream.Flush();
             }
@@ -87,11 +100,12 @@ namespace ClassicUO.Utility.Logging
 
         public async Task WriteAsync(string message)
         {
-            byte[] buffer = System.Buffers.ArrayPool<byte>.Shared.Rent(message.Length);
+            int byteCount = Encoding.UTF8.GetByteCount(message);
+            byte[] buffer = System.Buffers.ArrayPool<byte>.Shared.Rent(byteCount);
 
             try
             {
-                Encoding.UTF8.GetBytes
+                int written = Encoding.UTF8.GetBytes
                 (
                     message,
                     0,
@@ -100,7 +114,7 @@ namespace ClassicUO.Utility.Logging
                     0
                 );
 
-                await logStream.WriteAsync(buffer, 0, message.Length);
+                await logStream.WriteAsync(buffer, 0, written);
                 logStream.WriteByte((byte) '\n');
                 await logStream.FlushAsync();
             }
