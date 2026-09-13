@@ -203,12 +203,51 @@ files. Negligible, but it is synchronous I/O in the frame loop.
 
 ---
 
-## Not audited
+## Second pass - the ported helpers and what holds them up
 
-Additive and mostly gated off, so lowest blast radius:
+### `FeatureDiagnostics.Guard` - the isolation
 
-- `Game/Managers/AudioManager.cs` (+647) - surface reviewed, no per-frame hook
-- The ported helper managers - bandage, music, toast, spell range, feature
-  diagnostics, house contents recovery
-- `Game/UI/Gumps/ModernOptionsGump.cs` (+440)
-- `LegionScripting/`
+Every helper is invoked through it. It catches everything, records the failure,
+and after **3 failures inside a 60 second window** the feature is switched off
+for the session rather than throwing once a frame forever. `_entries` is keyed by
+feature name, so it is bounded by the number of features (22), not by the number
+of failures.
+
+That means a helper cannot take the client down even if it is wrong.
+
+### Null safety in the tick paths
+
+Every ported manager that dereferences `World.Player` guards it first. Checked
+across all 24: **no unguarded dereference anywhere**. The ones with no guard also
+never touch `World.Player`.
+
+With `Guard` wrapped around them as well, that is two independent protections
+against the obvious crash - a helper still ticking through a logout.
+
+### Collections
+
+Scanned every file added since the fork for a collection that grows without
+bound. Nothing found:
+
+- `FeatureDiagnostics._entries` - keyed by feature name, 22 max
+- `SkillReader._idx` - keyed by skill name, ~58 max
+- `MusicMapManager` - its two lists are locals inside the file parser, not state
+- everything else clears on `ResetForProfile` / `ResetSession`
+
+### `ModernOptionsGump.cs` (+440)
+
+`profile` is assigned once in the constructor from `ProfileManager.CurrentProfile`
+and dereferenced 368 times across the gump. The pages this fork added use it
+exactly as every upstream page does, so they introduce no failure mode the gump
+did not already have.
+
+### `AudioManager.cs` (+647)
+
+No per-frame hook. Instantiated once in `GameController`; everything else is
+driven by events. Large, but it cannot cost frame time when nothing is happening.
+
+---
+
+## Still not audited
+
+- `LegionScripting/` - the scripting language and its Python API
