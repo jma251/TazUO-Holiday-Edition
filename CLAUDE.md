@@ -207,17 +207,18 @@ Notes:
 
 ### What ships in the zip
 
-A Windows client and nothing else, since 2026-09-12. It used to carry the
-macOS and Linux runtimes too - `osx/`, `lib64/`, and the Mono launchers in
-`tools/monokickstart` including 22 MB of Linux debug symbols, the largest
-single file in the download. That was 110 MB of 176 MB uncompressed, for
-platforms this cannot be built for: the client csproj has hardcoded HintPaths
-into `Program Files (x86)`, and both workflows run on `windows-latest`.
+Everything: the Windows client plus the macOS and Linux runtimes - `osx/`,
+`lib64/`, and the Mono launchers in `tools/monokickstart`. Both branches ship
+the same set, and both zips are the same size. That is deliberate.
 
-Build with `-p:IncludeNonWindowsRuntimes=true` to put them back.
+There was briefly a build flag that dropped the non-Windows runtimes, on `dev`
+only, between 2026-09-12 and 2026-09-13. It was removed. The saving was real -
+they are 110 MB of 176 MB uncompressed - but it was never asked for, and it
+made the dev download stop matching the release download, which is the one
+thing a test build must not do. **Do not re-introduce it.** If trimming the
+zip ever becomes worth doing, it is a decision for both branches at once.
 
-`x64/` is never conditional. The FNA natives live there and the client exits
-on launch without them.
+`x64/` holds the FNA natives and the client exits on launch without them.
 
 ### Native libraries — the thing that breaks launches
 
