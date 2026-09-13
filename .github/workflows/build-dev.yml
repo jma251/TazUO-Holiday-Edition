@@ -1,6 +1,6 @@
 name: Build Dev
 
-# Builds the development branch, legacy, and publishes it as a separate,
+# Builds the development branch, dev, and publishes it as a separate,
 # disposable download for testing. It is deliberately kept away from the
 # release path: it never touches the "latest" release and never mints a
 # numbered version. Only build-release.yml, running off release, does either.
@@ -8,14 +8,14 @@ name: Build Dev
 on:
   # Every push to the development branch produces a fresh testable client.
   push:
-    branches: [legacy]
+    branches: [dev]
   # Allow starting a dev build by hand from the Actions tab.
   workflow_dispatch:
 
-# Separate from build-legacy's group on purpose: a dev build must never cancel
+# Separate from build-release's group on purpose: a dev build must never cancel
 # a release build, or the other way round.
 concurrency:
-  group: build-legacy
+  group: build-holiday-dev
   cancel-in-progress: true
 
 permissions:
@@ -30,7 +30,12 @@ env:
   CUO_ZIP_NAME: 'HolidayEdition-Dev.zip'
   # Not "dev": a tag by that name would collide with the inherited dev branch and
   # make "git checkout dev" ambiguous.
-  TAG_NAME: 'dev-latest'
+  # Never reuse a tag name a release has already published under. GitHub
+  # reserves such a name permanently - "tag_name was used by an immutable
+  # release" - and no setting undoes it. "latest" and "dev-latest" are both
+  # spent. This one is created once, below, and then never deleted, so it
+  # cannot be spent in turn.
+  TAG_NAME: 'dev-build'
 
   DOTNET_NOLOGO: true
   DOTNET_CLI_TELEMETRY_OPTOUT: 1
@@ -42,11 +47,11 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      # Always build legacy, whether triggered by push or by hand.
-      - name: Check out legacy branch
+      # Always build dev, whether triggered by push or by hand.
+      - name: Check out dev branch
         uses: actions/checkout@v4
         with:
-          ref: legacy
+          ref: dev
           fetch-depth: 0
 
       - name: Check out submodules (recursive)
@@ -61,27 +66,51 @@ jobs:
           echo "VERSION=$(grep -oP '<AssemblyVersion>\K\d+\.\d+\.\d+' src/ClassicUO.Client/ClassicUO.Client.csproj | head -1)" >> $GITHUB_ENV
           echo "DEV_SHA=$(git rev-parse HEAD)" >> $GITHUB_ENV
           echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+          # The release is updated in place rather than recreated, so GitHub's
+          # "released this N hours ago" is the date it was first made and never
+          # moves. Without this there is nothing on the page that says when the
+          # build you are about to download was actually produced.
+          echo "BUILT_AT=$(date -u '+%Y-%m-%d %H:%M UTC')" >> $GITHUB_ENV
 
-      # What is on legacy that has not been released yet. This is the useful
+      # What is on dev that has not been released yet. This is the useful
       # thing to read on a dev build: it is the list of what is being tested.
       - name: Build release notes
         shell: bash
         run: |
           export LC_ALL=C.UTF-8
 
-          git fetch origin legacy --quiet || true
+          # Against release, not the dev branch. This ran as origin/legacy..HEAD
+          # back when dev was called legacy - the branch against itself, always
+          # empty, so
+          # every dev build said there was nothing in it.
+          git fetch origin release --quiet || true
 
-          LOG=$(git log --no-merges --pretty=format:'- %s (%h)' origin/legacy..HEAD 2>/dev/null || true)
+          # Capped. This was the whole list, which is fifty-odd entries a few days
+          # after a release and only grows until the next one - a wall of text
+          # nobody reads, on the page someone lands on to fetch a test build.
+          # The most recent dozen, then a count and a link for anyone who wants
+          # the rest.
+          LIMIT=12
 
-          if [ -z "$LOG" ]; then
-            LOG="- Nothing here that is not already released."
+          ALL=$(git log --no-merges --pretty=format:'- %s (%h)' origin/release..HEAD 2>/dev/null || true)
+          COUNT=$(printf '%s' "$ALL" | grep -c '^- ' || true)
+
+          if [ -z "$ALL" ]; then
+            BODY="Nothing here that is not already released."
+          else
+            BODY=$(printf '%s\n' "$ALL" | head -n "$LIMIT")
+            if [ "$COUNT" -gt "$LIMIT" ]; then
+              REST=$((COUNT - LIMIT))
+              MORE="...and $REST more. [Full comparison](https://github.com/${{ github.repository }}/compare/release...dev)"
+              BODY="$BODY"$'\n\n'"$MORE"
+            fi
           fi
 
           {
             echo "NOTES<<HOLIDAY_NOTES_EOF"
-            echo "Ahead of \`legacy\` (not yet released):"
+            echo "### $COUNT change(s) ahead of \`release\`"
             echo ""
-            echo "$LOG"
+            echo "$BODY"
             echo "HOLIDAY_NOTES_EOF"
           } >> $GITHUB_ENV
 
@@ -125,25 +154,21 @@ jobs:
           filename: ${{ env.CUO_ZIP_NAME }}
           exclusions: '*.zip'
 
-      # Replaced every build, same as "latest" is on the release side. Only the
-      # dev-latest tag is ever touched here; Holiday tags are never deleted, and
-      # neither is the "latest" release.
-      - name: Delete previous dev release
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release delete "${{ env.TAG_NAME }}" --yes --cleanup-tag || echo "No previous dev release to delete."
-
+      # There is deliberately no delete step here. Deleting and recreating a
+      # release under a fixed tag is what burned "latest" and then "dev-latest":
+      # each recreate publishes the name afresh, and one of those publishes
+      # reserves it forever. allowUpdates edits the release that is already
+      # there, and removeArtifacts drops the previous zip off it, which gets the
+      # same rolling download without ever republishing the tag.
       # prerelease + makeLatest:false keep the "Latest" badge on the release
       # download, so nobody grabs a dev build by accident.
       - name: Publish dev release
         uses: ncipollo/release-action@v1.16.0
         with:
           artifacts: "${{ env.CUO_OUTPUT_PATH }}/${{ env.CUO_ZIP_NAME }}"
-          name: "TazUO Holiday Edition (dev) - v${{ env.VERSION }}"
+          name: "TazUO Holiday Edition (dev) - v${{ env.VERSION }} - ${{ env.BUILT_AT }} - ${{ env.SHORT_SHA }}"
           body: |
-            **Testing build off the `legacy` branch. Not a release.**
+            **Testing build off the `dev` branch. Not a release.**
 
             Unfinished and unconfirmed work lands here first. If you want the
             stable client, use the `latest` release instead.
@@ -162,3 +187,51 @@ jobs:
           makeLatest: false
           prerelease: true
           token: ${{ secrets.GITHUB_TOKEN }}
+
+      # allowUpdates rewrites the release and swaps the zip, but it will not
+      # repoint a tag that already exists - so the tag stayed on the commit it
+      # was first created from while the release moved on, and the release page
+      # showed a commit that had nothing to do with the download.
+      #
+      # This is a ref move, not a release publish. A tag name is reserved
+      # permanently by being PUBLISHED under an immutable release, which is what
+      # the old delete-and-recreate step did and what burned "latest" and
+      # "dev-latest". Moving a ref cannot do that, so this is safe to keep.
+      - name: Point the dev-build tag at the commit that was built
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api --method PATCH \
+            "repos/${{ github.repository }}/git/refs/tags/${{ env.TAG_NAME }}" \
+            -f sha='${{ env.DEV_SHA }}' -F force=true \
+            && echo "tag now at ${{ env.SHORT_SHA }}" \
+            || echo "::warning::could not move ${{ env.TAG_NAME }}; the zip is still correct."
+
+      # The run's own page, in the Actions tab, is the one place a dev build is
+      # visible without knowing where to look. Watching the repository for
+      # Releases does not help: the release is updated rather than created, so
+      # the "released" event never fires again. Watch Actions instead, and this
+      # summary is what that notification leads to.
+      - name: Write the download into the run summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## TazUO Holiday Edition — dev build"
+            echo
+            if [ "${{ job.status }}" = "success" ]; then
+              echo "**[Download HolidayEdition-Dev.zip](https://github.com/${{ github.repository }}/releases/download/${{ env.TAG_NAME }}/${{ env.CUO_ZIP_NAME }})**"
+              echo
+              echo "Unzip it over your \`TazUO\` folder and run \`ClassicUO.exe\`."
+            else
+              echo "**Build ${{ job.status }} — the download below is from the previous successful build.**"
+            fi
+            echo
+            echo "| | |"
+            echo "| --- | --- |"
+            echo "| Built | ${{ env.BUILT_AT }} |"
+            echo "| Commit | \`${{ env.SHORT_SHA }}\` |"
+            echo "| Build stamp | \`v${{ env.VERSION }}-dev.${{ env.SHORT_SHA }}\` |"
+            echo "| Release page | [${{ env.TAG_NAME }}](https://github.com/${{ github.repository }}/releases/tag/${{ env.TAG_NAME }}) |"
+          } >> "$GITHUB_STEP_SUMMARY"
