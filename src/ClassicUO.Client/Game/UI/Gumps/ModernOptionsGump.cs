@@ -2371,6 +2371,11 @@ namespace ClassicUO.Game.UI.Gumps
             PositionHelper.BlankLine();
 #endif
 
+#if HOLIDAY_DEV
+            // Dev-only. The server grants this in the C8 exchange and the client asks for
+            // whatever is set here, so a player moving it is negotiating their own view
+            // range with the shard - which is a thing to measure with, not a thing to
+            // ship. The release client asks for the stock range and leaves it alone.
             scroll.Add
             (
                 (s = new SettingsOption
@@ -2395,6 +2400,7 @@ namespace ClassicUO.Game.UI.Gumps
 
             PositionHelper.PositionControl(s.FullControl);
             PositionHelper.BlankLine();
+#endif
 
             scroll.Add
             (
@@ -2413,8 +2419,10 @@ namespace ClassicUO.Game.UI.Gumps
             PositionHelper.PositionControl(s.FullControl);
             PositionHelper.BlankLine();
 
-#if HOLIDAY_DEV
-            // Dev-only: the release client has no automatic house resync to offer.
+            // Ships. A house that comes back empty is the one fault a player hits
+            // routinely and cannot work around, and this is the only lever the client
+            // has against it. Off by default - it sends a resync, which is a blunt
+            // instrument - but it is theirs to switch on.
             scroll.Add
             (
                 (s = new SettingsOption
@@ -2426,7 +2434,6 @@ namespace ClassicUO.Game.UI.Gumps
 
             PositionHelper.PositionControl(s.FullControl);
             PositionHelper.BlankLine();
-#endif
 
 
             // Built from whatever folders exist under Music/Digital, so adding an era

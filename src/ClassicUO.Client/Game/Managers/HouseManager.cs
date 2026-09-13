@@ -51,9 +51,7 @@ namespace ClassicUO.Game.Managers
 
             if (reacquired)
             {
-#if HOLIDAY_DEV
                 HouseContentsRecovery.OnHouseAcquired(serial);
-#endif
             }
         }
 
@@ -72,9 +70,7 @@ namespace ClassicUO.Game.Managers
                     HouseDiagnostics.LogHouseLetGo(serial, "out_of_range", house.Components.Count);
 
                     // Counted while its contents are still here to count.
-#if HOLIDAY_DEV
                     HouseContentsRecovery.OnHouseLetGo(serial);
-#endif
 
                     house.ClearComponents();
                     _houses.Remove(serial);

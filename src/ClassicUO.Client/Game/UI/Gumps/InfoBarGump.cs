@@ -38,6 +38,7 @@ using ClassicUO.Game.Data;
 using ClassicUO.Game.Managers;
 using ClassicUO.Game.Scenes;
 using ClassicUO.Game.UI.Controls;
+using ClassicUO.Input;
 using ClassicUO.Renderer;
 using Microsoft.Xna.Framework;
 
@@ -71,6 +72,40 @@ namespace ClassicUO.Game.UI.Gumps
         }
 
         public override GumpType GumpType => GumpType.InfoBar;
+
+        /// <summary>
+        /// Stands in for the player while a target cursor is up, the same as their own
+        /// health bar does.
+        ///
+        /// The bar already reports hits, mana, stamina and the rest, so it is where the
+        /// eye is during a fight - and it was the one readout of the player that could
+        /// not be clicked to answer a cursor. Bandaging or healing yourself meant
+        /// finding your paperdoll or your health bar instead.
+        ///
+        /// Taken on mouse DOWN rather than up, matching HealthBarGump: the cursor is
+        /// answered before a drag can start, so a targeting click cannot be mistaken for
+        /// the beginning of a move. Everything else about the gump is unchanged - with
+        /// no cursor up, a left click still picks it up and moves it as before.
+        ///
+        /// The child controls set AcceptMouseInput = false, so a click anywhere on the
+        /// bar - including on the readouts themselves - arrives here.
+        /// </summary>
+        protected override void OnMouseDown(int x, int y, MouseButtonType button)
+        {
+            // InGame is Player != null && Map != null, so it covers the dereference below.
+            if (button == MouseButtonType.Left && TargetManager.IsTargeting && World.InGame)
+            {
+                TargetManager.Target(World.Player.Serial);
+
+                // So the click that answered the cursor is not also counted towards a
+                // double click. HealthBarGump does the same for the same reason.
+                Mouse.LastLeftButtonClickTime = 0;
+
+                return;
+            }
+
+            base.OnMouseDown(x, y, button);
+        }
 
         public void ResetItems()
         {

@@ -1,7 +1,11 @@
-// Dev-only. Compiled into the legacy-dev client and out of the release one, so
-// what other people download carries no automatic resync and no machinery for one.
-// See HOLIDAY_DEV in Directory.Build.props.
-#if HOLIDAY_DEV
+// Ships in the release client. It is off unless the player turns it on - see
+// RecoverHouseContents in Settings - and when off Update returns on its first
+// line, so a client that never enables it does no work for it at all.
+//
+// It was dev-only until 2026-09-13. The reason it is not any more: a house that
+// comes back empty is the one fault a player hits routinely and cannot work
+// around, and the only lever the client has against it is the resync this sends.
+// Holding that back from the people it happens to made no sense.
 
 using System.Collections.Generic;
 using ClassicUO.Configuration;
@@ -232,5 +236,3 @@ namespace ClassicUO.Game.Managers
         }
     }
 }
-
-#endif
