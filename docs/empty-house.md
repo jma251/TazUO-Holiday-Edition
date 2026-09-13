@@ -20,7 +20,7 @@ including one taken across login. House `0x409D4F76`, bounds (833,2362)-(856,238
 | Stepping to the threshold tile and back always works | ~70 occurrences, every one recovers within one second |
 | The client removes nothing of its own on a failure | 239 removals in the failing gap, all `srvdelete` via `PacketHandlers.DeleteObject`; 0 culls |
 | Walks are acknowledged normally through a failing entry | `0x02` out, `0x22` ConfirmWalk in, `0x77` — identical to a working one |
-| Items inside a house essentially never cull | 10 of 1,862 cull events had `iteminhouse=True` |
+| Items inside a house essentially never cull | 10 of 1,862 cull events had `iteminhouse=True` — **see the blind-spot section below before trusting this row** |
 | A resync moves *less* traffic than a normal entry | 797 incoming vs 831 |
 | The resync hitch is the walk being discarded, not the packets | 9 of 10 resyncs drew a `0x21` and every one produced a second resync (fixed in h69) |
 
@@ -39,7 +39,7 @@ Do not rebuild on any of these.
 
 | explanation | killed by |
 | --- | --- |
-| Client distance-culls house contents | 10 in-house culls out of 1,862; a 24×24 house is 23 tiles corner to corner |
+| Client distance-culls house contents | 10 in-house culls out of 1,862; a 24×24 house is 23 tiles corner to corner. **The cull counter was blind then — re-confirmed in September on other evidence, see below** |
 | Contents arrive in bulk past the view range and get culled | 0 destroys in the failing window; removals are all `srvdelete` |
 | The player did not really leave the region | walks acknowledged normally throughout |
 | It is a recall/gate/teleport | 2 of 5 failures involved no teleport; and see the rate table |
@@ -98,14 +98,34 @@ five known failures), 3 in tonight's 80 minutes, and none on the ~70 threshold
 dips. An earlier version that counted culled items near any house and polled
 blindly fired 10 times in 25 minutes with the house full every time.
 
-## A note on how this document gets used
+## What the August numbers could and could not see
 
-On 2026-09-12 a session proposed, in order: client distance-culling, contents
-arriving past the view range and being culled, and crossing out of the server's
-24-tile box. All three are in the DISPROVED table above, killed in August, under a
-heading that says not to rebuild on them.
+The cull-based rows above were measured with instrumentation that had a hole in
+it, and that is worth knowing before trusting them.
 
-Several hours went into re-deriving and publishing each one before the measurement
-that killed it was repeated. The table was right the first time.
+`HouseDiagnostics.LogItemCulled` returned without writing anything unless the
+player was standing inside a house at that moment. So a cull that happened while
+the player was **outside** - which is most of them, and all the interesting ones -
+went unrecorded. A 2026-09-12 capture showed **242 in-house items destroyed
+against 6 cull lines** in the same window.
 
-Read the DISPROVED list before forming a theory about this bug, not after.
+Fixed on 2026-09-13: it now gates on where the *item* is, through
+`InAnyKnownHouse`, the same as `LogHouseItemDestroyed` already did. Cull and
+destroy counts are directly comparable in a capture from that date on.
+
+So:
+
+| row | still safe? |
+| --- | --- |
+| "10 of 1,862 cull events had `iteminhouse=True`" | **no** - the counter could not see culls taken from outside a house |
+| "Client distance-culls house contents - killed by 10 in-house culls out of 1,862" | **weakened by the same hole**, though the September captures independently confirm it: 0 destroys and 0 culls in a failing window, and the server sends nothing |
+| Everything measured from arrivals, removals, `created` flags, packet counts and the rate table | **unaffected** - different counters, no blind spot |
+
+The conclusion survived, but it survived on the September evidence rather than the
+August cull count. Re-measuring it was right. This is what a new instrument is
+for, and it is why a DISPROVED row is worth re-testing when the thing that
+disproved it has changed.
+
+What is *not* worth redoing is a theory this document killed with a counter that
+was never blind - the rate table in particular, which is what makes the
+24-tile-box story wrong.
