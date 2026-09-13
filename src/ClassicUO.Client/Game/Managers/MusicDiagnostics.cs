@@ -103,9 +103,24 @@ namespace ClassicUO.Game.Managers
         [System.Diagnostics.Conditional("HOLIDAY_DEV")]
         public static void Ended(UOMusic music) => Write("END", music?.Index ?? -1, false);
 
-        /// <summary>A looping track hit the end and restarted from the beginning.</summary>
-        [System.Diagnostics.Conditional("HOLIDAY_DEV")]
-        public static void Looped(UOMusic music) => Write("LOOP", music?.Index ?? -1, true);
+        /// <summary>
+        /// A looping track hit the end and restarted from the beginning.
+        ///
+        /// The only one here that cannot carry [Conditional]: AudioManager assigns it as
+        /// a delegate - UOMusic.Looped = MusicDiagnostics.Looped - because UOMusic sits in
+        /// an assembly that cannot see the settings or the world. C# refuses a delegate to
+        /// a conditional method (CS1618), since the call it stands for cannot be removed
+        /// at the call site when there is no call site.
+        ///
+        /// So the body is compiled out instead, which reaches the same end: the delegate
+        /// exists and does nothing in a release build.
+        /// </summary>
+        public static void Looped(UOMusic music)
+        {
+#if HOLIDAY_DEV
+            Write("LOOP", music?.Index ?? -1, true);
+#endif
+        }
 
         [System.Diagnostics.Conditional("HOLIDAY_DEV")]
         public static void WarMode(bool on) => Write(on ? "WAR_ON" : "WAR_OFF");
