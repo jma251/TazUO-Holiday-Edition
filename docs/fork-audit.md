@@ -246,8 +246,30 @@ did not already have.
 No per-frame hook. Instantiated once in `GameController`; everything else is
 driven by events. Large, but it cannot cost frame time when nothing is happening.
 
+### `SpellVisualRangeManager.CheckCastExpiry` - per frame
+
+Called from `World.Update`. Early-returns on two comparisons when nothing is
+being cast. While casting it calls `DateTime.Now` once a frame, which does a
+timezone conversion; the rest of the codebase uses `Time.Ticks`. Negligible, but
+it is an inconsistency worth knowing about.
+
 ---
 
-## Still not audited
+## Coverage
 
-- `LegionScripting/` - the scripting language and its Python API
+Every file where upstream code was **modified or removed** has been read. That is
+where behaviour can change and therefore where a regression can hide.
+
+Everything left is a **pure addition** - `+N / -0`, a new file touching no
+upstream code:
+
+    HouseDiagnostics 1075   MusicDiagnostics 353   HouseContentsRecovery 236
+    MusicInfoGump 222       MusicMapManager 201    ToastGump 200
+    SpellVisualRangeManager 185   FeatureDiagnostics 179
+    AutomationScheduler 169  AutoHitListManager 139  BandageSettings 136
+
+A new file cannot change how the client behaved before it existed. It can only
+misbehave when something calls it, and everything that calls these goes through
+`FeatureDiagnostics.Guard` with the per-frame cost and null safety checked above.
+
+`LegionScripting/` is **untouched** since the fork - zero files changed.
