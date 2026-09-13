@@ -172,8 +172,13 @@ jobs:
           exclusions: '*.zip'
 
       # Permanent, numbered release. Never updated, never deleted - these
-      # accumulate to form the rollback history. makeLatest is false so the
-      # "Latest" badge stays on the "latest" release below.
+      # accumulate to form the rollback history, and this one takes the "Latest"
+      # badge, which is what /releases/latest/download resolves through.
+      #
+      # There is no "latest" release below any more. There was until 2026-09-12,
+      # deleted and recreated on every build so its download URL never moved, and
+      # recreating it under a fixed tag is what reserved that name permanently.
+      # The badge does the same job with nothing to delete.
       - name: Publish permanent Holiday release
         id: permanent_release
         if: env.SKIP_PERMANENT == 'false'
