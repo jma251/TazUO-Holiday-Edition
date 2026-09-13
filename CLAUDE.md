@@ -42,26 +42,70 @@ the branch it came from.
 
 - Work goes on **`dev`**, as commits. A separate branch per change is not
   the convention here - it produced ninety-odd leftovers that nothing deleted.
-- `dev` merges into `release` **only** when the work has been built, run,
-  and confirmed good. That merge publishes to real users, so it is not a routine
-  step — it is the decision to ship, and it needs a version bump to go with it.
-- **Never commit directly to `release`.** Everything reaches it through a merge
-  from `dev`.
+- **Never commit directly to `release`.** Everything reaches it through a merge,
+  and never a wholesale merge of `dev`.
 - **Never build, modify, or release `upstream-main` or `upstream-dev`.** They
   exist to be read.
-- Keep `dev` current with `release` (merge `release` in) so the two do not
-  drift; a release cut from a stale dev branch silently reverts things.
 
-Dev-only work does **not** need holding back from `release` by hand. Anything
-behind `HOLIDAY_DEV` is compiled out of the release build wherever it lands, so
-the branches stay mergeable rather than diverging. See the flag's description in
-`Directory.Build.props`.
+## Getting something into `release`
 
-The one exception to going through `dev`: a fix for something that is
-broken *in the wild right now*. Those may go straight to a branch off `release`,
-because routing an emergency through a dev branch full of untested work would
-ship that work alongside it. Merge `release` back down into `dev`
-afterwards.
+**`dev` is never merged into `release` wholesale.** Most of what is on `dev` is
+not meant to ship and some of it never will be - the ported MW helpers, the
+diagnostics, anything being tried out. A release is chosen, not accumulated.
+
+So work that is meant to ship is branched **off `release`**, merged **into
+`release`**, and then `release` is merged **down into `dev`**:
+
+```
+release ──┬──────────────── merge ──→ release
+          └─ some-feature ───┘             │
+                                           │
+dev ←─────────────── merge release down ───┘
+```
+
+    git checkout -b some-feature origin/release
+    ...work, commit...
+    git checkout release && git merge some-feature     # ships it
+    git checkout dev && git merge release              # dev keeps everything
+
+Why this shape and not the obvious alternatives:
+
+- **Nothing is cherry-picked**, so `release` never grows a commit that exists
+  nowhere in `dev`'s history, and the two cannot drift. They did drift once, in
+  September 2026: the same workflow work was done separately on each branch and
+  the branches ended up holding four different versions of the same files. The
+  reconciliation merge that fixed it is in the history.
+- **`dev` is always a superset of `release`.** Anything on `release` is on `dev`;
+  the reverse is deliberately untrue.
+- **Work that must never ship simply never gets a branch off `release`.** It
+  lives on `dev` and stays there. That is how `release` is kept lean - not by
+  removing things from it later.
+
+A release still needs a **version bump** to publish a numbered build. Merging to
+`release` without one refreshes the notes and publishes nothing new, which is
+deliberate: a release is a decision, not a side effect.
+
+Keep `dev` current by merging `release` down after every release-side change.
+That is what keeps the merges small.
+
+### When a flag is the right answer instead
+
+`HOLIDAY_DEV` is for things that should exist on both branches but **run on
+neither the release build nor a player's machine** - diagnostics, log writers,
+temporary probes. Anything behind it is compiled out of the release build
+wherever it lands, so it can sit on `release` harmlessly. See the flag's
+description in `Directory.Build.props`.
+
+Use the flag when the code is genuinely dev-only. Use a branch off `release`
+when the code is finished and you simply have not shipped it yet. A finished
+feature hidden behind a flag is the wrong tool, and so is a diagnostic kept off
+`release` by hand.
+
+### Emergencies
+
+Something broken *in the wild right now* takes the same path - a branch off
+`release` - it just skips waiting. Merge `release` back down into `dev`
+afterwards, as always.
 
 ### Porting a fix from `main` to the 4.7.2 branches
 
