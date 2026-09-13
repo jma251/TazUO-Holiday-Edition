@@ -3,17 +3,31 @@
 ***
 
 
-| Channel | Status                                                                                                                                                                     |
-| --- |----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Release | [![Release](https://github.com/PlayTazUO/TazUO/actions/workflows/build-test.yml/badge.svg?branch=main)](https://github.com/PlayTazUO/TazUO/actions/workflows/build-test.yml) |
-| Dev | [![Dev](https://github.com/PlayTazUO/TazUO/actions/workflows/build-test.yml/badge.svg?branch=dev)](https://github.com/PlayTazUO/TazUO/actions/workflows/build-test.yml)        |
+| Channel | Status |
+| --- | --- |
+| Release | [![Release](https://github.com/jma251/TazUO-Holiday-Edition/actions/workflows/build-release.yml/badge.svg?branch=release)](https://github.com/jma251/TazUO-Holiday-Edition/actions/workflows/build-release.yml) |
+| Dev | [![Dev](https://github.com/jma251/TazUO-Holiday-Edition/actions/workflows/build-dev.yml/badge.svg?branch=dev)](https://github.com/jma251/TazUO-Holiday-Edition/actions/workflows/build-dev.yml) |
 
 
 # What is TazUO?
 **TazUO** was originally a fork from ClassicUO with the mindset of adding features requested by users to improve QOL. **TazUO** has since moved away from ClassicUO, we will keep an eye on ClassicUO updates and incorporate changes or fixes as they have a wider user base that provides bug reports, but **TazUO** will no longer be merging all changes from ClassicUO.
 
-# Play now
-The easiest way to play with TazUO is via our [launcher](https://github.com/PlayTazUO/TUO-Launcher/releases/latest)!
+# Holiday Edition
+
+A personal fork of [TazUO](https://github.com/PlayTazUO/TazUO), kept on .NET
+Framework 4.7.2 so older plugins keep working. It follows TazUO's own version
+line rather than restarting, so `4.5.23xx` reads as "TazUO 4.5.23, Holiday
+build xx".
+
+Everything below is TazUO's, and all of it still applies.
+
+# Download
+
+**[Download the latest release](https://github.com/jma251/TazUO-Holiday-Edition/releases/latest/download/TazUO-Holiday-Edition.zip)**
+
+Unzip it and run `ClassicUO.exe`. Or use the
+[Holiday Edition launcher](https://github.com/jma251/TazUO-Launcher-Holiday-Edition/releases/latest),
+which keeps it up to date for you.
 
 # TazUO features
 Check out our [wiki](../../wiki) for details on all the changes TazUO has made for players!  
