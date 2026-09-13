@@ -2400,8 +2400,11 @@ namespace ClassicUO.Game.UI.Gumps
 
             PositionHelper.PositionControl(s.FullControl);
             PositionHelper.BlankLine();
-#endif
 
+            // Dev-only for the same reason as the one above: it is a number to tune while
+            // measuring, not a dial to hand a player. A house held too early is a house
+            // held with nothing in it, and a house dropped too late is memory spent on a
+            // building nobody is near. Neither is a choice worth making from a menu.
             scroll.Add
             (
                 (s = new SettingsOption
@@ -2418,6 +2421,7 @@ namespace ClassicUO.Game.UI.Gumps
 
             PositionHelper.PositionControl(s.FullControl);
             PositionHelper.BlankLine();
+#endif
 
             // Ships. A house that comes back empty is the one fault a player hits
             // routinely and cannot work around, and this is the only lever the client
