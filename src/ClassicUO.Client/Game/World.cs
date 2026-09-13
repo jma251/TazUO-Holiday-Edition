@@ -470,9 +470,8 @@ namespace ClassicUO.Game
                     _toRemove.Clear();
                 }
 
-#if HOLIDAY_DEV
                 HouseContentsRecovery.Update();
-#endif
+
                 // Ends a cast that needed no target and that the server never commented on.
                 // See SpellVisualRangeManager.CheckCastExpiry.
                 SpellVisualRangeManager.Instance.CheckCastExpiry();
@@ -952,9 +951,7 @@ namespace ClassicUO.Game
             OPL.Clear();
             WMapManager.Clear();
             HouseManager?.Clear();
-#if HOLIDAY_DEV
             HouseContentsRecovery.Reset();
-#endif
 
             Season = Season.Summer;
             OldSeason = Season.Summer;

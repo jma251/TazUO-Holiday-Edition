@@ -45,6 +45,7 @@ namespace ClassicUO.Game.Managers
         /// names the track already playing - a repeated packet is itself data.
         /// Resets the distance and time anchor.
         /// </summary>
+        [System.Diagnostics.Conditional("HOLIDAY_DEV")]
         public static void ServerPacket(int index)
         {
             Write("SERVER", index);
@@ -61,12 +62,14 @@ namespace ClassicUO.Game.Managers
         }
 
         /// <summary>The requested track is the one already playing, so nothing happens.</summary>
+        [System.Diagnostics.Conditional("HOLIDAY_DEV")]
         public static void SameTrack(int index) => Write("SAME", index);
 
         /// <summary>
         /// A track started. path is what the index actually resolved to, which is the
         /// only way to tell from the log which era supplied it.
         /// </summary>
+        [System.Diagnostics.Conditional("HOLIDAY_DEV")]
         public static void Started(int index, bool loop, string flags, string path = null)
         {
             string where = string.IsNullOrEmpty(path) ? "" : System.IO.Path.GetFileName(path);
@@ -79,6 +82,7 @@ namespace ClassicUO.Game.Managers
         /// The map is about to decide what belongs where the player is standing.
         /// Logged before the answer so an unexpected silence has a visible cause.
         /// </summary>
+        [System.Diagnostics.Conditional("HOLIDAY_DEV")]
         public static void MapLook(int mode, bool afterEnd) =>
             Write("MAP_LOOK", -1, null, (afterEnd ? "after_track_ended" : "silence") + " mode=" + mode.ToString(CultureInfo.InvariantCulture));
 
@@ -92,23 +96,45 @@ namespace ClassicUO.Game.Managers
             return string.IsNullOrEmpty(b) ? a : a + " " + b;
         }
 
+        [System.Diagnostics.Conditional("HOLIDAY_DEV")]
         public static void Stopped(int index) => Write("STOP", index);
 
         /// <summary>A non-looping track ran to its end on its own.</summary>
+        [System.Diagnostics.Conditional("HOLIDAY_DEV")]
         public static void Ended(UOMusic music) => Write("END", music?.Index ?? -1, false);
 
-        /// <summary>A looping track hit the end and restarted from the beginning.</summary>
-        public static void Looped(UOMusic music) => Write("LOOP", music?.Index ?? -1, true);
+        /// <summary>
+        /// A looping track hit the end and restarted from the beginning.
+        ///
+        /// The only one here that cannot carry [Conditional]: AudioManager assigns it as
+        /// a delegate - UOMusic.Looped = MusicDiagnostics.Looped - because UOMusic sits in
+        /// an assembly that cannot see the settings or the world. C# refuses a delegate to
+        /// a conditional method (CS1618), since the call it stands for cannot be removed
+        /// at the call site when there is no call site.
+        ///
+        /// So the body is compiled out instead, which reaches the same end: the delegate
+        /// exists and does nothing in a release build.
+        /// </summary>
+        public static void Looped(UOMusic music)
+        {
+#if HOLIDAY_DEV
+            Write("LOOP", music?.Index ?? -1, true);
+#endif
+        }
 
+        [System.Diagnostics.Conditional("HOLIDAY_DEV")]
         public static void WarMode(bool on) => Write(on ? "WAR_ON" : "WAR_OFF");
 
         /// <summary>The music map covered this spot and supplied a track.</summary>
+        [System.Diagnostics.Conditional("HOLIDAY_DEV")]
         public static void MapHit(int track, string areaName) => Write("MAP_HIT", track, null, areaName ?? "");
 
         /// <summary>Nothing in the music map covers this spot, so the answer is silence.</summary>
+        [System.Diagnostics.Conditional("HOLIDAY_DEV")]
         public static void MapMiss() => Write("MAP_MISS");
 
         /// <summary>The raw bytes of a music packet, so the wire can be read directly.</summary>
+        [System.Diagnostics.Conditional("HOLIDAY_DEV")]
         public static void RawMusicPacket(ushort index) =>
             Write("RAW6D", -1, null, $"6D {(index >> 8) & 0xFF:X2} {index & 0xFF:X2}");
 
@@ -117,6 +143,7 @@ namespace ClassicUO.Game.Managers
         /// index. Logged raw so the wire can be read directly, since it was being
         /// mistaken for a track number.
         /// </summary>
+        [System.Diagnostics.Conditional("HOLIDAY_DEV")]
         public static void SeasonPacket(int season, int playSound) =>
             Write("SEASON", -1, null, $"BC {season:X2} {playSound:X2}");
 
@@ -125,10 +152,12 @@ namespace ClassicUO.Game.Managers
         /// unreadable file and simply does not start, which is heard as a fraction of a
         /// second of audio and then nothing - and left no trace in the log at all.
         /// </summary>
+        [System.Diagnostics.Conditional("HOLIDAY_DEV")]
         public static void StartFailed(int index, string path) =>
             Write("START_FAILED", index, null, path ?? "(no file resolved)");
 
         /// <summary>The server's stop packet arrived and was thrown away on request.</summary>
+        [System.Diagnostics.Conditional("HOLIDAY_DEV")]
         public static void StopIgnored() => Write("STOP_IGNORED");
 
         /// <summary>
@@ -136,15 +165,18 @@ namespace ClassicUO.Game.Managers
         /// current track finish first. Without this the log showed a block change and
         /// then nothing, which reads the same as the map being broken.
         /// </summary>
+        [System.Diagnostics.Conditional("HOLIDAY_DEV")]
         public static void MapWait(int track, string why) => Write("MAP_WAIT", track, null, why);
 
         /// <summary>
         /// The map deliberately chose silence, and why. Distinct from MAP_MISS, which
         /// only says nothing covers the spot.
         /// </summary>
+        [System.Diagnostics.Conditional("HOLIDAY_DEV")]
         public static void MapSilent(string why) => Write("MAP_SILENT", -1, null, why);
 
         /// <summary>The music era changed, with the folder it now resolves against.</summary>
+        [System.Diagnostics.Conditional("HOLIDAY_DEV")]
         public static void EraChanged(string era) =>
             Write("ERA", -1, null, string.IsNullOrEmpty(era) ? "(default - stock Music/Digital)" : era);
 
@@ -187,12 +219,14 @@ namespace ClassicUO.Game.Managers
         /// the option says the server may not cut it, or because the map wanted that
         /// track regardless. Either way the map owns it now.
         /// </summary>
+        [System.Diagnostics.Conditional("HOLIDAY_DEV")]
         public static void Kept(int track, string why) => Write("MAP_KEEP", track, null, why);
 
         /// <summary>
         /// Called from the play/update path rather than hooked into World, so a map
         /// change is noticed wherever it happens.
         /// </summary>
+        [System.Diagnostics.Conditional("HOLIDAY_DEV")]
         public static void CheckMapChange()
         {
             if (!IsEnabled || World.Player == null)
@@ -221,6 +255,7 @@ namespace ClassicUO.Game.Managers
         /// Only a new furthest band is logged, so pacing back and forth over a
         /// boundary does not fill the file.
         /// </summary>
+        [System.Diagnostics.Conditional("HOLIDAY_DEV")]
         public static void CheckZone()
         {
             if (!IsEnabled || World.Player == null || _anchorX < 0)
