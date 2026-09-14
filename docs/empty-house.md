@@ -172,25 +172,62 @@ which is where the stale mobiles came from. The lever that actually works is
 the one already shipped: `0x22`, which makes the server run `SendEverything`
 and disregard the geometry entirely.
 
-### `CanSee(item)` is evaluated at that single moment
+### `CanSee(item)` is NOT a line-of-sight test
 
-The send is conditional on line of sight **at the instant of the transition**.
-If the wall is between the player and the room's contents on the step where
-they cross into range, `CanSee` is false, nothing is sent, and the geometry
-never offers a second opportunity.
+Correcting an earlier draft of this section, which claimed it was. `CanSee(Item)`
+checks map validity, the parent container chain, bank boxes, trade containers,
+`Deleted`, and `Visible`. It never calls `LineOfSight`. A wall between the
+player and the room does not suppress the send, and occlusion is not the
+stair-tile mechanism.
 
-That is a mechanism for the stair-tile trigger. Entering over a curved corner
-piece puts the player's crossing step where the house wall still occludes the
-room; entering over the middle three does not. It predicts the failure depends
-on **the step where range is first crossed**, not on the tile being special -
-which is consistent with 3 failures in 15 deliberate entries rather than a
-clean always/never split.
+### The furniture's one chance lands exactly on the cull boundary
 
-### Items carry their own update range
+The ranges are not one number, and the difference is the whole bug.
 
-`item.GetUpdateRange(m)` is per-item and separate from the mobile update range,
-so house contents need not use the same radius as the player's view range. This
-is worth knowing before anyone reasons about the two as if they were one number.
+```csharp
+// Server/Item.cs - loose items
+public virtual int GetUpdateRange(Mobile m)
+    => m.NetState == null ? Core.GlobalUpdateRange : m.NetState.UpdateRange;
+
+// Server/Items/BaseMulti.cs - the house itself
+var min = m.NetState != null ? m.NetState.UpdateRange : Core.GlobalUpdateRange;
+var max = Core.GlobalRadarRange - 1;
+var v = min + ((w > h ? w : h) / 2);      // half the house's longest side
+```
+
+With `GlobalUpdateRange = 18` and `GlobalRadarRange = 40` as the defaults in
+`Server/Main.cs`:
+
+| | range it is sent at |
+| --- | --- |
+| **loose items** - the furniture | exactly `NetState.UpdateRange`, which is **what this client asked for over `0xC8`** |
+| **the house multi** | that, plus half the building's longest side, capped at 39 |
+
+So the building arrives from far off and its contents arrive at precisely the
+negotiated view range - and each gets **one** crossing step. That is why the
+walls and doors always survive and the furniture does not: they are not
+delivered at the same distance, and only one of the two distances coincides
+with where the client throws things away.
+
+It also explains `HouseLoadRange`. Holding a house further out than loose
+objects is not a TazUO invention - it mirrors what the server already does.
+
+### Which suggests what the stair tiles actually are
+
+The crossing step is the whole event, so **the path taken decides the
+distance at which the contents first appear**. A cardinal step changes the
+distance by one; a diagonal changes both axes, so an item that would have
+crossed at 24 can instead first appear at 25 - and the outermost ring is
+exactly what the client was binning.
+
+Entering over the curved end pieces is a diagonal approach; the middle three
+are not. That predicts a dependence on the approach rather than on the tile
+being magic, and a failure rate that is neither always nor never - 3 in 15
+deliberate entries.
+
+**Untested.** It is a hypothesis with a mechanism, which is more than the
+previous four had, and it is checkable: walk in cardinally over a corner tile
+and see whether the room loads.
 
 **Caveat:** ServUO is the reference, not necessarily this shard. The pattern is
 RunUO-lineage and near-universal, but the shard has not been confirmed to run
