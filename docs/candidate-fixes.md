@@ -256,3 +256,43 @@ Already applied this session: the `Mobile.ProcessSteps` direction mask, the
 | `Marcus_Privat` | Mount animation precedence, journal classifier lock removal. |
 | `puppyflips` | Paperdoll armour layer ordering. |
 | the remainder | A handful of commits each, mostly shard-specific. |
+
+---
+
+# Read pass 4: closing sweep
+
+Everything remaining across both fork networks, plus ServUO and MW Edition.
+
+## Two more confirmed present
+
+| # | What | Where | From |
+| --- | --- | --- | --- |
+| 12 | **Same-Z statics draw in the wrong order.** The insertion tie-break covers `Land` only - `state` is `0` for Land, `1` for Mobile, `2` for a custom-house preview, and **`-1` for a plain static**. So `Static` vs `Static` at equal `PriorityZ` never breaks, the newly-added one is appended tail-ward, and the head-to-tail draw paints it last. The classic client does the reverse: whichever is stored earlier in `statics.mul` goes on top. K verified it against `client.exe` - 89% of same-Z carpet/floor pairs map-wide store the carpet first, and carpets render above floors. | `Chunk.cs`, the `while (o != null)` insertion walk | K `95d7744b44` |
+| 13 | **`FastList<T>.Length` assigned directly in the font wrap path**, six times, instead of `Resize()` - the overflow Kamron Batman fixed. | `FontsLoader.cs:831`, `:923`, `:1399` and three more | Kamron Batman `14af3802f6` |
+
+## Two more worth a look
+
+| | |
+| --- | --- |
+| **Character deletion goes by list position, not serial.** `LoginScene.DeleteCharacter(uint index)` sends `Send_DeleteCharacter((byte)index, ...)`. If the client's list order ever differs from the server's, this deletes the wrong character. Valentin (`959c4a56b0`) switched it to the serial and added the null guards on the `FirstOrDefault(...).RawName` lookups beside it, which are unguarded here too. |
+| **Wide items drawn behind southern statics.** Our `View.cs` computes `index.Width` and uses it for the x offset but never feeds it into `depth`. Jack Ward (`da7e249ccb`) adds `depth += index.Width / 22f`. We have both the `depth` parameter and `index.Width`, so it is a live candidate. |
+
+## Sources now exhausted
+
+| source | result |
+| --- | --- |
+| TazUO forks - 65 repos, 1,109 unique commits | read; `fork-scan.md` |
+| ClassicUO forks - 419 repos, 2,578 unique commits | read; `cuo-fork-scan.md` |
+| TazUO `main` since the fork | read; 124 commits, three applied, most touch files that do not exist on 4.7.2 |
+| TazUO `legacy` | frozen at our fork base. Nothing, ever. |
+| ClassicUO `main` | comparatively quiet; the live work is the ECS branch and does not port |
+| MW Edition | **16** commits not already in TazUO - CI, test enums, version and logo. Nothing to take. |
+| ServUO | read for the send path; it answered the empty house. See `empty-house.md`. |
+
+## Where this leaves things
+
+**Thirteen confirmed bugs**, each verified against our own source. Three fixed
+already this session (`Mobile.ProcessSteps` direction mask, the `0x19` null
+guard, the `Plugin.Tick` guard). Ten waiting on your call.
+
+Nothing has been applied beyond those three.
