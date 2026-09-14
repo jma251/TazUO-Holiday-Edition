@@ -159,42 +159,53 @@ for why a forced house recovery hitches and a walk-up does not.**
 lets `HashSet.Add` do the dedup in constant time. Same fix for the custom-house
 request list, which modern has and this fork does not.
 
-## CORRECTION to the section above, 2026-09-14
+## The OPL scan: retracted correction, 2026-09-14
 
-**The OPL scan is not the stutter, and the reasoning above is wrong.**
+An earlier draft of this file claimed the quadratic never matters because the
+queue stays shallow. **That was wrong and is withdrawn.** The reasoning and the
+measurement that settles it are both recorded here so neither gets repeated.
 
-The quadratic is real as written, but `n` never gets large enough to cost
-anything, which the section never checked.
+**The bad argument.** The client sends one `0xD6` request per frame. In the
+busiest second of the capture it sent 39, against a ceiling of about 60 at
+60fps, so - the argument went - the queue was empty a third of the time and
+never backed up.
 
-`SendMegaClilocRequests` runs once per frame and each `0xD6` carries **at most
-15 serials** (`Math.Min(15, serials.Count)` in `Send_MegaClilocRequest`). So the
-drain rate is ~900 serials a second. Measured against the capture, counting the
-request packets the client actually sent:
+That is circular. The send rate is capped by the **frame rate**, and the frame
+rate collapsing is the thing being investigated. 39 packets in a second is
+equally consistent with a client running at 39fps with the queue full the whole
+time. Packet count cannot distinguish the two.
 
-| | items arriving | OPL hashes | request packets sent |
+**The measurement that can** is how many serials each packet carried. The cap is
+15 (`Math.Min(15, serials.Count)`), so a shallow queue sends near-empty packets
+and a backed-up one sends full ones:
+
+| second | request packets | serials requested | serials per packet |
 | --- | --- | --- | --- |
-| login / zone load | 1,394 | 1,485 | **39** |
-| house approach | 487 | 490 | **21** |
-| recovery resync | 287 | 290 | **5** |
+| login / zone load | 39 | 565 | **14.5** |
+| house approach | 18 | 247 | **13.7** |
+| approach | 19 | 251 | **13.2** |
+| approach | 24 | 299 | 12.5 |
+| approach | 21 | 250 | 11.9 |
 
-At one send per frame the ceiling is about 60 packets a second. The busiest
-second reached 39, so **the queue was empty for a third of the frames even at
-login**. It never saturated and never carried across seconds. The pending list
-is tens of entries, not hundreds, and scanning tens on arrival is free.
+**14.5 out of a maximum of 15.** Every send was essentially full, which only
+happens if at least 15 serials were waiting each time. The queue is saturated
+through the whole burst.
 
-The reason is `OPLInfo`: every arriving item brings an OPL revision hash, and
-`World.OPL.IsRevisionEquals` drops it unless the revision actually changed. Most
-items never reach the queue at all - the 287-item recovery burst produced five
-request packets.
+So the original account stands: several hundred serials queue during a burst,
+arrivals land in a handful of frames, and `AddMegaClilocRequest` linear-scans
+the pending list on every one of them. At a peak depth around 500 that is on the
+order of 120,000 comparisons, concentrated in the frames where the client is
+already busiest.
 
-The earlier arithmetic (41,000 / 118,000 / 970,000 comparisons) assumed every
-arriving item was queued. None of those figures ever occurred.
+**What is still not established** is that this is the whole stutter. It is one
+real cost among several - object construction, the tile insertion walk, cold
+art loading - and none of those have been measured either. It is a cost worth
+removing on its own terms.
 
-**What the burst stutter actually is remains unknown.** Plausible and
-unmeasured: constructing ~1,400 objects, the tile linked-list insertion walk in
-`Chunk.AddGameObject` which scans to find its slot, and art loading from disk on
-a cold cache. None of that should be asserted without frame-level numbers, which
-we do not have.
+**Note on crameep's fix.** He keeps a parallel `HashSet` but then clears and
+rebuilds it from the remaining list on every send, which is O(n) per frame. That
+trades the arrival cost for a per-frame one. Removing only the serials that were
+actually sent - the first 15 - is O(15) and needs no rebuild.
 
 ## Confirmed: Python script threads are foreground threads
 
