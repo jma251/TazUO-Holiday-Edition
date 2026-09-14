@@ -130,8 +130,24 @@
     <Exec Command='dotnet run &#45;&#45;project ../APIToMarkdown/APIToMarkdown.csproj "$(ProjectDir)/LegionScripting/docs" $(DocFileArgs)' />
   </Target>-->
 
+  <!--
+    v.txt is what a launcher reads to decide whether the install is current.
+    A release build writes the bare version and nothing else - that is the
+    contract and it must not change.
+
+    A dev build writes the same version with "-dev" on the end. Without it a
+    dev install drops a v.txt claiming to be the release, and a launcher
+    pointed at that folder believes it already has the release and will not
+    update it. Dev is downloaded by hand and updated by hand; the file has to
+    say so.
+  -->
+  <PropertyGroup>
+    <HolidayVersionFileText Condition="'$(HOLIDAY_DEV_BUILD)' == 'true'">$(AssemblyVersion)-dev</HolidayVersionFileText>
+    <HolidayVersionFileText Condition="'$(HolidayVersionFileText)' == ''">$(AssemblyVersion)</HolidayVersionFileText>
+  </PropertyGroup>
+
   <Target Name="CreateVersionFile" AfterTargets="Build">
-    <WriteLinesToFile File="$(TargetDir)v.txt" Lines="$(AssemblyVersion)" Overwrite="true" />
+    <WriteLinesToFile File="$(TargetDir)v.txt" Lines="$(HolidayVersionFileText)" Overwrite="true" />
   </Target>
 
   <Target Name="CopyExternalDeps_build" AfterTargets="Build">
@@ -154,7 +170,7 @@
   </Target>
 
   <Target Name="CreateVersionFile_publish" AfterTargets="Publish">
-    <WriteLinesToFile File="$(PublishDir)v.txt" Lines="$(AssemblyVersion)" Overwrite="true" />
+    <WriteLinesToFile File="$(PublishDir)v.txt" Lines="$(HolidayVersionFileText)" Overwrite="true" />
   </Target>
 
   <Target Name="CopyExternalDeps_publish" AfterTargets="Publish">

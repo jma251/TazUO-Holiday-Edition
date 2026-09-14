@@ -66,6 +66,10 @@ jobs:
           echo "VERSION=$(grep -oP '<AssemblyVersion>\K\d+\.\d+\.\d+' src/ClassicUO.Client/ClassicUO.Client.csproj | head -1)" >> $GITHUB_ENV
           echo "DEV_SHA=$(git rev-parse HEAD)" >> $GITHUB_ENV
           echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+          # The sha says WHICH build; it does not say which is NEWER. run_number
+          # is monotonic for this workflow, so the stamp sorts, and it points
+          # straight back at the Actions run that produced the zip.
+          echo "DEV_BUILD_NUMBER=${{ github.run_number }}" >> $GITHUB_ENV
           # The release is updated in place rather than recreated, so GitHub's
           # "released this N hours ago" is the date it was first made and never
           # moves. Without this there is nothing on the page that says when the
@@ -124,7 +128,7 @@ jobs:
       # stamped build from an unstamped one, so the "v" is load-bearing; it displays
       # as e.g. 4.5.2301-dev.a1b2c3d.
       - name: Publish client
-        run: dotnet publish ${{ env.CUO_PROJECT_PATH }} -c Release -o ${{ env.CUO_OUTPUT_PATH }} -p:IS_DEV_BUILD=true -p:HOLIDAY_DEV_BUILD=true -p:InformationalVersion=v${{ env.VERSION }}-dev.${{ env.SHORT_SHA }}
+        run: dotnet publish ${{ env.CUO_PROJECT_PATH }} -c Release -o ${{ env.CUO_OUTPUT_PATH }} -p:IS_DEV_BUILD=true -p:HOLIDAY_DEV_BUILD=true -p:InformationalVersion=v${{ env.VERSION }}-dev.${{ env.DEV_BUILD_NUMBER }}.${{ env.SHORT_SHA }}
 
       - name: Place FNA native libraries next to the exe
         shell: pwsh
@@ -166,7 +170,7 @@ jobs:
         uses: ncipollo/release-action@v1.16.0
         with:
           artifacts: "${{ env.CUO_OUTPUT_PATH }}/${{ env.CUO_ZIP_NAME }}"
-          name: "TazUO Holiday Edition (dev) - v${{ env.VERSION }} - ${{ env.BUILT_AT }} - ${{ env.SHORT_SHA }}"
+          name: "TazUO Holiday Edition (dev) #${{ env.DEV_BUILD_NUMBER }} - ${{ env.BUILT_AT }} - ${{ env.SHORT_SHA }}"
           body: |
             **Testing build off the `dev` branch. Not a release.**
 
@@ -174,7 +178,7 @@ jobs:
             stable client, use the `latest` release instead.
 
             - Release this was cut from: `v${{ env.VERSION }}`
-            - Build stamp: `v${{ env.VERSION }}-dev.${{ env.SHORT_SHA }}` (shown in-client and in crash logs)
+            - Build stamp: `v${{ env.VERSION }}-dev.${{ env.DEV_BUILD_NUMBER }}.${{ env.SHORT_SHA }}` (shown in-client and in crash logs)
             - Commit: ${{ env.DEV_SHA }}
 
             Download `${{ env.CUO_ZIP_NAME }}` below, unzip it, and run `ClassicUO.exe`.
@@ -232,6 +236,6 @@ jobs:
             echo "| --- | --- |"
             echo "| Built | ${{ env.BUILT_AT }} |"
             echo "| Commit | \`${{ env.SHORT_SHA }}\` |"
-            echo "| Build stamp | \`v${{ env.VERSION }}-dev.${{ env.SHORT_SHA }}\` |"
+            echo "| Build stamp | \`v${{ env.VERSION }}-dev.${{ env.DEV_BUILD_NUMBER }}.${{ env.SHORT_SHA }}\` |"
             echo "| Release page | [${{ env.TAG_NAME }}](https://github.com/${{ github.repository }}/releases/tag/${{ env.TAG_NAME }}) |"
           } >> "$GITHUB_STEP_SUMMARY"
