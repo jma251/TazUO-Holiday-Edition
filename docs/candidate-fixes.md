@@ -296,3 +296,36 @@ already this session (`Mobile.ProcessSteps` direction mask, the `0x19` null
 guard, the `Plugin.Tick` guard). Ten waiting on your call.
 
 Nothing has been applied beyond those three.
+
+---
+
+# Read pass 5: the TazUO main backlog, finished
+
+Every fix commit on `taz/main` since the fork, checked for whether its files
+exist here. Earlier sampling suggested most did not; over the full set, more do.
+
+## Confirmed present
+
+| # | What | Where | From |
+| --- | --- | --- | --- |
+| 14 | **The audio probe crashes machines with no sound device.** `new DynamicSoundEffectInstance(0, AudioChannels.Stereo).Dispose()` leaves a partially-constructed object behind when the constructor throws `NoAudioHardwareException`; the GC finalizer then crashes on it. Catching the exception, as we do, does not help - the object is already queued. bittiez replaced the probe with a read of `SoundEffect.MasterVolume`, which needs no object. | `AudioManager.cs:61` | `54a6df2f84` (#967) |
+| 15 | **Peripheral input before profiles are loaded.** `string.IsNullOrEmpty(UIManager.SystemChat.TextBoxControl.Text)` runs with no check that `ProfileManager.CurrentProfile` and `GlobalSettings` exist yet. | `GameSceneInputHandler.cs:1607` | `68311fbe46` |
+
+Number 14 matters more than its size suggests: it is a hard crash at startup on
+any machine without working audio hardware, and this fork has rewritten
+`AudioManager` heavily for the region music map, so it is ours to carry now.
+
+## Not applicable
+
+| | |
+| --- | --- |
+| `91c844cea3`, profile migration version | Our `Profile.cs` has no `ProfileMigrationVersion`; different lineage. |
+| the UI-scaling fixes, `007bbd7d20`, `8521331976` | No UI scaling on 4.7.2. |
+| the majority of the crash batches | Modern split `PacketHandlers.cs` into one file per packet and added managers we do not have. Those need re-deriving from the symptom. |
+
+## Still to read
+
+`e4ab9ed33b` (corrupt InfoBar blocking bootstrap - we have the same
+`if (root != null)` shape and no per-item guard), `4a95c04d8a` (mouse changes,
+seven files we have), `ab0f248bb4` and `9e8ba53483` (door movement blocking),
+`ea57b6acd7` (multiple crash fixes, two files we have).
