@@ -80,7 +80,19 @@ namespace ClassicUO.Network
                 // Start background receive task
                 _receiveTask = Task.Run(() => ReceiveLoopAsync(_cancellationTokenSource.Token), _cancellationTokenSource.Token);
 
-                OnConnected?.Invoke(this, EventArgs.Empty);
+                // Fired OUTSIDE the connect guard below. Its handlers run the login
+                // handshake and touch the UI, and the socket is already up with the
+                // receive loop running by this point - so a fault in one of them is not
+                // a connection failure and must not be reported as "Connection lost:
+                // Socket Error", nor tear the connection down by returning false.
+                try
+                {
+                    OnConnected?.Invoke(this, EventArgs.Empty);
+                }
+                catch (Exception handlerEx)
+                {
+                    Log.Error($"Exception in an OnConnected handler. The socket is up; this is not a connection failure: {handlerEx}");
+                }
 
                 return true;
             }
@@ -315,7 +327,11 @@ namespace ClassicUO.Network
 
                         if (addressBytes != null && addressBytes.Length != 0)
                         {
-                            _localIP = (uint)(addressBytes[0] | (addressBytes[1] << 8) | (addressBytes[2] << 16) | (addressBytes[3] << 24));
+                            // Big-endian: the first byte of the address is the most
+                            // significant, which is the order the login seed is read in.
+                            // Composed the other way round the server is handed a seed
+                            // with its bytes reversed.
+                            _localIP = (uint)(addressBytes[3] | (addressBytes[2] << 8) | (addressBytes[1] << 16) | (addressBytes[0] << 24));
                         }
 
                         if (!_localIP.HasValue || _localIP == 0)

@@ -902,6 +902,10 @@ namespace ClassicUO.Network
             }
 
             uint serial = p.ReadUInt32BE();
+
+            // The server is placing this object, so a removal still queued for it is stale.
+            World.CancelPendingItemRemoval(serial);
+
             ushort count = 0;
             byte graphicInc = 0;
             byte direction = 0;
@@ -2011,6 +2015,9 @@ namespace ClassicUO.Network
             }
 
             uint serial = p.ReadUInt32BE();
+
+            // The server is placing this object, so a removal still queued for it is stale.
+            World.CancelPendingItemRemoval(serial);
 
             Item item = World.GetOrCreateItem(serial);
 
@@ -6439,6 +6446,9 @@ namespace ClassicUO.Network
             uint containerSerial
         )
         {
+            // The server is placing this object, so a removal still queued for it is stale.
+            World.CancelPendingItemRemoval(serial);
+
             if (Client.Game.GameCursor.ItemHold.Serial == serial)
             {
                 if (Client.Game.GameCursor.ItemHold.Dropped)

@@ -558,6 +558,27 @@ namespace ClassicUO.Game
             return ent;
         }
 
+        /// <summary>
+        /// The server has authoritatively placed this serial, so a removal still queued
+        /// for it is stale and must not run.
+        ///
+        /// ObjectToRemove is set when the player picks something up and is consumed a
+        /// frame later in Update. Between those two moments the server can place the same
+        /// object - the pickup was refused, or it was moved somewhere the player can still
+        /// see. The queued removal then deletes the server's object and it vanishes for no
+        /// reason the player can see.
+        ///
+        /// This was guarded in one place only, for the item held by the cursor. Ported
+        /// from Oleh Romanovskyi's fix, which covers every placement path.
+        /// </summary>
+        internal static void CancelPendingItemRemoval(uint serial)
+        {
+            if (ObjectToRemove == serial)
+            {
+                ObjectToRemove = 0;
+            }
+        }
+
         public static Item GetOrCreateItem(uint serial)
         {
             Item item = Items.Get(serial);

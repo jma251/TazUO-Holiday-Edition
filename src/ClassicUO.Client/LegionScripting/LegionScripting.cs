@@ -441,7 +441,12 @@ namespace ClassicUO.LegionScripting
                     if (script.PythonThread == null || !script.PythonThread.IsAlive)
                     {
                         script.ReadFromFile();
-                        script.PythonThread = new Thread(() => ExecutePythonScript(script));
+                        // Background, so a script still running does not hold the process
+                        // open after the window closes and leave a client to be killed.
+                        script.PythonThread = new Thread(() => ExecutePythonScript(script))
+                        {
+                            IsBackground = true
+                        };
                         PyThreads.Add(script.PythonThread.ManagedThreadId, script);
                         script.PythonThread.Start();
                     }

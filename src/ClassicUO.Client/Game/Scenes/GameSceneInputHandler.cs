@@ -1604,7 +1604,11 @@ namespace ClassicUO.Game.Scenes
                 }
                 else
                 {
-                    if (string.IsNullOrEmpty(UIManager.SystemChat.TextBoxControl.Text))
+                    // Input can arrive before the profile is loaded - a key or a pad
+                    // event during startup - and the body below reads both of these.
+                    if (string.IsNullOrEmpty(UIManager.SystemChat.TextBoxControl.Text)
+                        && ProfileManager.CurrentProfile != null
+                        && ProfileManager.GlobalSettings != null)
                     {
                         bool wasd = ProfileManager.CurrentProfile.UseWASDInsteadArrowKeys && !UIManager.SystemChat.IsActive;
 

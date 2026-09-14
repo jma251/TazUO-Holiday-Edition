@@ -330,12 +330,17 @@ namespace ClassicUO.Game.Managers
             if (multiplier > 1)
                 x -= (int)(((BAR_WIDTH * multiplier) / 2) - (BAR_WIDTH / 2));
 
-            batcher.Draw(
-                gumpInfo.Texture,
-                new Rectangle(x, y, gumpInfo.UV.Width * multiplier, gumpInfo.UV.Height * multiplier),
-                gumpInfo.UV,
-                hueVec
-            );
+            // A gump that is missing from the art files comes back with a null texture.
+            // Drawing it crashed rather than simply showing nothing.
+            if (gumpInfo.Texture != null)
+            {
+                batcher.Draw(
+                    gumpInfo.Texture,
+                    new Rectangle(x, y, gumpInfo.UV.Width * multiplier, gumpInfo.UV.Height * multiplier),
+                    gumpInfo.UV,
+                    hueVec
+                );
+            }
 
             hueVec.X = 90;
 

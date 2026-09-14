@@ -56,11 +56,23 @@ namespace ClassicUO.Game.Managers
 
         public void Initialize()
         {
+            // Probing by reading MasterVolume rather than by constructing a sound.
+            //
+            // This used to be `new DynamicSoundEffectInstance(0, AudioChannels.Stereo)
+            // .Dispose()`. On a machine with no audio device the constructor throws
+            // NoAudioHardwareException part-way through, which leaves a partially built
+            // object registered for finalization - and catching the exception here does
+            // not help, because the crash comes later when the GC finalizes it. The
+            // client simply died at startup.
+            //
+            // Touching MasterVolume exercises the same audio backend and allocates
+            // nothing, so there is no object left behind to be finalized.
+            // Ported from TazUO (#967, bittiez).
             try
             {
-                new DynamicSoundEffectInstance(0, AudioChannels.Stereo).Dispose();
+                float _ = SoundEffect.MasterVolume;
             }
-            catch (NoAudioHardwareException ex)
+            catch (Exception ex)
             {
                 Log.Warn(ex.ToString());
                 _canReproduceAudio = false;

@@ -795,6 +795,13 @@ namespace ClassicUO.Renderer
             float stroke
         )
         {
+            // texture.Bounds is dereferenced below. A texture that failed to load, or
+            // was disposed while a draw was queued, took the client down here.
+            if (texture == null || texture.IsDisposed)
+            {
+                return;
+            }
+
             var radians = ClassicUO.Utility.MathHelper.AngleBetweenVectors(start, end);
             Vector2.Distance(ref start, ref end, out var length);
 

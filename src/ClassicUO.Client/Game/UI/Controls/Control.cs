@@ -820,7 +820,11 @@ namespace ClassicUO.Game.UI.Controls
 
         public virtual void Clear()
         {
-            foreach (Control c in Children)
+            // Walk a copy. Disposing a child may add to or remove from this list, and
+            // List<T> throws the moment the collection it is enumerating is touched.
+            // The same hazard is handled this way in DisposeChildren below; this one
+            // was missed.
+            foreach (Control c in Children.ToArray())
             {
                 c.Dispose();
             }

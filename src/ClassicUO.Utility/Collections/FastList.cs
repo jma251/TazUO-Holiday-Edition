@@ -135,6 +135,30 @@ namespace ClassicUO.Utility.Collections
         /// <summary>
         /// if the buffer is at its max more space will be allocated to fit additionalItemCount
         /// </summary>
+        /// <summary>
+        /// Set the filled length, growing the buffer first if the new length will not fit.
+        ///
+        /// Length is a public field and assigning it directly is legal, which is how the
+        /// font wrap path used to set it - and a length larger than the buffer then
+        /// overflowed the moment anything indexed it. Growing here makes the assignment
+        /// mean what it looks like it means.
+        /// </summary>
+        public void Resize(int newLength)
+        {
+            if (newLength < 0)
+            {
+                newLength = 0;
+            }
+
+            if (newLength > Buffer.Length)
+            {
+                Array.Resize(ref Buffer, Math.Max(Buffer.Length << 1, newLength));
+            }
+
+            Length = newLength;
+        }
+
+
         public void EnsureCapacity(int additionalItemCount = 1)
         {
             if (Length + additionalItemCount >= Buffer.Length)

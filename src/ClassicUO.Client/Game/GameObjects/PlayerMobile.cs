@@ -1497,9 +1497,31 @@ namespace ClassicUO.Game.GameObjects
                 int x = X, y = Y, z = Z;
                 Pathfinder.GetNewXY((byte)Direction, ref x, ref y);
 
-                if (World.Items.Values.Any(s => s.ItemData.IsDoor && s.X == x && s.Y == y && s.Z - 15 <= z && s.Z + 15 >= z))
+                // Walk the one tile's object list instead of scanning every item in the
+                // world. This ran as World.Items.Values.Any(...) on EVERY step the player
+                // took, over the whole item dictionary - thousands of entries in a busy
+                // area - to answer a question about a single tile. The tile already knows
+                // what is standing on it.
+                //
+                // The test itself is unchanged: a door, within 15 z either way. The X and Y
+                // comparisons are gone because walking this tile's list makes them true by
+                // construction. Ported from TazUO main, which reached the same fix.
+                GameObject obj = World.Map?.GetTile(x, y, false);
+
+                while (obj?.TPrevious != null)
                 {
-                    GameActions.OpenDoor();
+                    obj = obj.TPrevious;
+                }
+
+                for (; obj != null; obj = obj.TNext)
+                {
+                    if (obj is Item door && door.ItemData.IsDoor && door.Z - 15 <= z && door.Z + 15 >= z)
+                    {
+                        GameActions.OpenDoor();
+
+                        // Any() stopped at the first match, so this does too.
+                        break;
+                    }
                 }
             }
         }
