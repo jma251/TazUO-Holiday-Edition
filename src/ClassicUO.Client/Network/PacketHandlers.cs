@@ -2519,14 +2519,23 @@ namespace ClassicUO.Network
 
                 if (Client.Version >= Utility.ClientVersion.CV_305D)
                 {
-                    // What the player set rather than the old hard-coded standard. The
-                    // server answers with what it granted, which overwrites this.
-                    World.ClientViewRange = (byte)Math.Max(
+                    // Ask for what the player set, and keep culling at the ceiling until
+                    // the server answers 0xC8 with what it actually granted.
+                    //
+                    // This used to assign the asked-for value to World.ClientViewRange at
+                    // the same moment, which made it the cull distance before anything had
+                    // agreed to it. Measured from a login capture the server's answer comes
+                    // 1,541 packets after the request, and for that whole window the client
+                    // was discarding at 24 what upstream keeps to 40 - and an object is
+                    // sent once, on the step it crosses into range, so what is dropped
+                    // there is gone until a resync. ClassicUO and TazUO both send the field
+                    // without ever writing to it; only the send was ours to change.
+                    byte requested = (byte)Math.Max(
                         Constants.MIN_VIEW_RANGE,
                         Math.Min(Constants.MAX_VIEW_RANGE, Settings.GlobalSettings.ClientViewRange)
                     );
 
-                    NetClient.Socket.Send_ClientViewRange(World.ClientViewRange);
+                    NetClient.Socket.Send_ClientViewRange(requested);
                 }
 
                 // Reset the global action cooldown here because, for some reason, immediately

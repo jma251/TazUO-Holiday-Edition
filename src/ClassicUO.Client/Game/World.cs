@@ -995,6 +995,13 @@ namespace ClassicUO.Game
             ActiveSpellIcons.Clear();
 
             SkillsRequested = false;
+
+            // Back to the ceiling for the next login. This is a static, so without the
+            // reset the second login of a process starts at whatever the last server
+            // granted - 24, typically - and culls at 24 from the first packet, which is
+            // the exact window the MAX_VIEW_RANGE default above exists to protect. Only
+            // the first login was ever covered.
+            ClientViewRange = Constants.MAX_VIEW_RANGE;
         }
 
         private static void InternalMapChangeClear(bool noplayer)
