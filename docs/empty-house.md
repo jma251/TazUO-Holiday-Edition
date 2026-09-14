@@ -129,3 +129,70 @@ disproved it has changed.
 What is *not* worth redoing is a theory this document killed with a counter that
 was never blind - the rate table in particular, which is what makes the
 24-tile-box story wrong.
+
+## 2026-09-14 — the server side, read from ServUO source
+
+`ServUO/Server/Mobile.cs`, the per-step send that runs on every move:
+
+```csharp
+var eeable = map.GetObjectsInRange(newLocation, Core.GlobalRadarRange);
+
+foreach (var o in eeable)
+{
+    if (o is Item item)
+    {
+        var range = item.GetUpdateRange(this);
+        var loc = item.GetWorldLocation();
+
+        if (!Utility.InRange(oldLocation, loc, range) && Utility.InRange(newLocation, loc, range) && CanSee(item))
+        {
+            item.SendInfoTo(ourState);
+        }
+    }
+    ...
+```
+
+Three things follow, and together they account for everything measured.
+
+### There is no "already delivered" ledger. The geometry is the ledger.
+
+An item is sent on **the one step where it crosses from out-of-range to
+in-range**, and never again while the player stays nearby: from the next step
+onward `!InRange(oldLocation, ...)` is false, so the condition cannot be true.
+No record is kept because none is needed.
+
+This is why a discarded item never comes back, and why a six-minute capture
+showed zero `DeleteObject` packets. It was never a server bookkeeping quirk -
+it is that **the client gets exactly one chance at each item**, and anything it
+drops on the frame of arrival is gone until something forces a full resend.
+
+It also settles what the cull should do. Extending the cull by a tile does not
+buy a second chance; it only holds objects the server has stopped maintaining,
+which is where the stale mobiles came from. The lever that actually works is
+the one already shipped: `0x22`, which makes the server run `SendEverything`
+and disregard the geometry entirely.
+
+### `CanSee(item)` is evaluated at that single moment
+
+The send is conditional on line of sight **at the instant of the transition**.
+If the wall is between the player and the room's contents on the step where
+they cross into range, `CanSee` is false, nothing is sent, and the geometry
+never offers a second opportunity.
+
+That is a mechanism for the stair-tile trigger. Entering over a curved corner
+piece puts the player's crossing step where the house wall still occludes the
+room; entering over the middle three does not. It predicts the failure depends
+on **the step where range is first crossed**, not on the tile being special -
+which is consistent with 3 failures in 15 deliberate entries rather than a
+clean always/never split.
+
+### Items carry their own update range
+
+`item.GetUpdateRange(m)` is per-item and separate from the mobile update range,
+so house contents need not use the same radius as the player's view range. This
+is worth knowing before anyone reasons about the two as if they were one number.
+
+**Caveat:** ServUO is the reference, not necessarily this shard. The pattern is
+RunUO-lineage and near-universal, but the shard has not been confirmed to run
+it. What is certain is that this shape of send logic produces every symptom
+recorded above without needing any other explanation.
