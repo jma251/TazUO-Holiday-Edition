@@ -49,12 +49,16 @@ namespace ClassicUO.Game.Managers
         /// </summary>
         private static readonly Dictionary<uint, int> _emptied = new Dictionary<uint, int>();
 
+        /// <summary>Reused by the drain below so the poll allocates nothing.</summary>
+        private static readonly List<uint> _pending = new List<uint>();
+
         private static long _nextAsk;
 
         public static void Reset()
         {
             _emptied.Clear();
             _highWater.Clear();
+            _pending.Clear();
             _nextPoll = 0;
             _nextAsk = 0;
         }
@@ -82,6 +86,10 @@ namespace ClassicUO.Game.Managers
             }
 
             _nextPoll = Time.Ticks + PollInterval;
+
+            // Houses taken back too far out to ask about yet. Done before the rest
+            // because it is not about the house being stood in.
+            DrainEmptied();
 
             uint serial;
 
@@ -120,10 +128,17 @@ namespace ClassicUO.Game.Managers
 
             // Whatever comes back is the new truth. Asked once per shortfall, so a room
             // that is genuinely emptier than it was does not get asked about forever.
+            //
+            // Lowered only if the ask went out. Ask throttles to one in three seconds
+            // and used to be called for its effect alone, so a throttled ask still
+            // reset the high water - the shortfall was forgotten without anything
+            // having been asked, and the room stayed short until it got shorter again.
             int missing = high - held;
-            _highWater[serial] = held;
 
-            Ask(serial, missing, "shortfall");
+            if (Ask(serial, missing, "shortfall"))
+            {
+                _highWater[serial] = held;
+            }
         }
 
         /// <summary>Where this house's multi says its floor is, or false if it cannot say.</summary>
@@ -175,7 +190,11 @@ namespace ClassicUO.Game.Managers
         /// </summary>
         public static void OnHouseLetGo(uint serial)
         {
-            if (!World.InGame)
+            // Nothing is recorded while the option is off. The record used to be taken
+            // regardless and cleared on re-acquire; now that an ask can be deferred
+            // instead, a record taken with the feature off would have nothing to drain
+            // it and would sit there for the rest of the session.
+            if (!Settings.GlobalSettings.RecoverHouseContents || !World.InGame)
             {
                 return;
             }
@@ -206,6 +225,55 @@ namespace ClassicUO.Game.Managers
                 return;
             }
 
+            TryAskForEmptied(serial);
+        }
+
+        /// <summary>
+        /// Every house taken back that this client emptied, asked about as soon as one
+        /// is near enough to be answered for.
+        /// </summary>
+        private static void DrainEmptied()
+        {
+            if (_emptied.Count == 0)
+            {
+                return;
+            }
+
+            _pending.Clear();
+
+            foreach (KeyValuePair<uint, int> pair in _emptied)
+            {
+                _pending.Add(pair.Key);
+            }
+
+            for (int i = 0; i < _pending.Count; ++i)
+            {
+                TryAskForEmptied(_pending[i]);
+            }
+
+            _pending.Clear();
+        }
+
+        /// <summary>
+        /// Ask about a house this client emptied, but only once it is near enough that
+        /// the server will answer for it.
+        ///
+        /// A house is taken back at the house range - 40 tiles, plus half the building -
+        /// while 0x22 makes the server resend only what lies inside the range it granted
+        /// the player, which is 24. Asked from out there the resync costs its whole burst
+        /// and returns nothing for this house, because none of the house's contents are
+        /// within the granted range yet. That is the stutter that started happening a
+        /// screen away from the door rather than at it, and it arrived when the house
+        /// range and the view range became separate numbers.
+        ///
+        /// The record used to be dropped whether the ask landed or not, on the reasoning
+        /// that a house which has come back is no longer a house that was dropped. With
+        /// the ask firing from 40 tiles out that reasoning cost the room: the one ask of
+        /// the approach was spent where it could do nothing, and by the time the player
+        /// reached the door there was no record left to ask again from.
+        /// </summary>
+        private static void TryAskForEmptied(uint serial)
+        {
             int emptied;
 
             if (!_emptied.TryGetValue(serial, out emptied))
@@ -213,19 +281,34 @@ namespace ClassicUO.Game.Managers
                 return;
             }
 
-            // Taken off whether the ask happens or not. A house that has come back is no
-            // longer a house that was dropped, and leaving the record would have it asked
-            // about again on every future approach.
-            _emptied.Remove(serial);
+            Item multi = World.Items.Get(serial);
 
-            Ask(serial, emptied, "reacquired");
+            // Gone rather than approached. Nothing to ask for and nothing to wait for.
+            if (multi == null || multi.IsDestroyed)
+            {
+                _emptied.Remove(serial);
+
+                return;
+            }
+
+            // Still out where the answer would be empty. Kept for the next poll.
+            if (multi.Distance > World.ClientViewRange)
+            {
+                return;
+            }
+
+            if (Ask(serial, emptied, "reacquired"))
+            {
+                _emptied.Remove(serial);
+            }
         }
 
-        private static void Ask(uint serial, int missing, string why)
+        /// <summary>True if the resync actually went out.</summary>
+        private static bool Ask(uint serial, int missing, string why)
         {
             if (!Settings.GlobalSettings.RecoverHouseContents || Time.Ticks < _nextAsk)
             {
-                return;
+                return false;
             }
 
             _nextAsk = Time.Ticks + AskInterval;
@@ -233,6 +316,8 @@ namespace ClassicUO.Game.Managers
             HouseDiagnostics.Note($"recover house=0x{serial:X8} missing={missing} why={why}");
 
             NetClient.Socket.Send_Resync();
+
+            return true;
         }
     }
 }

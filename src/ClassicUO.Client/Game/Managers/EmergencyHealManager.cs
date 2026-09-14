@@ -72,5 +72,24 @@ namespace ClassicUO.Game.Managers
             GameActions.Print($"EmergencyHeal {(on ? "ON" : "OFF")} (<{ThresholdPct}% → {SpellName}).",
                 (ushort)(on ? 0x35 : 0x21));
         }
+
+        /// <summary>
+        /// Back to defaults on the way out of a world.
+        ///
+        /// This and the other five consumable/spell helpers were the only ones the
+        /// scheduler's ResetSession did not call. They are statics, so switching one on
+        /// for a character and then logging in as another left it on for the second
+        /// character - a helper that casts and drinks, armed by somebody else's choice.
+        /// Nothing persists them either, so there was no saved preference being honoured;
+        /// the state was simply never cleared.
+        /// </summary>
+        public static void ResetForProfile()
+        {
+            Enabled = false;
+            ThresholdPct = 25;
+            SpellName = "Greater Heal";
+            _nextPoll = 0;
+            _lastCastAt = 0;
+        }
     }
 }

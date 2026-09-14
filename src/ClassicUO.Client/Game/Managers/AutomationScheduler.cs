@@ -164,6 +164,15 @@ namespace ClassicUO.Game.Managers
             AutoStopOnDeathManager.ResetSession();
             AutoStealthManager.ResetSession();
             AutoVendorCloseManager.ResetSession();
+
+            // The consumable and spell helpers. They had no reset of any kind, so their
+            // switches carried from one character to the next.
+            EmergencyHealManager.ResetForProfile();
+            PoisonCureManager.ResetForProfile();
+            AutoCurePotionManager.ResetForProfile();
+            AutoHealPotionManager.ResetForProfile();
+            AutoRefreshPotionManager.ResetForProfile();
+            AutoBuffManager.ResetForProfile();
         }
     }
 }
