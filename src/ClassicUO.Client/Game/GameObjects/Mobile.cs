@@ -729,12 +729,12 @@ namespace ClassicUO.Game.GameObjects
             if (Steps.Count != 0 && !IsDestroyed)
             {
                 ref Step step = ref Steps.Front();
-                dir = step.Direction;
 
-                if (step.Run)
-                {
-                    dir &= 7;
-                }
+                // Always masked. It used to be masked only when the step was a running
+                // one, so a walking step kept bit 0x80 - the Running flag that shares
+                // this byte - and handed Draw a direction of 8 or more to index with.
+                // Ported from TazUO #1031.
+                dir = (byte)(step.Direction & 7);
 
                 if (evalutate)
                 {

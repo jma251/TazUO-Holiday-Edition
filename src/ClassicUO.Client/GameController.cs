@@ -147,6 +147,9 @@ namespace ClassicUO
 
         private const int MAX_PACKETS_PER_FRAME = 25;
 
+        /// <summary>Throttles the plugin-error notice. See the catch around Plugin.Tick.</summary>
+        private long _nextPluginCrashNotice;
+
         private void ProcessNetworkPackets()
         {
             int packetsProcessed = 0;
@@ -487,7 +490,24 @@ namespace ClassicUO
             ProcessNetworkPackets();
             Profiler.ExitContext("Packets");
 
-            Plugin.Tick();
+            // A throwing plugin used to take the client down with it. Upstream debounces
+            // the notice with a helper that does not exist on 4.7.2, so the throttle is
+            // done by hand here: log every one, tell the player at most once a second.
+            // Ported from TazUO #999.
+            try
+            {
+                Plugin.Tick();
+            }
+            catch (Exception e)
+            {
+                Log.Error(e.ToString());
+
+                if (Time.Ticks >= _nextPluginCrashNotice)
+                {
+                    _nextPluginCrashNotice = Time.Ticks + 1000;
+                    GameActions.Print("It looks like your plugin had an error. Check the Log History or Console for the full error.");
+                }
+            }
 
             if(drawScene)
             {

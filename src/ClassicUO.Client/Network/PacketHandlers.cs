@@ -4784,7 +4784,10 @@ namespace ClassicUO.Network
 
                         case 2:
 
-                            if (serial == World.Player)
+                            // World.Player can be null while the world is tearing down -
+                            // the packet still arrives and the comparison dereferences it.
+                            // Ported from TazUO #1036.
+                            if (World.Player != null && serial == World.Player)
                             {
                                 byte updategump = p.ReadUInt8();
                                 byte state = p.ReadUInt8();
