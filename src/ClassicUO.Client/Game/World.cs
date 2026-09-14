@@ -313,12 +313,19 @@ namespace ClassicUO.Game
 
                     mob.Update();
 
-                    // +1 for the same reason as the item sweep below: the server sends one
-                    // tile past the view range it granted. 91 mobiles arrived at distance
-                    // 25 in one capture against 37 at 24, so the outer ring is where most
-                    // of them turn up - and every one was dropped on the next frame and
-                    // then re-created when it moved a step closer.
-                    if (do_delete && mob.Distance > ClientViewRange + 1)
+                    // Exactly the granted range, as ClassicUO and TazUO both do.
+                    //
+                    // This was ClientViewRange + 1 between 2026-09-12 and 2026-09-14, on the
+                    // reasoning that the server sends one tile past what it grants and the
+                    // client was throwing that ring away. The sending is real; the remedy
+                    // was not. ServUO sends an object on the single step it crosses into
+                    // range and the condition can never be true again while the player
+                    // stays near, so holding it one tile further buys no second delivery -
+                    // it only keeps an object the server has stopped maintaining, which
+                    // gets no movement, no death and no removal. That is how a killed
+                    // mobile stayed standing and a live one was never drawn. See
+                    // docs/empty-house.md.
+                    if (do_delete && mob.Distance > ClientViewRange)
                     {
                         RemoveMobile(mob);
                     }
@@ -405,29 +412,24 @@ namespace ClassicUO.Game
                     // server sent for it.
                     int houseRange = Settings.GlobalSettings.HouseLoadRange;
 
-                    // ClientViewRange is what the server GRANTED. It sends one tile
-                    // further than that, so culling at the granted figure throws away
-                    // everything on the outermost ring the moment it arrives.
+                    // Loose objects answer to exactly the granted range, as upstream does.
                     //
-                    // Measured, not assumed. A capture that includes login shows the
-                    // negotiation agreeing on 24 in both directions - C8 18 out, C8 18
-                    // back, logged as "viewrange value=24" - and then 5,198 objects
-                    // delivered at distance 25 against 783 at 24. Mobiles the same: 91
-                    // at 25, 37 at 24. The ring is real and it is the busiest one.
+                    // The measurement that prompted the +1 stands: a capture showed 5,198
+                    // objects delivered at distance 25 against 783 at 24, and everything on
+                    // that outer ring was discarded on the next frame and never sent again.
+                    // What was wrong was the conclusion. ServUO sends an object on the one
+                    // step it crosses into range - "was out of range at the old position,
+                    // is in range at the new one" - and that can never be true a second
+                    // time while the player stays near it. Holding the ring one tile longer
+                    // does not earn another delivery; it just keeps objects the server no
+                    // longer updates.
                     //
-                    // Everything landing there was discarded on the next frame while the
-                    // server kept it recorded as delivered, so it was never sent again
-                    // and no delete was ever issued for it - zero DeleteObject packets in
-                    // a six-minute capture. That is how a house keeps its walls and doors,
-                    // which come with the design and can be re-requested, and loses its
-                    // furniture, which cannot.
-                    //
-                    // +1 rather than raising the setting: the setting is what gets asked
-                    // for, and the server answers it by sending one past whatever it
-                    // grants. Asking for more just moves the ring outwards.
+                    // The house case has its own answer and it is already shipped: 0x22
+                    // makes the server run SendEverything and ignore the crossing geometry
+                    // altogether. That is the recovery checkbox. See docs/empty-house.md.
                     int keepWithin = item.IsMulti
                         ? houseRange + item.MultiDistanceBonus
-                        : ClientViewRange + 1;
+                        : ClientViewRange;
 
                     if (do_delete && item.OnGround && item.Distance > keepWithin)
                     {

@@ -295,10 +295,16 @@ namespace ClassicUO.Game.GameObjects
             ProcessAnimation(true);
         }
 
+        /// <summary>When the last step was enqueued, so the next one can be timed against it.</summary>
+        private uint _lastEnqueueTime;
+
         public void ClearSteps()
         {
             Steps.Clear();
             Offset = Vector3.Zero;
+
+            // The next step has nothing to measure against, so it falls back to the table.
+            _lastEnqueueTime = 0;
         }
 
         public bool EnqueueStep(int x, int y, sbyte z, Direction direction, bool run)
@@ -315,6 +321,12 @@ namespace ClassicUO.Game.GameObjects
                 return true;
             }
 
+            // The interval the server actually delivered this step at. On the first step
+            // of a walk there is no previous one to measure from, so the table stands in.
+            int timeDiff = _lastEnqueueTime == 0
+                ? MovementSpeed.TimeToCompleteMovement(run, IsMounted || IsFlying)
+                : (int)(Time.Ticks - _lastEnqueueTime);
+
             if (Steps.Count == 0)
             {
                 if (!IsWalking)
@@ -324,6 +336,8 @@ namespace ClassicUO.Game.GameObjects
 
                 LastStepTime = Time.Ticks;
             }
+
+            _lastEnqueueTime = Time.Ticks;
 
             Direction moveDir = DirectionHelper.CalculateDirection(endX, endY, x, y);
             Step step = new Step();
@@ -337,6 +351,7 @@ namespace ClassicUO.Game.GameObjects
                     step.Z = endZ;
                     step.Direction = (byte)moveDir;
                     step.Run = run;
+                    step.TimeDiff = timeDiff;
                     Steps.AddToBack(step);
                 }
 
@@ -345,6 +360,7 @@ namespace ClassicUO.Game.GameObjects
                 step.Z = z;
                 step.Direction = (byte)moveDir;
                 step.Run = run;
+                step.TimeDiff = timeDiff;
                 Steps.AddToBack(step);
             }
 
@@ -355,6 +371,7 @@ namespace ClassicUO.Game.GameObjects
                 step.Z = z;
                 step.Direction = (byte)direction;
                 step.Run = run;
+                step.TimeDiff = timeDiff;
                 Steps.AddToBack(step);
             }
 
@@ -751,46 +768,40 @@ namespace ClassicUO.Game.GameObjects
                         || IsFlying;
                     bool run = step.Run;
 
-                    // Client auto movements sync.
-                    // When server sends more than 1 packet in an amount of time less than 100ms if mounted (or 200ms if walking mount)
-                    // we need to remove the "teleport" effect.
-                    // When delay == 0 means that we received multiple movement packets in a single frame, so the patch becomes quite useless.
-                    if (!mounted && Serial != World.Player && Steps.Count > 1 && delay > 0)
-                    {
-                        mounted =
-                            delay
-                            <= (
-                                run
-                                    ? MovementSpeed.STEP_DELAY_MOUNT_RUN
-                                    : MovementSpeed.STEP_DELAY_MOUNT_WALK
-                            );
-                    }
 
-                    // A mobile is drawn at the front of its queue, and the server's real
-                    // position is the back of it. Playing that back at a fixed rate off a
-                    // compiled-in table means anything the server moves faster than the
-                    // table allows falls one step further behind on every update, with no
-                    // way to make it up - the client has no catch-up, only overflow. At
-                    // five queued steps EnqueueStep refuses, and the handler throws the
-                    // position away and puts the mobile where the server says it is. That
-                    // is the jump across the ground.
+                    // Play each step back at the rate the server actually delivered it,
+                    // rather than at a rate guessed from a compiled-in table.
                     //
-                    // Draining faster the deeper the queue keeps the drawn position close
-                    // to the real one and stops the queue ever reaching the point where it
-                    // has to be discarded. A full queue plays back five times as fast,
-                    // which is a mobile moving quickly - the alternative is a mobile
-                    // moving at the wrong speed and then appearing somewhere else.
-                    int stepTime = MovementSpeed.TimeToCompleteMovement(run, mounted);
+                    // Two guesses used to live here and they compounded. The first was
+                    // inherited: if a mobile had a backlog and steps were arriving inside
+                    // 100/200ms, it was drawn on the mounted timing - halving the step
+                    // once, as a proxy for "the server is moving this faster than the
+                    // table allows". The second was ours, added 2026-08-17: divide the
+                    // step time by the depth of the queue. Together a five-deep queue
+                    // played back at up to ten times the table rate, then dropped back to
+                    // normal as it drained, which is what made mobiles appear to skip
+                    // while chasing. Ours also had no "not the player" guard, so it sped
+                    // up the player's own character, which the inherited one deliberately
+                    // never did.
+                    //
+                    // TimeDiff is the measured interval, so neither guess is needed. The
+                    // player is excepted because their movement is predicted locally and
+                    // acknowledged afterwards; there is no delivery rate to measure.
+                    // Ported from TazUO main.
+                    int maxDelay;
 
-                    if (Steps.Count > 1)
+                    if (Serial == World.Player)
                     {
-                        stepTime /= Steps.Count;
+                        maxDelay = MovementSpeed.TimeToCompleteMovement(run, mounted)
+                                 - (int)Client.Game.FrameDelay[1];
                     }
-
-                    // Never zero: it is divided by below to work out how far between two
-                    // tiles to draw, and a frame slower than the shortened step would
-                    // otherwise put a division by zero into the offset.
-                    int maxDelay = Math.Max(1, stepTime - (int)Client.Game.FrameDelay[1]);
+                    else
+                    {
+                        maxDelay = (step.TimeDiff > 0
+                                        ? step.TimeDiff
+                                        : MovementSpeed.TimeToCompleteMovement(step.Run, IsMounted || IsFlying))
+                                 - (int)Client.Game.FrameDelay[1];
+                    }
 
                     bool removeStep = delay >= maxDelay;
                     bool directionChange = false;
@@ -1166,6 +1177,13 @@ namespace ClassicUO.Game.GameObjects
             public sbyte Z;
             public byte Direction;
             public bool Run;
+
+            /// <summary>
+            /// How long the server actually took to send this step after the one before
+            /// it. Played back at this rate rather than at a rate guessed from a table.
+            /// Zero on the first step of a walk, where there is nothing to measure yet.
+            /// </summary>
+            public int TimeDiff;
         }
     }
 }
