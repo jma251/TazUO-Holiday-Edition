@@ -75,13 +75,6 @@ namespace ClassicUO.Network
             new[] { '@', '@' }
         );
 
-        /// <summary>
-        /// Serials per 0xD6 request. The packet writer sends this many and drops them from
-        /// the list, so the dedup set has to forget exactly the same ones - the two must
-        /// agree or a serial is either never re-requestable or never deduped.
-        /// </summary>
-        internal const int OPL_REQUESTS_PER_PACKET = 15;
-
         private List<uint> _clilocRequests = new List<uint>();
 
         /// <summary>
@@ -408,18 +401,21 @@ namespace ClassicUO.Network
                 {
                     if (Handler._clilocRequests.Count != 0)
                     {
-                        // Forget exactly what is about to be sent, and nothing else, so
-                        // those serials can be asked for again later while the ones still
-                        // queued stay deduped. Costs at most OPL_REQUESTS_PER_PACKET
-                        // removals rather than rebuilding the whole set every frame.
-                        int sending = Math.Min(OPL_REQUESTS_PER_PACKET, Handler._clilocRequests.Count);
-
-                        for (int i = 0; i < sending; ++i)
-                        {
-                            Handler._clilocRequested.Remove(Handler._clilocRequests[i]);
-                        }
-
                         NetClient.Socket.Send_MegaClilocRequest(ref Handler._clilocRequests);
+
+                        // Rebuilt from what the send left behind, so the set always agrees
+                        // with the list no matter how many serials the packet took. An
+                        // earlier version here removed a counted number instead, which is
+                        // cheaper but only correct while this file and the packet writer
+                        // agree on the batch size - and if they ever drifted, a serial
+                        // would become either permanently un-requestable or never deduped.
+                        // Deriving it from the list cannot drift. crameep's shape.
+                        Handler._clilocRequested.Clear();
+
+                        for (int i = 0; i < Handler._clilocRequests.Count; ++i)
+                        {
+                            Handler._clilocRequested.Add(Handler._clilocRequests[i]);
+                        }
                     }
                 }
                 else
