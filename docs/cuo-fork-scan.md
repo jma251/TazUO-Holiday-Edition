@@ -119,3 +119,89 @@ reading for the *reasoning*, never for the diff.
 | `Storm Kiernan` (in several forks) | Packet and movement correctness. |
 | `UOOutlands`, `Vita-Nex`, `Voxpire`, `ServUOX` | Shard and server-project forks. |
 | `Tolokio/ClassicUOExtended`, `SneauxROSE/ClassicUORenaissance`, `filipehb/EpicUO`, `2dchaos/ZanUO` | Named derivative clients. |
+
+---
+
+## The ECS rewrite — what it actually is
+
+Earlier in this document the ECS work is dismissed as "not portable". That is
+true, but it is worth being precise about what it is, because it determines
+where ClassicUO's fixes will and will not come from in future.
+
+### Two branches, not one
+
+| branch | commits ahead of `cuo/main` | last commit | state |
+| --- | --- | --- | --- |
+| `cuo/imp/ecs-source-gen` | 202 | **2025-06-11** | dormant, 15 months untouched |
+| `cuo/impl/ecs` | **593** | **2026-06-28** | **active** |
+
+The dormant one is the easy one to find and the wrong one to read. The live
+work is on `impl/ecs`, started 2024-04-20 and still moving.
+
+### What it is
+
+A ground-up re-architecture of the client as an **entity-component-system** on
+`TinyEcs`, with a **Bevy-style** plugin and scheduling API - Bevy being the Rust
+game engine whose design it copies. The shape is visible in `Boot.cs`:
+
+```csharp
+internal readonly struct CuoPlugin : IPlugin
+{
+    public void Build(App app)
+    {
+        app.AddState(GameState.Loading);
+        app.AddResource(new GameContext() { Map = -1, MaxObjectsDistance = 32 });
+        app.AddResource(Settings.GlobalSettings);
+
+        app.AddSystem(Stage.Startup, (ResMut<GameContext> gameCtx, Res<Settings> settings) => { ... });
+
+        app.AddPlugin<PersistencePlugin>();
+        app.AddPlugin(new FnaPlugin() { WindowResizable = true, MouseVisible = false, VSync = true });
+```
+
+Instead of objects with methods - `Mobile.ProcessSteps`, `World.Update`,
+`GameScene.Draw` - there are **components** (plain data on entities) and
+**systems** (free functions that query for the components they need, declared
+as `Res<T>` / `ResMut<T>` parameters and wired by the scheduler). Everything is
+assembled from plugins: `PlayerMovementPlugin`, `TerrainPlugin`,
+`ContainersPlugin`, `NetworkPlugin`, `WorldRenderingPlugin`.
+
+### The project layout it implies
+
+```
+src/ClassicUO.Ecs/            the new client - ~30 plugins
+src/ClassicUO.Client/         the legacy client, still present, still builds
+src/ClassicUO.Bootstrap/      apphost
+src/ClassicUO.Agent.Host/     AGENT_BUILD only - a remote-control surface
+src/ClassicUO.Agent.Contracts/
+src/ClassicUO.Schema/
+src/Mods/                     WASM mods, in Rust and C#, via wasmtime-dotnet
+```
+
+`net10.0`, `LangVersion` Preview. The legacy client is kept alongside rather
+than deleted, so the two coexist in one tree.
+
+Two things there are not in any other fork: an **agent host** for driving the
+client programmatically, and a **WASM mod system** - `src/Mods/ecs-blocktest`
+is a Rust crate with a `world.wit` interface definition, loaded through
+`wasmtime-dotnet`.
+
+### Why none of it ports here
+
+- **Architecture.** There is no `Mobile.ProcessSteps` to patch. A fix reads as
+  a change to a system's query or to component data.
+- **Framework.** `net10.0` and preview C#, against our `net472`.
+- **Dependencies.** TinyEcs, TinyEcs.Bevy, wasmtime - none available to us.
+
+### What it means in practice
+
+The commits that sound most relevant to this fork's open problems - **`+ fix
+walking over multi`**, **`+ reduce the entities to parse while walking`**,
+**`+ netclient: span everywhere`**, **`fix(ecs): cull and occlude dynamic lights
+like legacy`**, **`perf(ecs): bump TinyEcs — zero-alloc parallel system
+scheduler`** - are all on `impl/ecs`. Read them for the reasoning and re-derive
+by hand; never attempt the diff.
+
+It also means **ClassicUO's mainline is comparatively quiet**, and the fixes
+this fork can actually take are coming from TazUO main and from the fork
+network, not from ClassicUO itself.
