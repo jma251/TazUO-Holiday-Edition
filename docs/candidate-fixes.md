@@ -111,3 +111,77 @@ log file**. Take the log level, never the guard.
 | Andrew Livesay `beb508811c` | Rendertarget and filter fixes. |
 | crameep, rest of the perf series | Corpse snapshot caching, scavenger snapshot cache, autoloot decoupling. |
 | birdinforest / CanGG weather | Graphics, and a feature rather than a fix - but a wanted one. |
+
+---
+
+# Read pass 2: crameep and credzba
+
+Both are active, long-running forks. Read in full.
+
+## Confirmed: the OPL request list is an O(n²) scan in the burst path
+
+`PacketHandlers.AddMegaClilocRequest` (`PacketHandlers.cs:447`):
+
+```csharp
+public static void AddMegaClilocRequest(uint serial)
+{
+    foreach (uint s in Handler._clilocRequests)
+    {
+        if (s == serial)
+        {
+            return;
+        }
+    }
+
+    Handler._clilocRequests.Add(serial);
+}
+```
+
+A linear scan of the pending list, on every call. It is called once per arriving
+object - `PacketHandlers.cs:5722` and `:7501`, and from
+`ObjectPropertiesListManager.cs:85`. The list is only emptied when
+`SendMegaClilocRequests` runs, so within one burst it just grows.
+
+That makes the cost quadratic in the size of the burst:
+
+| burst | comparisons |
+| --- | --- |
+| 287 items (a recovery resync) | ~41,000 |
+| 487 items (the largest measured) | ~118,000 |
+| 1,394 items (login / zone load) | ~970,000 |
+
+Against a walking arrival rate of ~7 items/second this is invisible - the list
+never gets long. It only bites when objects arrive in bulk, which is exactly
+when the stutter is felt. **This is the best mechanical explanation found so far
+for why a forced house recovery hitches and a walk-up does not.**
+
+`crameep` (`ea6e61a2a2`) keeps a parallel `HashSet<uint>` beside the list and
+lets `HashSet.Add` do the dedup in constant time. Same fix for the custom-house
+request list, which modern has and this fork does not.
+
+## Confirmed: Python script threads are foreground threads
+
+`LegionScripting.cs:444`:
+
+```csharp
+script.PythonThread = new Thread(() => ExecutePythonScript(script));
+```
+
+No `IsBackground = true`. A foreground thread keeps the process alive after the
+window closes, so a script still running leaves the client as a zombie process
+that has to be killed. `crameep` (`81ddea7887`) sets `IsBackground` and joins
+with a 3 second timeout.
+
+## Does not apply, after reading
+
+| candidate | why not |
+| --- | --- |
+| credzba `b71ed11794`, the network hang | Modern keeps a persistent `LoginHandshake.Instance`, so `CurrentLoginStep` survives as `EnteringBritania` and the reconnect guard never matches. Here `LoginScene` is constructed fresh at all six call sites and `CurrentLoginStep` initialises to `Main`, which our guard at `LoginScene.cs:202` accepts. The bug is an artifact of a refactor we never took. |
+| credzba `ef664c6a3e`, map loading performance | It removes a global `MapFileIOLock` held around a seek-then-read of every map block. We have no such lock: `Chunk.cs` reads through raw pointers into the memory-mapped file (`MapBlock* block = (MapBlock*) im.MapAddress`). **We are already faster than the thing being fixed** - worth remembering before anyone "modernises" that read path. |
+| crameep's `fix(scaling)` series, ~10 commits | All are UIScale > 1 corrections. There is no UI scaling on 4.7.2. |
+| crameep's macOS codesign/bundle fixes | This fork ships Windows only. |
+
+## Still unread
+
+crameep's controller overhaul and autoloot work (features), the weather work,
+LasherasGH's DirectX 11 driver force, Andrew Livesay's rendertarget fixes.
