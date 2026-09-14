@@ -12,10 +12,14 @@ Reference checkouts are now remotes, so all four can be read here directly:
 
 | remote | what |
 | --- | --- |
-| `cuo/main` | ClassicUO |
+| `cuo/main` | ClassicUO — the original |
 | `taz/legacy` | TazUO 4.7.2 — what this fork came from |
 | `taz/main` | TazUO modern (net10.0, 5.24.x) |
+| `mw/main` | MW Edition — where the ported helpers in section E came from |
 | `servuo/master` | ServUO — the server side |
+
+MW also carries `mw/release/0.2` and `mw/release/0.21`, which are the tagged
+states the port was read out of.
 
 The column that matters for the cleanup is **Verdict**, and it is a proposal,
 not a decision.
