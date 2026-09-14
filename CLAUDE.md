@@ -15,8 +15,8 @@ Two branches, and both are this fork's. The other two came with it.
 
 | Branch | Framework | Version | Role |
 | --- | --- | --- | --- |
-| **`dev`** | .NET Framework **4.7.2** (`net472`) | 4.5.2301 | **Development.** Where work goes, and where the `v4.5.23-h1`…`h73` tags point. |
-| **`release`** | .NET Framework **4.7.2** (`net472`) | 4.5.2301 | **Release.** What other people download, and the repository's default branch. Only tested, confirmed work lands here, and landing here *is* the release. |
+| **`dev`** | .NET Framework **4.7.2** (`net472`) | 4.5.2302 | **Development.** Where work goes, and where the `v4.5.23-h1`…`h73` tags point. |
+| **`release`** | .NET Framework **4.7.2** (`net472`) | 4.5.2302 | **Release.** What other people download, and the repository's default branch. Only tested, confirmed work lands here, and landing here *is* the release. |
 | `upstream-main` | .NET **10** (`net10.0`) | 5.24.5 | Upstream's. Reference only — a mirror kept so fixes can be read out of it. |
 | `upstream-dev` | .NET **10** (`net10.0`) | 5.24.5 | Upstream's. Not used here, not built, not a release path. |
 
@@ -42,6 +42,7 @@ the branch it came from.
 
 - Work goes on **`dev`**, as commits. A separate branch per change is not
   the convention here - it produced ninety-odd leftovers that nothing deleted.
+  Branches off `release` are the exception, and they are short-lived.
 - **Never commit directly to `release`.** Everything reaches it through a merge,
   and never a wholesale merge of `dev`.
 - **Never build, modify, or release `upstream-main` or `upstream-dev`.** They
@@ -49,44 +50,69 @@ the branch it came from.
 
 ## Getting something into `release`
 
-**`dev` is never merged into `release` wholesale.** Most of what is on `dev` is
-not meant to ship and some of it never will be - the ported MW helpers, the
-diagnostics, anything being tried out. A release is chosen, not accumulated.
+**`release` is the trunk and it holds exactly what you say it holds.** `dev` is
+where testing happens, and testing is sometimes radically different from what
+ships. `release` is never asked to carry something so that `dev` keeps working.
 
-So work that is meant to ship is branched **off `release`**, merged **into
-`release`**, and then `release` is merged **down into `dev`**:
+Only one merge direction: **`release` merges down into `dev`, never the reverse.**
 
 ```
-release ──┬──────────────── merge ──→ release
-          └─ some-feature ───┘             │
-                                           │
-dev ←─────────────── merge release down ───┘
+release ──┬──────────────── merge ──→ release ─────┐
+          └─ some-change ───┘                      │
+                                                   ↓
+dev ←────────────────────────── merge release down ┘
 ```
 
-    git checkout -b some-feature origin/release
-    ...work, commit...
-    git checkout release && git merge some-feature     # ships it
-    git checkout dev && git merge release              # dev keeps everything
+### Promoting work from `dev`
 
-Why this shape and not the obvious alternatives:
+Branch off `release`, take **`dev`'s file content verbatim**, merge in, merge
+back down:
 
-- **Nothing is cherry-picked**, so `release` never grows a commit that exists
-  nowhere in `dev`'s history, and the two cannot drift. They did drift once, in
-  September 2026: the same workflow work was done separately on each branch and
-  the branches ended up holding four different versions of the same files. The
-  reconciliation merge that fixed it is in the history.
-- **`dev` is always a superset of `release`.** Anything on `release` is on `dev`;
-  the reverse is deliberately untrue.
-- **Work that must never ship simply never gets a branch off `release`.** It
-  lives on `dev` and stays there. That is how `release` is kept lean - not by
-  removing things from it later.
+    git checkout -b some-change origin/release
+    git checkout dev -- <the files>       # dev's exact content, not a rewrite
+    git commit
+    git checkout release && git merge some-change
+    git checkout dev && git merge release              # content no-op
+
+Taking the content rather than re-authoring it is the whole discipline. The
+change exists once and lands on both branches, so the two can never hold
+different versions of it.
+
+### Removing something from `release`
+
+Delete it on `release`, then **restore it once on `dev`** after the merge-down:
+
+    git checkout release && git rm <file> && git commit
+    git checkout dev && git merge release      # this deletes it on dev too
+    git checkout <the deleting commit>^ -- <file> && git commit
+
+That restore is a **one-time cost**. Verified: every later `release` → `dev`
+merge leaves the file alone. It is not whack-a-mole, and it is how `release`
+gets genuinely leaner rather than merely gated.
+
+### The only drift that matters
+
+Two different things get called drift and only one is dangerous.
+
+- **`release` simply lacking something `dev` has.** That is not drift, it is
+  scope, and it is the point.
+- **The same change authored twice, once per branch.** That is the hazard. It
+  happened in September 2026: the same workflow work was done separately on
+  each branch and they ended up holding four versions of the same files.
+
+So the rule is one line: **never author the same change twice; let `release`
+lack whatever it likes.**
+
+### What this replaces
+
+An earlier version of this file said "`dev` is always a superset of `release`"
+as though it were a law. It is a convention, and it was charging `release`
+1,400 lines of diagnostics it compiles out and never runs, purely to keep
+merges quiet. `release` does not exist to keep `dev` building.
 
 A release still needs a **version bump** to publish a numbered build. Merging to
 `release` without one refreshes the notes and publishes nothing new, which is
 deliberate: a release is a decision, not a side effect.
-
-Keep `dev` current by merging `release` down after every release-side change.
-That is what keeps the merges small.
 
 ### When a flag is the right answer instead
 
@@ -96,10 +122,14 @@ temporary probes. Anything behind it is compiled out of the release build
 wherever it lands, so it can sit on `release` harmlessly. See the flag's
 description in `Directory.Build.props`.
 
-Use the flag when the code is genuinely dev-only. Use a branch off `release`
-when the code is finished and you simply have not shipped it yet. A finished
-feature hidden behind a flag is the wrong tool, and so is a diagnostic kept off
-`release` by hand.
+Use the flag for something that must exist on **both** branches and run on
+neither - a probe in shared code, a log line inside a function release also
+calls. For anything that is wholly dev-only, such as a diagnostics file, do not
+gate it: **keep it off `release` entirely**, per "Removing something from
+`release`" above. Gating puts the code in the release tree where it is dead
+weight; removing it means release never had it.
+
+A finished feature hidden behind a flag is the wrong tool in either direction.
 
 ### Emergencies
 
