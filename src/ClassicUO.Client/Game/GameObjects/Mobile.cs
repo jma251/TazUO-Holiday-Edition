@@ -54,6 +54,12 @@ namespace ClassicUO.Game.GameObjects
                 mobile.Graphic = 0;
                 mobile.Steps.Clear();
                 mobile.Offset = Vector3.Zero;
+
+                // A recycled mobile must not inherit the previous occupant's enqueue
+                // timestamp: the first step would be timed against it and come out as
+                // however long the object sat in the pool. This mirrors ClearSteps, which
+                // the pool does not call.
+                mobile._lastEnqueueTime = 0;
                 mobile.SpeedMode = CharacterSpeedType.Normal;
                 mobile.Race = 0;
                 mobile.Hits = 0;
@@ -837,10 +843,21 @@ namespace ClassicUO.Game.GameObjects
                             float steps = maxDelay / (float)Constants.CHARACTER_ANIMATION_DELAY;
                             float x = delay / (float)Constants.CHARACTER_ANIMATION_DELAY;
                             float y = x;
-                            Offset.Z = (sbyte)((step.Z - Z) * x * (4.0f / steps));
-                            MovementSpeed.GetPixelOffset(step.Direction, ref x, ref y, steps);
-                            Offset.X = (sbyte)x;
-                            Offset.Y = (sbyte)y;
+
+                            // steps is divided by twice below. maxDelay used to be clamped to
+                            // at least 1 where it was calculated, which made that safe; it is
+                            // now the server's measured interval minus a frame and can land on
+                            // or under zero. Guarded here at the point of use, which is what
+                            // taz/main does - it dropped the clamp and added this check, and
+                            // taking the first half without the second is what put a division
+                            // by zero back in.
+                            if (steps > 0)
+                            {
+                                Offset.Z = (sbyte)((step.Z - Z) * x * (4.0f / steps));
+                                MovementSpeed.GetPixelOffset(step.Direction, ref x, ref y, steps);
+                                Offset.X = (sbyte)x;
+                                Offset.Y = (sbyte)y;
+                            }
                         }
                     }
                     else
