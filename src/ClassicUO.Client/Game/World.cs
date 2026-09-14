@@ -87,7 +87,18 @@ namespace ClassicUO.Game
         // Starts at the stock range rather than the slider's ceiling: on a client old
         // enough to skip the 0x55 handshake the setting is never applied, and starting
         // at the ceiling meant culling at 40 all session with nothing to justify it.
-        public static byte ClientViewRange { get; set; } = Constants.DEFAULT_VIEW_RANGE;
+        // MAX_VIEW_RANGE, as ClassicUO, TazUO main and the 4.5.23 base all have it.
+        //
+        // This was DEFAULT_VIEW_RANGE (24) here, on the reasoning that 24 is what gets
+        // asked for so it should also be the starting point. That is the wrong way round:
+        // the value is only a default until the server answers 0xC8 and overwrites it, and
+        // until then it is the cull distance. Measured from a login capture, 1,316 objects
+        // arrive before that answer - 658 before the client has even sent its request - so
+        // for that entire window the client was discarding everything past 24 that upstream
+        // would have kept to 40. An object is sent once, on the step it crosses into range,
+        // so anything dropped there is gone until a resync. Defaulting high costs a little
+        // memory for a moment; defaulting low loses objects permanently.
+        public static byte ClientViewRange { get; set; } = Constants.MAX_VIEW_RANGE;
 
         public static bool SkillsRequested { get; set; }
 
