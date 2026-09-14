@@ -185,3 +185,74 @@ with a 3 second timeout.
 
 crameep's controller overhaul and autoloot work (features), the weather work,
 LasherasGH's DirectX 11 driver force, Andrew Livesay's rendertarget fixes.
+
+---
+
+# Read pass 3: the rest
+
+All 65 forks, 1,109 unique commits, read to completion. Nothing applied.
+
+## Confirmed present in this fork
+
+Verified against our own source. The line numbers are ours.
+
+| # | What | Where | From |
+| --- | --- | --- | --- |
+| 1 | **OPL request list is an O(n²) scan in the burst path** | `PacketHandlers.cs:447` | crameep `ea6e61a2a2` |
+| 2 | **`OnConnected` fires inside the connect try/catch** - a UI fault becomes "Connection lost: Socket Error" and tears down a live socket | `AsyncNetClient.cs:83` | Sitch `927480fe54` |
+| 3 | **`Control.Clear()` disposes while enumerating the live list** - we fixed the identical hazard at `:1141` and missed this | `Control.cs:823` | Sitch `927480fe54` |
+| 4 | **LINQ scan of every item in the world, per step** (auto-open-doors) | `PlayerMobile.cs:1500` | crameep `2e81f4240e`, Sitch `c0b83b598e` |
+| 5 | **Deferred removal can delete what the server just placed** | `World.ObjectToRemove`, guarded only at `PacketHandlers.cs:1787` | Oleh Romanovskyi `f9afddf4c5` |
+| 6 | **Python script threads are foreground** - a running script holds the process open after the window closes | `LegionScripting.cs:444` | crameep `81ddea7887` |
+| 7 | **Three exclusive `FileStream` opens** - no `FileShare.Read`, so a second client cannot read them | `WorldMapGump.cs:1879`, `:1903`, `ClilocLoader.cs:109` | credzba `3eba99ea49` |
+| 8 | **`DrawLine` dereferences `texture.Bounds` with no null/disposed guard** | `Batcher2D.cs:789` | Derek Wang `8a7d60e676` |
+| 9 | **`HealthLinesManager` draws `gumpInfo.Texture` unguarded** | `HealthLinesManager.cs:334` | fuzzlecutter `f947a39cdd` |
+| 10 | **`_localIP` is composed little-endian** for the login seed | `AsyncNetClient.cs:318` | fuzzlecutter `6cec5e7552` |
+| 11 | **No door-diagonal guard in the pathfinder.** A door on either cardinal tile flanking a diagonal makes the server reject the step even when the door is open; the client approves and sends it, so the walk is denied - rubber-banding | `Pathfinder.cs` (has `IsDoor` at `:296`, `:300`, no diagonal check) | Claude/bittiez `b5482f6829` |
+
+Already applied this session: the `Mobile.ProcessSteps` direction mask, the
+`0x19` null guard, and the `Plugin.Tick` guard.
+
+## Read and ruled out - do not spend time on these again
+
+| candidate | why not |
+| --- | --- |
+| credzba's network hang `b71ed11794` | Fixes a stale step on modern's persistent `LoginHandshake.Instance`. We build `LoginScene` fresh at all six call sites and start at `Main`, which our guard accepts. |
+| credzba's map loading perf `ef664c6a3e` | Removes a global `MapFileIOLock` around a seek-and-read. We have no such lock - `Chunk.cs` reads through raw pointers into the memory-mapped file. **We are already faster than the code being repaired.** |
+| TazmanianTad's out-of-bounds read fallbacks `299fcdbb37` | Guards the `ReadAt` path that the above introduced. We never had it. |
+| `TextureAtlas` packed-rectangle scope `09912d2d0d` | Ours already declares the rectangle outside the loop. |
+| crameep's ~10 `fix(scaling)` commits, and the two-pass UI draw skip | UIScale > 1 does not exist on 4.7.2; our `UIManager` has no `uiTransform`. |
+| crameep's macOS codesign / .app bundle fixes | Windows-only download. |
+| TazmanianTad's BandageManager timer GC `365617fe47` | Our `BandageManager` uses no `System.Threading.Timer`. |
+
+## Large, real, needs its own review before anyone touches it
+
+| | |
+| --- | --- |
+| **Andrew Livesay `beb508811c`** - rendertarget and filter rework, 313 lines in `GameScene` alone. Changes the default filter from `xbr` to `linear`, adds a max-texture-size clamp and a single `GetActiveScale()`. Plausible rendering correctness and performance win, far too big to take on trust. |
+| **TazmanianTad `c426e7448a`** - audio device disconnect recovery and fallback, 272 lines in `AudioManager`. We have already rewritten `AudioManager` heavily for the region music map, so this is a merge, not a port. |
+| **LasherasGH `66cadd31f3`** - `ForceDriver 4` selecting D3D11 via `FNA3D_FORCE_DRIVER` and the SDL render-driver hint. Nine lines, self-contained, claimed general Windows performance win. Cheap to try, needs measuring. |
+| **Senzaiken `b4270b2926`** - reload dynamic maps only when the facet size actually changes, and relink items, mobiles and houses across the reload instead of dropping them. Touches `World.cs` and the same object-retention question as our cull work. |
+
+## What each fork actually is
+
+| fork | what it is |
+| --- | --- |
+| `crameep` 206 | Controller overhaul, autoloot, UI scaling, and a genuine performance series. The most useful single fork. |
+| `Nesci28` 135 | Grid highlight, nameplates, multi-move. Mostly UI features. |
+| `yuval-po` 90 | Myra UI rework, scripting, a real test suite. Little applies to the 4.7.2 UI. |
+| `birdinforest` / `CanGG` 82 | Weather - rain sound, splashes, ripples - with unit tests. A feature, and a competent one. |
+| `shedar` 46 | Headless WebSocket frontend and a QA harness. Carries the item-removal race fix (#5 above). |
+| `openuo-online` / `uu1001com` 46 | OpenUO. A separate project now. |
+| `fuzzlecutter` 39 | `uo1998`, an era-locked client. Source of the endianness and texture-crash fixes. |
+| `fspy` 27 | Myra widgets and IronPython API guards. |
+| `Andries1985` 26 | POL emulator compatibility and character-creation gumps. Shard-specific. |
+| `credzba` 21 | Reconnect, file locks, tile markers, a custom status gump. |
+| `sitch` 18 | Options and container UI, plus the phantom-disconnect fix and a hardened `TryOpenDoors`. |
+| `Senzaiken` | Server-driven dynamic map definitions and dynamic spellbooks. |
+| `eddo87` | Self-heal timing from FC/FCR, spell bar hotkeys, world-map pathfinding. |
+| `Marc G.` (across forks) | The largest body of UI work anywhere - nameplates, grid highlight, item comparison. Almost none of it ports. |
+| `Oleh Romanovskyi` | A ModernUO QA harness, plus the item-removal race fix. |
+| `Marcus_Privat` | Mount animation precedence, journal classifier lock removal. |
+| `puppyflips` | Paperdoll armour layer ordering. |
+| the remainder | A handful of commits each, mostly shard-specific. |
