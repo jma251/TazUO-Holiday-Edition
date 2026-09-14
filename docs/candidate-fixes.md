@@ -159,6 +159,43 @@ for why a forced house recovery hitches and a walk-up does not.**
 lets `HashSet.Add` do the dedup in constant time. Same fix for the custom-house
 request list, which modern has and this fork does not.
 
+## CORRECTION to the section above, 2026-09-14
+
+**The OPL scan is not the stutter, and the reasoning above is wrong.**
+
+The quadratic is real as written, but `n` never gets large enough to cost
+anything, which the section never checked.
+
+`SendMegaClilocRequests` runs once per frame and each `0xD6` carries **at most
+15 serials** (`Math.Min(15, serials.Count)` in `Send_MegaClilocRequest`). So the
+drain rate is ~900 serials a second. Measured against the capture, counting the
+request packets the client actually sent:
+
+| | items arriving | OPL hashes | request packets sent |
+| --- | --- | --- | --- |
+| login / zone load | 1,394 | 1,485 | **39** |
+| house approach | 487 | 490 | **21** |
+| recovery resync | 287 | 290 | **5** |
+
+At one send per frame the ceiling is about 60 packets a second. The busiest
+second reached 39, so **the queue was empty for a third of the frames even at
+login**. It never saturated and never carried across seconds. The pending list
+is tens of entries, not hundreds, and scanning tens on arrival is free.
+
+The reason is `OPLInfo`: every arriving item brings an OPL revision hash, and
+`World.OPL.IsRevisionEquals` drops it unless the revision actually changed. Most
+items never reach the queue at all - the 287-item recovery burst produced five
+request packets.
+
+The earlier arithmetic (41,000 / 118,000 / 970,000 comparisons) assumed every
+arriving item was queued. None of those figures ever occurred.
+
+**What the burst stutter actually is remains unknown.** Plausible and
+unmeasured: constructing ~1,400 objects, the tile linked-list insertion walk in
+`Chunk.AddGameObject` which scans to find its slot, and art loading from disk on
+a cold cache. None of that should be asserted without frame-level numbers, which
+we do not have.
+
 ## Confirmed: Python script threads are foreground threads
 
 `LegionScripting.cs:444`:
