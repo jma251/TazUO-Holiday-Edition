@@ -157,3 +157,71 @@ Three rows were wrong and are corrected above:
 1. **Cull `+1`** - dev only, two lines, live symptoms.
 2. **Step timing** - both branches eventually; it is in the public build.
 3. **OPL linear scan** - the burst stutter. See `candidate-fixes.md` #1.
+
+---
+
+## Audit of the MW automation port (2026-09-14)
+
+Thirty-odd files under `Game/Managers`, none of which exist on `release`. Reached
+from the **Automation** page of the modern options gump, polled at 5 Hz by
+`AutomationScheduler.Tick()` from `GameScene.Update()`, behind a master switch
+that is `profile.AutomationEnabled` (off by default).
+
+### Fixed
+
+| Fault | Where | What it did |
+| --- | --- | --- |
+| Auto-stealth never subscribed to movement | `AutoStealthManager.cs` | The options toggle assigns `Enabled` directly, so `EnsureHooked` - reachable only from `SetEnabled`, which nothing calls - never ran. `_lastMoveAt` stayed 0, the idle test read "has not moved since the client started", and the helper used Hiding every twelve seconds **while the player was running**. `Tick` now hooks, and treats an unseen `_lastMoveAt` as "standing still from now". |
+| Six helpers never reset between characters | `EmergencyHeal`, `PoisonCure`, `AutoCurePotion`, `AutoHealPotion`, `AutoRefreshPotion`, `AutoBuff` | They were the only entries the scheduler's `ResetSession` did not call, and nothing persists them. Switching one on for one character left it armed for the next - helpers that cast and drink, armed by somebody else's choice. Each now has `ResetForProfile()` and the scheduler calls it. |
+
+### Known and unfixed - decisions, not defects
+
+- **Nine more helpers leave `Enabled` set across a character switch**: `AfkReply`,
+  `AutoCloseEmptyCorpse`, `AutoMount`, `AutoOpenBackpack`, `AutoOpenPaperdoll`,
+  `AutoRearm`, `AutoSayThanks`, `AutoStealth`, `AutoStopOnDeath`. The other half
+  of the set resets to off. The inconsistency is the bug; which way to resolve it
+  is a choice. Resetting all is safe and loses the setting on every logout;
+  persisting all to the profile is what the master switch already does and is the
+  better end state.
+- **`AutoBandage` and `PetBandage` switch themselves on** once the server sends a
+  Healing/Veterinary value of 40 or more, if the player has never expressed a
+  preference. `ManualOverride` suppresses it and persists in `bandage.tsv`. MW's
+  design, ported intact.
+- **`AutomationCoordinator.Enabled` is written `= true`** in its field
+  initialiser. Inert - `GameScene.Load` calls `ResetSession` before `Update` ever
+  ticks - but it is the wrong default to write down for a master automation
+  switch.
+
+### Unreachable
+
+- **`AfkReplyManager` and `AutoSayThanksManager`** have no options toggle and no
+  command. Their `EnsureHooked` is reachable only from `SetEnabled`, which nothing
+  calls, so neither ever subscribes to `EventSink`. 181 lines that cannot run.
+- **`AutoFollowManager`** is armed only by `Set(serial)`, which nothing calls.
+- **`AutoBuffManager`'s toggle is inert**: `Arm(buff, spell)` is the only thing
+  that sets what to watch, and nothing calls it, so `Tick` always returns at the
+  `Watch == -1` guard. The checkbox does nothing.
+- **`AutoHitListManager`'s toggle is inert** unless `autohit.tsv` is written by
+  hand: `AddPattern` has no caller.
+- `AutoMountManager.Pick` and `AutoRearmManager.Pick` also have no callers, but
+  both helpers learn their serials in `Tick`, so they work without it.
+- `AutoHitListManager.FilePath` is a private property with no reader, duplicating
+  the `FILENAME` constant.
+
+### Looked at and sound
+
+`FeatureDiagnostics` (lock-protected, volatile snapshot for lock-free reads,
+bounded failure window, marshals its print to the main thread), `ProfileDataStore`
+(temp file, `Flush(true)`, `File.Replace` with a backup, every path caught),
+`AutoCloseEmptyCorpse` (snapshots the gump list before disposing), the
+coordinator's lease arithmetic, and every helper that acts without taking the
+lease - all four only call `GameActions.Print`, which is local text.
+
+`SkillReader` caches a failed lookup as `-1` for the life of the process, which
+would silently stop the bandage auto-enable forever. Not reachable: `SkillsLoader`
+is a lazy singleton loaded by `UOFileManager` at startup, long before any
+`GameScene` tick. Recorded rather than changed.
+
+`CrashRecoveryManager` copies `profile.json` and `gumps.xml` into
+`crash_recovery/` every five minutes and keeps six of each. It is live on `dev`
+and absent from `release`, so it writes nothing on a player's machine.

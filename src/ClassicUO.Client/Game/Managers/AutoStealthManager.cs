@@ -67,6 +67,24 @@ namespace ClassicUO.Game.Managers
             if (!Enabled) return;
             if (World.Player == null || !World.InGame) return;
             if (World.Player.IsDead) return;
+
+            // Hooked here rather than only in SetEnabled. The options toggle assigns
+            // Enabled directly, so turning this on from the menu never subscribed to
+            // OnPositionChanged - _lastMoveAt stayed 0, the idle test below read
+            // "has not moved since the client started", and it tried to hide every
+            // twelve seconds while the player was running.
+            EnsureHooked();
+
+            // 0 means no movement has been seen yet: either the subscription was just
+            // made, or ResetSession cleared it on the way into this world. Standing
+            // still from here, not idle since boot.
+            if (_lastMoveAt == 0)
+            {
+                _lastMoveAt = (long)Time.Ticks;
+
+                return;
+            }
+
             if (Time.Ticks - _lastMoveAt < IDLE_THRESHOLD_MS) return;
             if (Time.Ticks - _lastUsedAt < MIN_INTERVAL_MS) return;
             if (!AutomationCoordinator.TryAcquire("AutoStealth", 250)) return;
