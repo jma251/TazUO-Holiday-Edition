@@ -270,6 +270,20 @@ Everything remaining across both fork networks, plus ServUO and MW Edition.
 | 12 | **Same-Z statics draw in the wrong order.** The insertion tie-break covers `Land` only - `state` is `0` for Land, `1` for Mobile, `2` for a custom-house preview, and **`-1` for a plain static**. So `Static` vs `Static` at equal `PriorityZ` never breaks, the newly-added one is appended tail-ward, and the head-to-tail draw paints it last. The classic client does the reverse: whichever is stored earlier in `statics.mul` goes on top. K verified it against `client.exe` - 89% of same-Z carpet/floor pairs map-wide store the carpet first, and carpets render above floors. | `Chunk.cs`, the `while (o != null)` insertion walk | K `95d7744b44` |
 | 13 | **`FastList<T>.Length` assigned directly in the font wrap path**, six times, instead of `Resize()` - the overflow Kamron Batman fixed. | `FontsLoader.cs:831`, `:923`, `:1399` and three more | Kamron Batman `14af3802f6` |
 
+> **Correction on #12, added 2026-09-14.** K's fix landed on ClassicUO `main`
+> on 2026-06-04 and **andreakarasho reverted it eight days later**
+> (`b5b77ea149`, 2026-06-12). It is on no ClassicUO branch today - not `main`,
+> not `beta`, not `impl/ecs`. The revert carries no explanation, but same-Z
+> ordering has a history: a 2018 commit records that *"on Outlands shard some
+> tiles have same Z and same PriorityZ, so the mergesort exchanges them every
+> time an object gone to this tile"*.
+>
+> The **observation** still stands - our tie-break covers `Land` only, `state`
+> is `-1` for a plain static, so two statics at equal `PriorityZ` never break
+> and the later-loaded one is painted on top. What is no longer established is
+> that K's fix is the right answer. Treat #12 as **contested, not confirmed**,
+> and do not apply it without understanding why upstream backed it out.
+
 ## Two more worth a look
 
 | | |
