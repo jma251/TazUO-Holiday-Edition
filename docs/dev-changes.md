@@ -29,126 +29,130 @@ not a decision.
 ## A. Gameplay behaviour — the ones that can change how the game plays
 
 Highest scrutiny. Everything here alters what the client does with what the
-server said, which means it can be wrong in ways a player feels.
+server said.
 
-| Change | Files | Verdict |
-| --- | --- | --- |
-| **Cull `+1`** — keep items and mobiles one tile past the granted view range | `World.cs` | **CUT.** Both CUO and Taz cull at exactly `ClientViewRange`. Holding past the grant means the server stops maintaining the object: no movement, no death, no delete. Suspected cause of mobiles drawn after death and of the invisible dragon. |
-| **Mobile step timing** — `stepTime /= Steps.Count` when a queue builds | `Mobile.cs` | **CUT.** Stacks on top of TazUO's existing "teleport effect" patch, which already bumps a backlogged mobile to the mounted speed table. The two compound; a 5-deep queue plays back 5× fast. Taz modern solves it properly by recording the *observed* interval per step (`TimeDiff`). Likely cause of monsters jumping while chasing. |
-| **Chunk cell repair** — an object being removed handed the cell to a neighbour first | `GameObject.cs`, `Chunk.cs` | **KEEP.** Real bug: the chunk kept one object per cell as its way in and never reassigned it, so removing that object detached every other object on the tile — alive in `World.Items`, drawn by nobody. `Chunk.RemoveGameObject` had always done it correctly and was never called. |
-| **Object pooling** (`ReturnToPool` split out of `Destroy`) | `Item.cs`, `Mobile.cs`, `World.cs` | **KEEP, but re-read.** Fixes a real aliasing bug — an object went on the reuse pile while still filed under its old serial. Exists in neither CUO nor Taz, so it is ours to own. |
-| **House keep range** split from view range | `World.cs`, `Item.cs`, `HouseManager.cs` | **DECIDE.** Separates "how far a house is held" from "how far loose objects are held". Sound in principle; the default of 40 is untested against 24. |
-| Pathfinder, TargetManager, drawing-sort `LastDrawnTime` | `Pathfinder.cs`, `TargetManager.cs`, `GameSceneDrawingSorting.cs` | **DECIDE** — small, mostly diagnostic hooks. |
+| Change | Files | On release? | Verdict |
+| --- | --- | --- | --- |
+| **Cull `+1`** - keep items and mobiles one tile past the granted view range | `World.cs` (2 sites) | **no** | **CUT.** CUO and Taz both cull at exactly `ClientViewRange`. ServUO settled why: an item is sent on the one step it crosses into range and never again, so the extra tile buys no second chance - it only holds objects the server has stopped maintaining. Suspected cause of mobiles drawn after death and the invisible dragon. |
+| **Mobile step timing** - `stepTime /= Steps.Count` | `Mobile.cs` (1 site) | **YES** | **CUT.** Stacks on top of TazUO's own "teleport effect" patch, still in the file directly above it. The two compound; a 5-deep queue plays back 5x fast. Likely cause of monsters jumping while chasing. **This one is live in the public 4.5.2302.** |
+| **Chunk cell repair** - hand the cell to a neighbour before unlinking | `GameObject.cs`, `Chunk.cs` | yes | **KEEP.** Real bug: the chunk kept one object per cell as its way in and never reassigned it, so removing that object detached every other object on the tile - alive in `World.Items`, drawn by nobody. |
+| **Object pooling** - `ReturnToPool` split out of `Destroy` | `Item.cs`, `Mobile.cs`, `World.cs` | yes | **KEEP, re-read.** Fixes a real aliasing bug. Exists in neither CUO nor Taz, so it is ours to own. |
+| **House keep range** split from view range | `World.cs`, `Item.cs`, `HouseManager.cs` | yes | **KEEP.** ServUO does the same thing: `BaseMulti.GetUpdateRange` is the client's range plus half the building's longest side, while loose items use the plain range. This mirrors the server rather than inventing something. |
+| **Info bar answers a target cursor** | `InfoBarGump.cs` | yes | **KEEP.** Shipped in 4.5.2302 deliberately. |
+| Pathfinder, TargetManager, drawing-sort `LastDrawnTime` | 3 files | yes | **DECIDE** - small, mostly diagnostic hooks. |
 
 ---
 
 ## B. Empty house
 
-| Change | Files | Verdict |
-| --- | --- | --- |
-| **Contents recovery** — count the room, resync on a shortfall | `HouseContentsRecovery.cs` (+238) | **KEEP.** Shipped, confirmed working by hand. The only lever against the server sending nothing on a corner-stair entry. |
-| **House diagnostics** | `HouseDiagnostics.cs` (+1,075) | **CUT from release, keep on dev behind `HOLIDAY_DEV`.** The single largest file we added, and it is pure instrumentation. |
-| House let-go / reacquire bookkeeping | `HouseManager.cs` (+76) | **KEEP** — the recovery depends on it. |
+| Change | Files | On release? | Verdict |
+| --- | --- | --- | --- |
+| **Contents recovery** - count the room, resync on a shortfall | `HouseContentsRecovery.cs` (+238) | yes | **KEEP.** Confirmed working by hand. ServUO explains why it is the *only* lever: `0x22` makes the server run `SendEverything` and ignore the crossing-step geometry entirely. |
+| **House diagnostics** | `HouseDiagnostics.cs` (1,019 lines) | yes, **18 `HOLIDAY_DEV` refs** | **GUT from release.** Compiled out already, but the lines are still in the release tree. Per the new branch model, remove rather than gate. |
+| House let-go / reacquire bookkeeping | `HouseManager.cs` (+76) | yes | **KEEP** - the recovery depends on it. |
 
 ---
 
 ## C. Network
 
-| Change | Files | Verdict |
-| --- | --- | --- |
-| Socket hardening — reconnect teardown, connect timeout, idle polling | `AsyncNetClient.cs` (+157/−50) | **DECIDE.** Real robustness work; needs reading against CUO before it ships. |
-| Resync on a malformed packet instead of spinning | `PacketHandlers.cs` | **KEEP** — the alternative is a permanently stuck stream. |
-| Packet pump | `GameController.cs` | **FIX.** `MAX_PACKETS_PER_FRAME` counts socket *reads*, not packets, so it bounds nothing. Same in CUO and Taz — inherited, not ours — but still wrong. |
+| Change | Files | On release? | Verdict |
+| --- | --- | --- | --- |
+| Socket hardening - reconnect teardown, connect timeout, idle polling | `AsyncNetClient.cs` (+157/-50) | yes | **KEEP, but fix.** `OnConnected` fires inside the connect try/catch, so a login-handler fault reports as a socket error and tears down a live connection. See `candidate-fixes.md` #2. |
+| Resync on a malformed packet instead of spinning | `PacketHandlers.cs` | yes | **KEEP.** |
+| Packet pump | `GameController.cs` | yes | **FIX.** `MAX_PACKETS_PER_FRAME` counts socket *reads*, not packets, so it bounds nothing. Inherited from CUO and Taz, still wrong. |
+| `Plugin.Tick` guard, `0x19` null guard, step direction mask | 3 files | **no** | **KEEP** - ported from TazUO main this session, untested. |
 
 ---
 
-## D. Music and audio — ~1,700 lines, almost all ours
+## D. Music and audio — ~1,700 lines, almost all ours, and most of it ships
 
-| Change | Files | Verdict |
-| --- | --- | --- |
-| Region music map — play what the area calls for when the server sends none | `MusicMapManager.cs`, `AudioManager.cs` (+647) | **DECIDE.** Largest single feature we added and nobody asked whether it should ship. |
-| Music diagnostics + on-screen panel | `MusicDiagnostics.cs` (+388), `MusicInfoGump.cs` (+222) | **CUT from release.** Investigation scaffolding. |
-| Sound loader / `Sound.cs` / `UOMusic.cs` | +265 net | **DECIDE** — some are fixes, some support the map. |
+| Change | Files | On release? | Verdict |
+| --- | --- | --- | --- |
+| **Region music map** - play what the area calls for when the server sends none | `MusicMapManager.cs`, `AudioManager.cs` (+647) | **YES, ungated** | **DECIDE.** `MusicMapMode` defaults to `0` (off), so it ships dormant. Largest single feature we added and nobody decided it should ship. |
+| **Music overlay** - on-screen panel showing what is playing and why | `MusicInfoGump.cs` (+222) | **YES, ungated, with a player-facing checkbox in Experimental** | **DECIDE.** Defaults off, but this is investigation scaffolding with a switch in the release options menu. |
+| **Music diagnostics** | `MusicDiagnostics.cs` (388) | yes, **20 `HOLIDAY_DEV` refs** | **GUT from release.** |
+| Sound loader / `Sound.cs` / `UOMusic.cs` | +265 net | yes | **DECIDE** - some fixes, some support the map. |
 
 ---
 
-## E. MW's ported work — ~2,500 lines, all switched off
+## E. MW's ported work — ~2,500 lines, all switched off, all dev-only
 
-17 `Auto*Manager` files, the scheduler and coordinator, the bandage set
-(5 files), `ToastGump`, `MobileCache`, `ProfileDataStore`, `SkillReader`,
-`EmergencyHealManager`, `PoisonCureManager`, plus the "MW's Work" options page
-in `ModernOptionsGump.cs`.
+17 `Auto*Manager`, the scheduler and coordinator, the bandage set, `ToastGump`,
+`MobileCache`, `ProfileDataStore`, `SkillReader`, `EmergencyHealManager`,
+`PoisonCureManager`, plus the "MW's Work" options page.
 
-**Verdict: stays on `dev`, never ships as-is.** None of it is reachable at
-runtime today. It is a parts bin for future work, which is what it was meant
-to be — but it is also 38 files of unreachable code sitting in every build.
+**Verified: none of it is on `release`.** Nothing reachable at runtime on either
+branch.
+
+**Verdict: stays on `dev`.** A parts bin for future work - but 38 files of
+unreachable code in every dev build.
 
 ---
 
 ## F. Spells and casting
 
-| Change | Files | Verdict |
-| --- | --- | --- |
-| Real cast times for every spell, Faster Casting applied | `DefaultSpellIndicatorConfig.json` (+2,701/−2,026), `SpellVisualRangeManager.cs`, `PlayerMobile.cs` | **DECIDE.** Largest data change in the fork. Went through four rewrites as theories changed. Worth re-reading end to end before it ships. |
+| Change | Files | On release? | Verdict |
+| --- | --- | --- | --- |
+| Real cast times, Faster Casting applied, server decides disturbance | `DefaultSpellIndicatorConfig.json` (+2,701/-2,026), `SpellVisualRangeManager.cs`, `PlayerMobile.cs` | **YES** | **DECIDE.** Largest data change in the fork, four rewrites as theories changed, and it is already in the public build. Worth re-reading end to end. |
 
 ---
 
 ## G. Diagnostics and logging
 
-| Change | Files | Verdict |
-| --- | --- | --- |
-| Log writer fixes — truncated lines, colliding names, unwritten crash logs | `Logger.cs`, `LogFile.cs` | **KEEP** — real fixes to existing code. |
-| Feature diagnostics | `FeatureDiagnostics.cs` (+179) | **CUT from release.** |
-| Crash recovery — rolling backups of `profile.json` / `gumps.xml` | `CrashRecoveryManager.cs` | **DECIDE.** Writes files on a player's machine and does file I/O in the frame loop. |
+| Change | Files | On release? | Verdict |
+| --- | --- | --- | --- |
+| Log writer fixes - truncated lines, colliding names, unwritten crash logs | `Logger.cs`, `LogFile.cs` | yes | **KEEP** - real fixes to existing code. |
+| Feature diagnostics | `FeatureDiagnostics.cs` (179) | **no** | dev-only already. **KEEP on dev.** |
+| Crash recovery - rolling backups of `profile.json` / `gumps.xml` | `CrashRecoveryManager.cs` | **no** | dev-only already. **DECIDE** - writes files, and does file I/O in the frame loop. |
 
 ---
 
 ## H. UI
 
-`ModernOptionsGump.cs` (+451) is mostly the MW page and the two experimental
-sliders. `InfoBarGump` targeting **shipped in 4.5.2302**. `LoginGump` version
-lines moved left so a dev build stamp fits. `NameOverheadGump`, `Control`,
-`TextBox`, `ResizableJournal` — small, uninvestigated.
-
-**Verdict: mostly KEEP**, but the two Experimental sliders (view range, house
+`ModernOptionsGump.cs` (+451) is mostly the MW page and the Experimental
+entries. `LoginGump` version lines moved left so a dev stamp fits.
+`NameOverheadGump`, `Control`, `TextBox`, `ResizableJournal` - small,
+uninvestigated. **Mostly KEEP.** The two Experimental sliders (view range, house
 range) are tuning dials and are already gated off release.
 
 ---
 
-## I. Inherited-bug fixes — ported from upstream PRs
+## I. Inherited-bug fixes — ported from upstream
 
-| Fix | File |
-| --- | --- |
-| `StaticFilters` — survive concurrent access from multiple clients (PR 780) | `StaticFilters.cs` |
-| `Chunk` — guard null `Node` before dereferencing (PR 835) | `Chunk.cs` |
-| Item mouse selection `IndexOutOfRangeException` (#656) | `GameSceneInputHandler.cs` |
-| Animation / font loader fixes | `Animation.cs`, `AnimationsLoader.cs`, `TrueTypeLoader.cs` |
-
-**Verdict: KEEP all.** These are upstream's own fixes re-applied here.
+`StaticFilters` concurrent access (PR 780), `Chunk` null `Node` guard (PR 835),
+item mouse selection `IndexOutOfRangeException` (#656), animation and font
+loader fixes. **KEEP all** - upstream's own fixes re-applied.
 
 ---
 
 ## J. Removals
 
-| Removed | Files | Verdict |
-| --- | --- | --- |
-| Discord client and SDK | 14 | **KEEP REMOVED** — called deliberately. |
-| Anonymous login metrics | 1 | **KEEP REMOVED.** |
+Discord client and SDK (14 files) and anonymous login metrics. **KEEP REMOVED** -
+both called deliberately. Neither removal has reached `release`.
 
 ---
 
 ## K. Infrastructure
 
-Version scheme, build stamp, `v.txt`, settings/profile/language plumbing,
-`CommandManager`, `EventSink`, 3 test files. **KEEP.**
+Version scheme, build stamp, `v.txt` (now marks dev builds), settings/profile/
+language plumbing, `CommandManager`, `EventSink`, 3 test files. **KEEP.**
 
 ---
 
-## What to look at first
+## What changed in this chart since the first version
 
-1. **Cull `+1`** — live symptoms, one line each, deviates from both upstreams.
-2. **Step timing** — live symptom, deviates from both upstreams, and Taz modern
-   has the correct mechanism to copy.
-3. **Invisible mobiles** — the chunk-cell repair (section A) was the fix for
-   exactly this symptom in August. It is still happening, so either that fix
-   does not cover mobiles or there is a second path.
+Three rows were wrong and are corrected above:
+
+- **The cull `+1` is not on `release`.** It was listed as needing a revert on
+  both. Only `dev` has it.
+- **The diagnostics are already `HOLIDAY_DEV`-gated on `release`**, not merely
+  "cut from release" as pending work. They compile out; what remains is to
+  remove the lines from the release tree entirely.
+- **The music map and its overlay ship on `release`, ungated**, with a
+  player-facing checkbox. The first chart implied all music work was dev-side.
+
+## What to do first
+
+1. **Cull `+1`** - dev only, two lines, live symptoms.
+2. **Step timing** - both branches eventually; it is in the public build.
+3. **OPL linear scan** - the burst stutter. See `candidate-fixes.md` #1.
