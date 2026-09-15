@@ -133,9 +133,6 @@ namespace ClassicUO.Utility.Collections
 
 
         /// <summary>
-        /// if the buffer is at its max more space will be allocated to fit additionalItemCount
-        /// </summary>
-        /// <summary>
         /// Set the filled length, growing the buffer first if the new length will not fit.
         ///
         /// Length is a public field and assigning it directly is legal, which is how the
@@ -159,6 +156,9 @@ namespace ClassicUO.Utility.Collections
         }
 
 
+        /// <summary>
+        /// if the buffer is at its max more space will be allocated to fit additionalItemCount
+        /// </summary>
         public void EnsureCapacity(int additionalItemCount = 1)
         {
             if (Length + additionalItemCount >= Buffer.Length)

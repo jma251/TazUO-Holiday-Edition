@@ -391,3 +391,101 @@ any machine without working audio hardware, and this fork has rewritten
 `if (root != null)` shape and no per-item guard), `4a95c04d8a` (mouse changes,
 seven files we have), `ab0f248bb4` and `9e8ba53483` (door movement blocking),
 `ea57b6acd7` (multiple crash fixes, two files we have).
+
+---
+
+# Deep read: #11 and #13, 2026-09-15
+
+## #13 - the font wrap overflow
+
+**Where the idea came from.** Kamron Batman `14af3802f6`, recorded in the read
+pass above. The commit itself was not re-read this session; what follows was
+worked out from this fork's own code.
+
+**Where the code came from.** Mine. `FastList<T>.Resize` exists on neither
+`origin/release` nor `origin/upstream-main` - both have `Add` and
+`EnsureCapacity` and nothing else that moves `Length`. Six call sites in
+`FontsLoader.cs` changed from `ptr.Data.Length = X` to `ptr.Data.Resize(X)`.
+
+**Is it a real bug here?** Yes, and it is narrow. `FastList.Length` is a public
+field, so assigning it is legal and silent, and `Add` is the only thing that
+grows `Buffer`. In `GetInfoASCII` the two counts stay in step everywhere except
+one branch:
+
+```csharp
+else if (countspaces && si != '\0' && lastSpace - eval == ptr.CharCount)
+{
+    ptr.CharCount++;          // no matching ptr.Data.Add
+}
+...
+ptr.Data.Length = ptr.CharCount;   // now one past what was added
+```
+
+`Add` grows the buffer to 5, 10, 20, 40, 80 and so on, so `Length` only
+exceeds `Buffer.Length` when the last `Add` filled the buffer exactly and that
+`CharCount++` then fires. When it does, anything walking `Data` up to `Length`
+indexes one past the end - an `IndexOutOfRangeException` inside the text wrap
+path, so a crash while drawing text rather than anything subtle.
+
+The other five sites are consistent; they are changed for uniformity, since a
+raw assignment is the hazard whether or not that particular one can overflow.
+`Resize` grows first and then assigns, so the assignment means what it looks
+like it means.
+
+## #11 - the diagonal, verified against the server
+
+**The rule, from ServUO `Scripts/Services/Pathing/Movement.cs`**, fetched and
+read this session:
+
+```csharp
+bool checkDiagonals = ((int)d & 0x1) == 0x1;
+...
+if (moveIsOk && checkDiagonals)
+{
+    if (m != null && m.Player && m.AccessLevel < AccessLevel.GameMaster)
+    {
+        if (!Check(left) || !Check(right))   // a player needs BOTH flanks
+            moveIsOk = false;
+    }
+    else
+    {
+        if (!Check(left) && !Check(right))   // a creature needs EITHER
+            moveIsOk = false;
+    }
+}
+```
+
+Two things settle the fix's shape:
+
+- **There is no door in that code.** `Check` is the ordinary passability test on
+  the flanking tile, reading the item's current flags. A closed door is
+  impassable and blocks; an **open door is passable and does not**. So a fix
+  that special-cases `IsDoor` - which is what `b5482f6829` does - would refuse
+  legal diagonals past every open door. That is the objection that stopped this
+  being applied, and it holds.
+- **The client has no flank test at all.** `Pathfinder.OpenNodes` costs a
+  diagonal at 2 and calls `CanWalk` on the destination only. So the client will
+  path diagonally between two walls, between two crates, or through any other
+  blocked pair, send the step, and be refused. Doors are the common case, not
+  the cause.
+
+**The fix worth making is the server's rule, not the door case**: on a diagonal,
+require `CanWalk` on both flanking cardinal tiles. It uses the test already in
+the file, it covers walls and furniture as well as doors, and an open door
+passes it. Creatures get the either-flank form, which the client does not path
+for anyway.
+
+## Do the two door changes collide?
+
+No. The one already applied is in `PlayerMobile.TryOpenDoors` and answers "is
+there a door on the tile I am about to step onto, so should I send an
+open-door", replacing a `World.Items.Values.Any(...)` scan of every item in the
+world, on every step, with a walk of that one tile's object list. #11 would be
+in `Pathfinder`, and answers "is this diagonal step legal at all". Different
+files, different questions, no shared state.
+
+One interaction is worth naming rather than hiding: with the flank rule in, a
+diagonal flanked by a **closed** door becomes illegal, so the pathfinder routes
+around it instead of through - even though auto-open-doors would have opened
+that door had the player walked into it. That matches the server, which would
+have refused the step, and the route around costs a tile.
