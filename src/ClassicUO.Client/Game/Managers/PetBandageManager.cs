@@ -14,9 +14,10 @@ namespace ClassicUO.Game.Managers
     /// </summary>
     public static class PetBandageManager
     {
-        public const float AUTO_ENABLE_VETERINARY_SKILL = 40f;
+        // Off unless the player's profile says otherwise. It used to switch itself
+        // on from a Veterinary value of 40 or more; see AutoBandageManager for why
+        // that is gone.
         public static bool Enabled;
-        public static bool ManualOverride { get; private set; }
         public static int ThresholdPct = 90;
         // Shard-actual bandage range — pets within 2 tiles only.
         public static int MaxDistance = 2;
@@ -50,40 +51,21 @@ namespace ClassicUO.Game.Managers
         public static bool BlockOnDead = false;
 
         private static long _nextPoll;
-        // Skill / bandage-availability re-check throttle (5 min).
-        private const long SKILL_RECHECK_MS = 300_000;
-        private static long _nextSkillCheck;
 
         public static void Tick()
         {
+            if (!Enabled) return;
             if (World.Player == null || !World.InGame) return;
+            if (World.Player.IsDead) return;
 
-            // Auto-enable based on Veterinary skill ≥ threshold. Bandage
-            // availability is checked separately when an action is needed.
-            if (!ManualOverride && Time.Ticks >= _nextSkillCheck)
+            // Same reason as AutoBandage: a belt's contents are invisible until it
+            // has been opened once, and opening one is an action, so it waits for
+            // the switch.
+            if (World.Player.FindBandage() == null)
             {
-                float vet = SkillReader.Get("Veterinary");
-                if (vet <= 0f)
-                {
-                    _nextSkillCheck = (long)Time.Ticks + 500;
-                }
-                else
-                {
-                    _nextSkillCheck = (long)Time.Ticks + SKILL_RECHECK_MS;
-                    bool hasBand = World.Player.FindBandage() != null;
-                    if (!hasBand && vet >= AUTO_ENABLE_VETERINARY_SKILL)
-                    {
-                        // Piggy-back on AutoBandage's auto-open helper.
-                        AutoBandageManager.TryAutoOpenBackpackContainersPublic();
-                        _nextSkillCheck = (long)Time.Ticks + 2000;
-                    }
-                    bool wantOn = ShouldAutoEnable(vet);
-                    if (wantOn != Enabled) Enabled = wantOn;
-                }
+                AutoBandageManager.TryAutoOpenBackpackContainersPublic();
             }
 
-            if (!Enabled) return;
-            if (World.Player.IsDead) return;
             if (Time.Ticks < _nextPoll) return;
             _nextPoll = (long)Time.Ticks + POLL_INTERVAL_MS;
 
@@ -183,18 +165,12 @@ namespace ClassicUO.Game.Managers
         public static void SetEnabled(bool on)
         {
             Enabled = on;
-            ManualOverride = true;
-            BandageSettings.MarkDirty();
             GameActions.Print(
                 $"Pet bandage {(on ? "ON" : "OFF")} (threshold {ThresholdPct}%, range {MaxDistance}).",
                 (ushort)(on ? 0x35 : 0x21));
         }
 
-        public static bool ShouldAutoEnable(float veterinarySkill)
-            => veterinarySkill >= AUTO_ENABLE_VETERINARY_SKILL;
-
         public static void SetEnabledQuiet(bool on)        { Enabled = on; }
-        public static void SetManualOverride(bool v)       { ManualOverride = v; }
 
         public static void SetThreshold(int pct)
         {
@@ -207,7 +183,6 @@ namespace ClassicUO.Game.Managers
         public static void ResetForProfile()
         {
             Enabled = false;
-            ManualOverride = false;
             ThresholdPct = 90;
             MaxDistance = 2;
             CycleMs = 2200;
@@ -217,7 +192,6 @@ namespace ClassicUO.Game.Managers
             _mode = MultiPetMode.AlwaysWeakest;
             _focusedSerial = 0;
             _nextPoll = 0;
-            _nextSkillCheck = 0;
         }
     }
 }

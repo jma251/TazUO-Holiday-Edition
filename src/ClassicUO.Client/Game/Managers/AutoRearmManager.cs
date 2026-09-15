@@ -51,7 +51,9 @@ namespace ClassicUO.Game.Managers
         private static long _nextPoll;
         private static long _lastActionAt;
 
-        public static void ResetSession() { _nextPoll = 0; _lastActionAt = 0; }
+        // The remembered weapons too - they belong to the character that just
+        // left, and Tick learns the new ones from whatever is in hand.
+        public static void ResetSession() { _nextPoll = 0; _lastActionAt = 0; OneHandedSerial = 0; TwoHandedSerial = 0; }
 
         public static void Tick()
         {

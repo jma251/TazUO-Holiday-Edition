@@ -50,7 +50,9 @@ namespace ClassicUO.Game.Managers
         private static long _nextPoll;
         private static long _lastActionAt;
 
-        public static void ResetSession() { _nextPoll = 0; _lastActionAt = 0; }
+        // MountSerial too: it is a serial belonging to the character that just
+        // left, and Tick learns the new one from whatever is equipped.
+        public static void ResetSession() { _nextPoll = 0; _lastActionAt = 0; MountSerial = 0; }
 
         public static void Tick()
         {

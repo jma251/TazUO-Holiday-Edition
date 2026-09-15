@@ -97,6 +97,45 @@ namespace ClassicUO.Game.Managers
             GameActions.Print("AutoBuff OFF.", 0x21);
         }
 
+        /// <summary>
+        /// Armed from the profile, without the chat print. Arm() is the loud
+        /// version and nothing calls it - the options page is the only way in.
+        /// </summary>
+        public static void ArmQuiet(string buffName, string spellName)
+        {
+            BuffIconType b;
+
+            if (!TryParseBuff(buffName, out b) || string.IsNullOrWhiteSpace(spellName))
+            {
+                Disarm();
+
+                return;
+            }
+
+            Watch = b;
+            WatchLabel = buffName;
+            SpellName = spellName;
+            Enabled = true;
+            _wasPresent = false;
+        }
+
+        /// <summary>
+        /// Back to watching nothing. Tick returns at its first guard in this
+        /// state, so this is what "off" means for this helper - the Enabled flag
+        /// alone was never enough to describe it.
+        /// </summary>
+        public static void Disarm()
+        {
+            Enabled = false;
+            Watch = (BuffIconType)(-1);
+            SpellName = string.Empty;
+            WatchLabel = string.Empty;
+            _wasPresent = false;
+        }
+
+        public static bool TryParseBuffPublic(string name, out BuffIconType buff)
+            => TryParseBuff(name, out buff);
+
         private static bool TryParseBuff(string name, out BuffIconType buff)
         {
             buff = default;

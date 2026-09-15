@@ -44,7 +44,6 @@ namespace ClassicUO.Game.Managers
     {
         public const ushort BANDAGE_GRAPHIC = 0x0E21;
         public const int DEFAULT_THRESHOLD = 90;     // percent
-        public const float AUTO_ENABLE_HEALING_SKILL = 40f;
 
         // Shard-specific bandage cycle in ms (mutable via gump).
         public static long CycleMs = 2200;
@@ -53,15 +52,13 @@ namespace ClassicUO.Game.Managers
         public static bool BlockOnMortal = true;
         public static bool BlockOnDead = true;
 
-        // Starts OFF until skills arrive. It auto-enables when Healing >= 40,
-        // unless the user manually overrides it.
+        // Off unless the player's profile says otherwise. It used to switch itself
+        // on once the server reported Healing of 40 or more, which meant a helper
+        // that consumes bandages and targets could arm itself on a character whose
+        // owner had never asked for it. The checkbox is the whole answer now.
         public static bool Enabled { get; private set; }
-        public static bool ManualOverride { get; private set; }
         public static int ThresholdPercent { get; private set; } = DEFAULT_THRESHOLD;
         private static long _lastCheckTime;
-        // Skill / bandage-availability re-check throttle (5 min).
-        private const long SKILL_RECHECK_MS = 300_000;
-        private static long _nextSkillCheck;
 
         // Sub-containers in the backpack we've already auto-opened to
         // populate their contents (e.g. First Aid Belt). Re-trying every
@@ -72,40 +69,19 @@ namespace ClassicUO.Game.Managers
 
         public static void Tick()
         {
-            // Auto-enable based on Healing skill ≥ threshold. Bandage
-            // availability is checked separately when an action is needed.
-            if (!ManualOverride && World.Player != null && World.InGame
-                && Time.Ticks >= _nextSkillCheck)
-            {
-                float healing = SkillReader.Get("Healing");
-                // Skill value 0 = not yet loaded from server (skill packets
-                // arrive a few seconds after login). Don't lock in the 5-min
-                // window yet — retry next tick.
-                if (healing <= 0f)
-                {
-                    _nextSkillCheck = (long)Time.Ticks + 500;
-                }
-                else
-                {
-                    _nextSkillCheck = (long)Time.Ticks + SKILL_RECHECK_MS;
-                    bool hasBand = FindBandageInBackpack() != null;
-                    // Skill OK but no bandage visible? Sub-containers may
-                    // not have streamed their contents yet — kick the
-                    // First-Aid-Belt-style auto-open.
-                    if (!hasBand && healing >= AUTO_ENABLE_HEALING_SKILL)
-                    {
-                        TryAutoOpenBackpackContainers();
-                        // Retry sooner (skills are loaded, we just need
-                        // containers to populate).
-                        _nextSkillCheck = (long)Time.Ticks + 2000;
-                    }
-                    bool wantOn = ShouldAutoEnable(healing);
-                    if (wantOn != Enabled) Enabled = wantOn;
-                }
-            }
-
             if (!Enabled) return;
             if (World.Player == null || !World.InGame) return;
+
+            // A First Aid Belt and its like hold bandages the client cannot see
+            // until the container has been opened once. Kept from the old skill
+            // check, which is where it used to live, but behind the switch: it
+            // double-clicks a container, and nothing should do that on behalf of
+            // a player who has not turned this on.
+            if (FindBandageInBackpack() == null)
+            {
+                TryAutoOpenBackpackContainers();
+            }
+
             if (BlockOnDead && World.Player.IsDead) return;
             if (BlockOnPoisoned && World.Player.IsPoisoned) return;
             if (BlockOnMortal && World.Player.IsYellowHits) return;
@@ -170,18 +146,12 @@ namespace ClassicUO.Game.Managers
         public static void SetEnabled(bool enabled)
         {
             Enabled = enabled;
-            ManualOverride = true; // any -autobandage cmd disables skill-based auto-toggle
-            BandageSettings.MarkDirty();
             GameActions.Print(
                 $"Auto-bandage {(enabled ? "ON" : "OFF")} (threshold {ThresholdPercent}%).",
                 (ushort)(enabled ? 0x35 : 0x21));
         }
 
-        public static bool ShouldAutoEnable(float healingSkill)
-            => healingSkill >= AUTO_ENABLE_HEALING_SKILL;
-
         public static void SetEnabledQuiet(bool enabled) { Enabled = enabled; }
-        public static void SetManualOverride(bool v)     { ManualOverride = v; }
         public static void SetThresholdQuiet(int pct)
         {
             if (pct < 1) pct = 1;
@@ -199,14 +169,12 @@ namespace ClassicUO.Game.Managers
         public static void ResetForProfile()
         {
             Enabled = false;
-            ManualOverride = false;
             ThresholdPercent = DEFAULT_THRESHOLD;
             CycleMs = 2200;
             BlockOnPoisoned = false;
             BlockOnMortal = true;
             BlockOnDead = true;
             _lastCheckTime = 0;
-            _nextSkillCheck = 0;
             _nextAutoOpen = 0;
             _autoOpenedContainers.Clear();
         }

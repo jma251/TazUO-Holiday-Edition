@@ -56,11 +56,6 @@ namespace ClassicUO.Game.Managers
 
         public static IReadOnlyCollection<string> Patterns => _patterns;
 
-        private static string FilePath =>
-            string.IsNullOrEmpty(ProfileManager.ProfilePath)
-                ? null
-                : Path.Combine(ProfileManager.ProfilePath, "autohit.tsv");
-
         public static void EnsureLoaded()
         {
             if (_loaded) return;
@@ -81,6 +76,37 @@ namespace ClassicUO.Game.Managers
             _nextCheck = 0;
             Enabled = false;
             AlsoAttack = false;
+        }
+
+        /// <summary>
+        /// The whole list at once, from a comma-separated line. The options page
+        /// edits it this way rather than adding one name at a time: a box that
+        /// appends on every keystroke would have left "d", "dr", "dra" and
+        /// "drag" in the list on the way to "dragon".
+        ///
+        /// Deliberately does not write the file. The box this is called from
+        /// fires on every keystroke, and ProfileDataStore.Write ends in a
+        /// Flush(true) - an fsync per character typed. AutomationScheduler.Save
+        /// writes it on the way out of a world, which is the same moment the
+        /// profile itself is written.
+        /// </summary>
+        public static void ReplaceAll(string commaSeparated)
+        {
+            EnsureLoaded();
+            _patterns.Clear();
+
+            if (!string.IsNullOrWhiteSpace(commaSeparated))
+            {
+                foreach (string part in commaSeparated.Split(','))
+                {
+                    string trimmed = part.Trim();
+
+                    if (trimmed.Length != 0)
+                    {
+                        _patterns.Add(trimmed);
+                    }
+                }
+            }
         }
 
         public static void AddPattern(string pat) { EnsureLoaded(); if (!string.IsNullOrWhiteSpace(pat)) { _patterns.Add(pat.Trim()); Save(); } }

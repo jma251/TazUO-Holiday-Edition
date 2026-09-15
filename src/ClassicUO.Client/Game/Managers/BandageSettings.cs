@@ -44,6 +44,13 @@ namespace ClassicUO.Game.Managers
             Save();
         }
 
+        /// <summary>
+        /// The tuning only. Every on/off switch moved to the character's profile,
+        /// so there is one place a helper is armed from and it is the same place
+        /// the checkbox writes. Keys this file no longer writes are simply not
+        /// matched when an older file is read, so an existing bandage.tsv cannot
+        /// bring a switch back that the profile says is off.
+        /// </summary>
         public static void Save()
         {
             _dirty = false;
@@ -54,8 +61,6 @@ namespace ClassicUO.Game.Managers
                 sw.WriteLine($"Priority\t{(int)BandageScheduler.Priority}");
 
                 // AutoBandage (player)
-                sw.WriteLine($"Auto.Enabled\t{(AutoBandageManager.Enabled ? 1 : 0)}");
-                sw.WriteLine($"Auto.Manual\t{(AutoBandageManager.ManualOverride ? 1 : 0)}");
                 sw.WriteLine($"Auto.Threshold\t{AutoBandageManager.ThresholdPercent}");
                 sw.WriteLine($"Auto.Cycle\t{AutoBandageManager.CycleMs}");
                 sw.WriteLine($"Auto.BlockPoison\t{(AutoBandageManager.BlockOnPoisoned ? 1 : 0)}");
@@ -63,8 +68,6 @@ namespace ClassicUO.Game.Managers
                 sw.WriteLine($"Auto.BlockDead\t{(AutoBandageManager.BlockOnDead ? 1 : 0)}");
 
                 // PetBandage
-                sw.WriteLine($"Pet.Enabled\t{(PetBandageManager.Enabled ? 1 : 0)}");
-                sw.WriteLine($"Pet.Manual\t{(PetBandageManager.ManualOverride ? 1 : 0)}");
                 sw.WriteLine($"Pet.Threshold\t{PetBandageManager.ThresholdPct}");
                 sw.WriteLine($"Pet.Range\t{PetBandageManager.MaxDistance}");
                 sw.WriteLine($"Pet.BlockPoison\t{(PetBandageManager.BlockOnPoisoned ? 1 : 0)}");
@@ -73,7 +76,6 @@ namespace ClassicUO.Game.Managers
                 sw.WriteLine($"Pet.Mode\t{(int)PetBandageManager.Mode}");
 
                 // ExternalBandage
-                sw.WriteLine($"Ext.Enabled\t{(ExternalBandageManager.Enabled ? 1 : 0)}");
                 sw.WriteLine($"Ext.Threshold\t{ExternalBandageManager.ThresholdPct}");
                 sw.WriteLine($"Ext.BlockPoison\t{(ExternalBandageManager.BlockOnPoisoned ? 1 : 0)}");
                 sw.WriteLine($"Ext.BlockMortal\t{(ExternalBandageManager.BlockOnMortal ? 1 : 0)}");
@@ -81,7 +83,6 @@ namespace ClassicUO.Game.Managers
                 sw.WriteLine($"Ext.Target\t{ExternalBandageManager.TargetSerial}");
 
                 // Low-stock
-                sw.WriteLine($"Stock.Enabled\t{(BandageStockWarner.Enabled ? 1 : 0)}");
                 sw.WriteLine($"Stock.Threshold\t{BandageStockWarner.Threshold}");
             });
         }
@@ -101,8 +102,6 @@ namespace ClassicUO.Game.Managers
             switch (key)
             {
                 case "Priority":         if (System.Enum.IsDefined(typeof(BandageScheduler.Pref), i)) BandageScheduler.Priority = (BandageScheduler.Pref)i; break;
-                case "Auto.Enabled":     AutoBandageManager.SetEnabledQuiet(b);                break;
-                case "Auto.Manual":      AutoBandageManager.SetManualOverride(b);              break;
                 case "Auto.Threshold":   AutoBandageManager.SetThresholdQuiet(i);              break;
                 case "Auto.Cycle":
                     AutoBandageManager.CycleMs = System.Math.Max(250, System.Math.Min(60000, lv));
@@ -112,8 +111,6 @@ namespace ClassicUO.Game.Managers
                 case "Auto.BlockMortal": AutoBandageManager.BlockOnMortal   = b;               break;
                 case "Auto.BlockDead":   AutoBandageManager.BlockOnDead     = b;               break;
 
-                case "Pet.Enabled":      PetBandageManager.SetEnabledQuiet(b);                 break;
-                case "Pet.Manual":       PetBandageManager.SetManualOverride(b);               break;
                 case "Pet.Threshold":    PetBandageManager.ThresholdPct = System.Math.Max(5, System.Math.Min(99, i)); break;
                 case "Pet.Range":        PetBandageManager.MaxDistance = System.Math.Max(1, System.Math.Min(12, i)); break;
                 case "Pet.BlockPoison":  PetBandageManager.BlockOnPoisoned = b;                break;
@@ -121,14 +118,12 @@ namespace ClassicUO.Game.Managers
                 case "Pet.BlockDead":    PetBandageManager.BlockOnDead     = b;                break;
                 case "Pet.Mode":         if (System.Enum.IsDefined(typeof(PetBandageManager.MultiPetMode), i)) PetBandageManager.Mode = (PetBandageManager.MultiPetMode)i; break;
 
-                case "Ext.Enabled":      ExternalBandageManager.Enabled = b;                   break;
                 case "Ext.Threshold":    ExternalBandageManager.ThresholdPct = System.Math.Max(5, System.Math.Min(99, i)); break;
                 case "Ext.BlockPoison":  ExternalBandageManager.BlockOnPoisoned = b;           break;
                 case "Ext.BlockMortal":  ExternalBandageManager.BlockOnMortal   = b;           break;
                 case "Ext.BlockDead":    ExternalBandageManager.BlockOnDead     = b;           break;
                 case "Ext.Target":       if (lv >= 0 && lv <= uint.MaxValue) ExternalBandageManager.TargetSerial = (uint)lv; break;
 
-                case "Stock.Enabled":    BandageStockWarner.Enabled = b;                       break;
                 case "Stock.Threshold":  BandageStockWarner.Threshold = System.Math.Max(1, System.Math.Min(5000, i)); break;
             }
         }

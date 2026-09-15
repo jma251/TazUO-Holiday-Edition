@@ -57,10 +57,11 @@ namespace ClassicUO.Game.Managers
             new Feature("AutoVendorClose", AutoVendorCloseManager.Tick, () => AutoVendorCloseManager.Enabled),
             new Feature("AutoOpenPaperdoll", AutoOpenPaperdollManager.Tick, () => AutoOpenPaperdollManager.Enabled),
             new Feature("BandageSettings", BandageSettings.Tick),
-            // These two keep polling while off: a skill threshold can switch them
-            // on by itself once the server has sent skill values.
-            new Feature("AutoBandage", AutoBandageManager.Tick),
-            new Feature("PetBandage", PetBandageManager.Tick),
+            // Gated like the rest now. They used to poll while switched off so a
+            // skill value could switch them on by itself; that is gone, and the
+            // switch on the profile is the only thing that arms them.
+            new Feature("AutoBandage", AutoBandageManager.Tick, () => AutoBandageManager.Enabled),
+            new Feature("PetBandage", PetBandageManager.Tick, () => PetBandageManager.Enabled),
             new Feature("ExternalBandage", ExternalBandageManager.Tick, () => ExternalBandageManager.Enabled),
             new Feature("BandageStockWarn", BandageStockWarner.Tick, () => BandageStockWarner.Enabled)
         };
@@ -137,6 +138,7 @@ namespace ClassicUO.Game.Managers
             AutomationCoordinator.ResetForProfile(ProfileManager.CurrentProfile?.AutomationEnabled ?? false);
             FeatureDiagnostics.ResetSession();
 
+
             AutoHitListManager.ResetForProfile();
             AutoBandageManager.ResetForProfile();
             PetBandageManager.ResetForProfile();
@@ -173,6 +175,12 @@ namespace ClassicUO.Game.Managers
             AutoHealPotionManager.ResetForProfile();
             AutoRefreshPotionManager.ResetForProfile();
             AutoBuffManager.ResetForProfile();
+
+            // Last, so the character's own switches land on top of the defaults
+            // every ResetForProfile above has just restored and the tuning the
+            // files have just been read over them. Everything before this line
+            // decides what a helper does; this decides whether it does it.
+            AutomationProfile.Apply(ProfileManager.CurrentProfile);
         }
     }
 }

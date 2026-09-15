@@ -5667,6 +5667,56 @@ namespace ClassicUO.Game.UI.Gumps
                 PositionHelper.PositionControl(o.FullControl);
             }
 
+            void Text(string label, string current, Action<string> set)
+            {
+                SettingsOption o;
+                InputFieldWithLabel field = null;
+
+                field = new InputFieldWithLabel
+                (
+                    label, 200, current ?? string.Empty, false, (sender, e) => { set(field.Text ?? string.Empty); }
+                );
+
+                options.Add(o = new SettingsOption(string.Empty, field, MainContent.RightWidth, (int)PAGE.MWWork));
+                PositionHelper.PositionControl(o.FullControl);
+            }
+
+            // Every box writes the profile and then hands the whole profile back
+            // to the helpers. Rebuilding all of them on one click is a few dozen
+            // assignments, and it leaves exactly one description of what is armed
+            // rather than one per checkbox that can drift from it.
+            void Reapply()
+            {
+                AutomationProfile.Apply(profile);
+            }
+
+            // A checkbox that cannot do what it says should say so rather than sit
+            // there ticked. Both of these need something besides the switch.
+            void ReportBuff(bool on)
+            {
+                if (!on)
+                {
+                    return;
+                }
+
+                if (string.IsNullOrWhiteSpace(profile.AutoBuffWatch) || string.IsNullOrWhiteSpace(profile.AutoBuffSpell))
+                {
+                    GameActions.Print("Auto buff needs a buff to watch and a spell to recast before it will do anything.", 0x21);
+                }
+                else if (!AutomationProfile.IsKnownBuff(profile.AutoBuffWatch))
+                {
+                    GameActions.Print($"'{profile.AutoBuffWatch}' is not a buff this client knows.", 0x21);
+                }
+            }
+
+            void ReportHitList(bool on)
+            {
+                if (on && AutoHitListManager.Patterns.Count == 0)
+                {
+                    GameActions.Print("The hit list is empty, so nothing will be picked.", 0x21);
+                }
+            }
+
             Header("Master switch");
             PositionHelper.Indent();
             // Sets both: the profile field is what survives a restart, and the
@@ -5684,44 +5734,63 @@ namespace ClassicUO.Game.UI.Gumps
 
             Header("Healing and cures");
             PositionHelper.Indent();
-            Toggle("Emergency heal", EmergencyHealManager.Enabled, (b) => { EmergencyHealManager.Enabled = b; });
-            Toggle("Cure potion", AutoCurePotionManager.Enabled, (b) => { AutoCurePotionManager.Enabled = b; });
-            Toggle("Heal potion", AutoHealPotionManager.Enabled, (b) => { AutoHealPotionManager.Enabled = b; });
-            Toggle("Refresh potion", AutoRefreshPotionManager.Enabled, (b) => { AutoRefreshPotionManager.Enabled = b; });
-            Toggle("Cure poison (spell)", PoisonCureManager.Enabled, (b) => { PoisonCureManager.Enabled = b; });
+            Toggle("Emergency heal", profile.AutoEmergencyHeal, (b) => { profile.AutoEmergencyHeal = b; Reapply(); });
+            Toggle("Cure potion", profile.AutoCurePotion, (b) => { profile.AutoCurePotion = b; Reapply(); });
+            Toggle("Heal potion", profile.AutoHealPotion, (b) => { profile.AutoHealPotion = b; Reapply(); });
+            Toggle("Refresh potion", profile.AutoRefreshPotion, (b) => { profile.AutoRefreshPotion = b; Reapply(); });
+            Toggle("Cure poison (spell)", profile.AutoPoisonCure, (b) => { profile.AutoPoisonCure = b; Reapply(); });
             PositionHelper.RemoveIndent();
             PositionHelper.BlankLine();
 
             Header("Bandages");
             PositionHelper.Indent();
-            // SetEnabledQuiet, because Enabled has a private setter and the loud
-            // SetEnabled also latches ManualOverride, which would stop the
-            // skill-based auto-toggle from ever running again.
-            Toggle("Bandage self", AutoBandageManager.Enabled, (b) => { AutoBandageManager.SetEnabledQuiet(b); });
-            Toggle("Bandage pet", PetBandageManager.Enabled, (b) => { PetBandageManager.Enabled = b; });
-            Toggle("Bandage others", ExternalBandageManager.Enabled, (b) => { ExternalBandageManager.Enabled = b; });
-            Toggle("Warn when low on bandages", BandageStockWarner.Enabled, (b) => { BandageStockWarner.Enabled = b; BandageSettings.MarkDirty(); });
+            Toggle("Bandage self", profile.AutoBandageSelf, (b) => { profile.AutoBandageSelf = b; Reapply(); });
+            Toggle("Bandage pet", profile.AutoBandagePet, (b) => { profile.AutoBandagePet = b; Reapply(); });
+            Toggle("Bandage others", profile.AutoBandageOthers, (b) => { profile.AutoBandageOthers = b; Reapply(); });
+            Toggle("Warn when low on bandages", profile.AutoBandageStockWarn, (b) => { profile.AutoBandageStockWarn = b; Reapply(); });
             PositionHelper.RemoveIndent();
             PositionHelper.BlankLine();
 
             Header("Combat");
             PositionHelper.Indent();
-            Toggle("Auto buff", AutoBuffManager.Enabled, (b) => { AutoBuffManager.Enabled = b; });
-            Toggle("Auto stealth", AutoStealthManager.Enabled, (b) => { AutoStealthManager.Enabled = b; });
-            Toggle("Auto re-arm", AutoRearmManager.Enabled, (b) => { AutoRearmManager.Enabled = b; });
-            Toggle("Auto mount", AutoMountManager.Enabled, (b) => { AutoMountManager.Enabled = b; });
-            Toggle("Hit list", AutoHitListManager.Enabled, (b) => { AutoHitListManager.Enabled = b; });
-            Toggle("Re-target after a kill", AutoRespawnTargetManager.Enabled, (b) => { AutoRespawnTargetManager.Enabled = b; });
-            Toggle("Pause everything while dead", AutoStopOnDeathManager.Enabled, (b) => { AutoStopOnDeathManager.Enabled = b; });
+            // The switch alone never armed this one: with nothing to watch, Tick
+            // returns at its first guard. The two boxes below are what arm it, and
+            // the checkbox is refused while either is empty or the buff name is
+            // not one the client knows.
+            Toggle("Auto buff", profile.AutoBuff, (b) => { profile.AutoBuff = b; Reapply(); ReportBuff(b); });
+            Text("Buff to watch", profile.AutoBuffWatch, (t) => { profile.AutoBuffWatch = t; Reapply(); });
+            Text("Spell to recast", profile.AutoBuffSpell, (t) => { profile.AutoBuffSpell = t; Reapply(); });
+            Toggle("Auto stealth", profile.AutoStealth, (b) => { profile.AutoStealth = b; Reapply(); });
+            Toggle("Auto re-arm", profile.AutoRearm, (b) => { profile.AutoRearm = b; Reapply(); });
+            Toggle("Auto mount", profile.AutoMount, (b) => { profile.AutoMount = b; Reapply(); });
+            // Same shape: the list of names lives in autohit.tsv beside the
+            // profile, and with none in it the helper has nothing to match.
+            Toggle("Hit list", profile.AutoHitList, (b) => { profile.AutoHitList = b; Reapply(); ReportHitList(b); });
+            Toggle("Hit list also attacks", profile.AutoHitListAttack, (b) => { profile.AutoHitListAttack = b; Reapply(); });
+            Text("Hit list names, comma separated", string.Join(", ", AutoHitListManager.Patterns), (t) => { AutoHitListManager.ReplaceAll(t); });
+            Toggle("Re-target after a kill", profile.AutoRespawnTarget, (b) => { profile.AutoRespawnTarget = b; Reapply(); });
+            Toggle("Re-target also attacks", profile.AutoRespawnTargetAttack, (b) => { profile.AutoRespawnTargetAttack = b; Reapply(); });
+            Toggle("Pause everything while dead", profile.AutoStopOnDeath, (b) => { profile.AutoStopOnDeath = b; Reapply(); });
             PositionHelper.RemoveIndent();
             PositionHelper.BlankLine();
 
             Header("Convenience");
             PositionHelper.Indent();
-            Toggle("Close empty corpses", AutoCloseEmptyCorpse.Enabled, (b) => { AutoCloseEmptyCorpse.Enabled = b; });
-            Toggle("Open backpack on login", AutoOpenBackpackManager.Enabled, (b) => { AutoOpenBackpackManager.Enabled = b; });
-            Toggle("Open paperdoll on login", AutoOpenPaperdollManager.Enabled, (b) => { AutoOpenPaperdollManager.Enabled = b; });
-            Toggle("Close vendor gumps on walk away", AutoVendorCloseManager.Enabled, (b) => { AutoVendorCloseManager.Enabled = b; });
+            Toggle("Close empty corpses", profile.AutoCloseEmptyCorpse, (b) => { profile.AutoCloseEmptyCorpse = b; Reapply(); });
+            Toggle("Open backpack on login", profile.AutoOpenBackpack, (b) => { profile.AutoOpenBackpack = b; Reapply(); });
+            Toggle("Open paperdoll on login", profile.AutoOpenPaperdoll, (b) => { profile.AutoOpenPaperdoll = b; Reapply(); });
+            Toggle("Close vendor gumps on walk away", profile.AutoVendorClose, (b) => { profile.AutoVendorClose = b; Reapply(); });
+            PositionHelper.RemoveIndent();
+            PositionHelper.BlankLine();
+
+            Header("Speech");
+            PositionHelper.Indent();
+            // Neither of these could be reached before: they have no Tick, they
+            // are driven by EventSink, and the only thing that subscribed them
+            // was a SetEnabled nothing called.
+            Toggle("Reply to players while AFK", profile.AutoAfkReply, (b) => { profile.AutoAfkReply = b; Reapply(); });
+            Text("AFK reply", AfkReplyManager.Message, (t) => { profile.AutoAfkReplyMessage = t; Reapply(); });
+            Toggle("Say thanks when healed", profile.AutoSayThanks, (b) => { profile.AutoSayThanks = b; Reapply(); });
             PositionHelper.RemoveIndent();
         }
 

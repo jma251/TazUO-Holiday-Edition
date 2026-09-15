@@ -628,6 +628,63 @@ namespace ClassicUO.Configuration
         // running. MW Edition drove all of it from overlays that are not here.
         public bool AutomationEnabled { get; set; } = false;
 
+        // Each helper's own switch, kept here so it belongs to the character
+        // rather than the process. They used to be bare statics: half were
+        // cleared on the way out of a world and half were not, so a helper armed
+        // on one character could still be armed on the next, and nothing
+        // survived a restart either way.
+        //
+        // The switch is the whole answer. Nothing turns itself on from a skill
+        // value or anything else the server says - checked is on, unchecked is
+        // off. AutoFollow is absent on purpose: it is armed by having a target,
+        // not by a flag.
+        public bool AutoEmergencyHeal { get; set; } = false;
+        public int AutoEmergencyHealPct { get; set; } = 25;
+        public string AutoEmergencyHealSpell { get; set; } = "Greater Heal";
+
+        public bool AutoCurePotion { get; set; } = false;
+
+        public bool AutoHealPotion { get; set; } = false;
+        public int AutoHealPotionPct { get; set; } = 50;
+
+        public bool AutoRefreshPotion { get; set; } = false;
+        public int AutoRefreshPotionPct { get; set; } = 30;
+
+        public bool AutoPoisonCure { get; set; } = false;
+        public string AutoPoisonCureSpell { get; set; } = "Cure";
+
+        public bool AutoBandageSelf { get; set; } = false;
+        public bool AutoBandagePet { get; set; } = false;
+        public bool AutoBandageOthers { get; set; } = false;
+        public bool AutoBandageStockWarn { get; set; } = false;
+
+        public bool AutoBuff { get; set; } = false;
+        public string AutoBuffWatch { get; set; } = string.Empty;
+        public string AutoBuffSpell { get; set; } = string.Empty;
+
+        public bool AutoStealth { get; set; } = false;
+        public bool AutoRearm { get; set; } = false;
+        public bool AutoMount { get; set; } = false;
+
+        public bool AutoHitList { get; set; } = false;
+        public bool AutoHitListAttack { get; set; } = false;
+
+        public bool AutoRespawnTarget { get; set; } = false;
+        public bool AutoRespawnTargetAttack { get; set; } = false;
+
+        // The one that defaults on. It only pauses the others while dead.
+        public bool AutoStopOnDeath { get; set; } = true;
+
+        public bool AutoCloseEmptyCorpse { get; set; } = false;
+        public bool AutoOpenBackpack { get; set; } = false;
+        public bool AutoOpenPaperdoll { get; set; } = false;
+        public bool AutoVendorClose { get; set; } = false;
+
+        public bool AutoAfkReply { get; set; } = false;
+        public string AutoAfkReplyMessage { get; set; } = string.Empty;
+
+        public bool AutoSayThanks { get; set; } = false;
+
         public bool UseOneHPBarForLastAttack { get; set; } = true;
 
         public bool DisableMouseInteractionOverheadText { get; set; } = false;
