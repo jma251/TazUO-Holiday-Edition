@@ -489,3 +489,74 @@ diagonal flanked by a **closed** door becomes illegal, so the pathfinder routes
 around it instead of through - even though auto-open-doors would have opened
 that door had the player walked into it. That matches the server, which would
 have refused the step, and the route around costs a tile.
+
+---
+
+# Crash read: the animation atlas, 2026-09-16
+
+From a dev-build crash log on `login.uoalive.com`:
+
+```
+System.InvalidOperationException: Texture2D creation failed! Error Code: The GPU
+will not respond to more commands ... (0x887A0006)
+   at ClassicUO.Renderer.TextureAtlas.CreateNewTexture2D()
+   at ClassicUO.Renderer.TextureAtlas.AddSprite(...)
+   at ClassicUO.Renderer.Animations.Animations.GetAnimationFrames(...)
+   at ClassicUO.Game.GameObjects.Mobile.DrawInternal(...)
+```
+
+**Not from anything on `dev`.** `git diff origin/release...dev -- src/ClassicUO.Renderer/`
+is seven lines, all of them the `DrawLine` null guard, which is on no path in
+this stack. The file that crashed is byte-identical on both branches, and
+identical again on `origin/upstream-main`.
+
+**What the code did.** `AddSprite` had one exit:
+
+```csharp
+while (!_packer.PackRect(width, height, out pr))
+{
+    CreateNewTexture2D();
+    index = _textureList.Count - 1;
+}
+```
+
+`CreateNewTexture2D` allocates a whole page and **replaces the packer with a
+fresh empty one**. So a sprite that does not fit an empty page cannot ever fit,
+and the loop allocates another page - 4096x4096x4, **64 MB**, for the art and
+animation atlases - and tries again, without limit.
+
+Nothing upstream bounds the size. `AnimationsLoader` reads frame dimensions as
+`ReadInt16LE()` and tests only `frame.Width <= 0 || frame.Height <= 0`, so
+anything from 4097 to 32767 arrives at a 4096 atlas intact.
+
+**What the error code means, and what it does not.** `0x887A0006` is
+`DXGI_ERROR_DEVICE_HUNG` - a TDR, Windows resetting a GPU that stopped
+answering. It is not an out-of-memory code; that would be `E_OUTOFMEMORY` or
+`DXGI_ERROR_DEVICE_REMOVED` (`0x887A0005`). So the stack proves the allocation
+was the call that *noticed* the hung device, not that it caused it. Two readings
+fit:
+
+1. The loop ran away and hammered the driver until it stopped answering.
+2. The GPU hung for its own reasons and this was simply the next call to touch it.
+
+**How to tell them apart.** `CreateNewTexture2D` writes
+`creating texture: 4096x4096 Color` at Trace on every page. In the client's
+ordinary log - not the crash log - a burst of those immediately before the
+crash means the first reading; one or two means the second.
+
+**Fixed regardless**, because the loop can only ever end in a hang or an
+exhausted card:
+
+- A sprite bigger than the atlas is refused up front.
+- The loop stops after one fresh page fails, rather than trusting that size
+  test to be right about the packer's own arithmetic. A sprite that will not go
+  into an empty page will not go into the next empty page either.
+- `null` is returned, which is exactly what all five callers already use to mean
+  "not loaded", and what `MobileView.DrawInternal` already tests for before
+  drawing. A refused sprite does not draw; it does not stop the client.
+- `Dispose` no longer assumes `_packer` exists, since a client that only ever
+  saw refused sprites would never have built one.
+
+**This is on `release` too**, unchanged, and in upstream TazUO `main`. Getting
+it into the public build is the usual promotion off `release`, and needs a
+version bump to publish.
