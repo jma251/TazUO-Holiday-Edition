@@ -18,6 +18,11 @@ namespace ClassicUO.Renderer.Animations
             _atlas = new TextureAtlas(device, 4096, 4096, SurfaceFormat.Color);
         }
 
+        /// <summary>Atlas pages this cache has taken from the device. Each is
+        /// width x height x 4 bytes and is never given back, so it is the number
+        /// worth having when the card stops answering.</summary>
+        public int AtlasPages => _atlas.TexturesCount;
+
         public int MaxAnimationCount => _dataIndex.Length;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

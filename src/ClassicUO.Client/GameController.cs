@@ -68,6 +68,15 @@ namespace ClassicUO
         private readonly float[] _intervalFixedUpdate = new float[2];
         private double _totalElapsed, _currentFpsTime, _nextSlowUpdate;
         private uint _totalFrames;
+
+        /// <summary>
+        /// _totalFrames is zeroed every second to give the frame rate. These two are
+        /// not, because "how long had it been running and how much had it drawn" is the
+        /// first thing anyone asks of a fault that only shows up after a long session.
+        /// </summary>
+        private ulong _totalFramesEver;
+
+        private readonly DateTime _startedUtc = DateTime.UtcNow;
         private UltimaBatcher2D _uoSpriteBatch;
         private bool _suppressedDraw;
         private Texture2D _background;
@@ -130,6 +139,9 @@ namespace ClassicUO
             _filter = HandleSdlEvent;
             SDL_SetEventFilter(_filter, IntPtr.Zero);
 
+            Renderer.GpuDeviceWatch.ContextProvider = DescribeGpuState;
+            Renderer.GpuDeviceWatch.DeviceLostDetected += OnGraphicsDeviceLost;
+
 #if HOLIDAY_DEV
             // Carry the saved packet-log setting into this session. Without this the
             // option in Experimental would only last until the client was closed,
@@ -143,6 +155,66 @@ namespace ClassicUO
 #endif
 
             base.Initialize();
+        }
+
+        /// <summary>
+        /// What the log should say alongside a device that has stopped answering. Every
+        /// figure here is one that was wanted and missing while reading a real crash:
+        /// how long the process had been up, how much had been asked of the card, and
+        /// whether the picture had already stopped moving.
+        /// </summary>
+        private string DescribeGpuState()
+        {
+            var uptime = DateTime.UtcNow - _startedUtc;
+
+            return
+                $"Process up for: {uptime:d\.hh\:mm\:ss}\n"
+                + $"Frames drawn: {_totalFramesEver}\n"
+                + $"Atlas pages - art: {Arts?.AtlasPages ?? -1}, animations: {Animations?.AtlasPages ?? -1}, "
+                + $"gumps: {Gumps?.AtlasPages ?? -1}, texmaps: {Texmaps?.AtlasPages ?? -1}, lights: {Lights?.AtlasPages ?? -1}\n"
+                + $"Managed memory: {GC.GetTotalMemory(false) / (1024 * 1024)} MB\n"
+                + $"Scene: {Scene?.GetType().Name ?? "(none)"}";
+        }
+
+        /// <summary>
+        /// Said once, then the client stops.
+        ///
+        /// There is nothing to recover to: this client cannot rebuild its resources
+        /// against a new device, and carrying on means a window frozen on its last frame
+        /// while the game keeps playing behind it - which is what used to happen, for
+        /// hours, until some unrelated draw finally threw. Better to say what went wrong
+        /// while the words can still reach someone.
+        ///
+        /// The message box is SDL's, not a gump: drawing a gump needs the device that
+        /// has just stopped answering.
+        /// </summary>
+        private void OnGraphicsDeviceLost(string summary)
+        {
+            try
+            {
+                SDL_ShowSimpleMessageBox(
+                    SDL_MessageBoxFlags.SDL_MESSAGEBOX_ERROR,
+                    "TazUO Holiday Edition - graphics device lost",
+                    "The graphics device stopped responding and the client cannot continue.\n\n"
+                    + "This is usually the display driver resetting. Check Windows' System event log "
+                    + "around this time for a display-driver error.\n\n"
+                    + "The full details were written to the log beside the client.",
+                    IntPtr.Zero
+                );
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"could not show the device-lost message: {ex}");
+            }
+
+            try
+            {
+                Exit();
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"could not exit cleanly after device loss: {ex}");
+            }
         }
 
         private const int MAX_PACKETS_PER_FRAME = 25;
@@ -587,6 +659,7 @@ namespace ClassicUO
             Profiler.EnterContext("Draw-Tiles");
 
             _totalFrames++;
+            _totalFramesEver++;
             GraphicsDevice.Clear(Color.Black);
 
             _uoSpriteBatch.Begin();

@@ -1827,6 +1827,29 @@ namespace ClassicUO.Game.UI.Gumps
             return (_showGridIfZoomed && Zoom >= 4);
         }
 
+        /// <summary>
+        /// Takes ownership of the icon under this name, freeing whatever was there.
+        /// Clears the caller's reference so its finally block knows the texture found a
+        /// home; anything still held when that runs is disposed instead of leaked.
+        ///
+        /// Last file wins, which is a choice: the alternative is first-wins, and neither
+        /// is more correct when two files claim one name. Last-wins at least matches the
+        /// order the directories are searched in.
+        /// </summary>
+        private static void StoreMarkerIcon(string key, ref Texture2D texture)
+        {
+            if (_markerIcons.TryGetValue(key, out Texture2D existing))
+            {
+                if (existing != null && !existing.IsDisposed)
+                {
+                    existing.Dispose();
+                }
+            }
+
+            _markerIcons[key] = texture;
+            texture = null;
+        }
+
         private void LoadMarkers()
         {
             //return Task.Run(() =>
@@ -1881,15 +1904,35 @@ namespace ClassicUO.Game.UI.Gumps
                         fs.CopyTo(ms);
                         ms.Seek(0, SeekOrigin.Begin);
 
+                        Texture2D texture = null;
+
                         try
                         {
-                            Texture2D texture = CurLoader.CreateTextureFromICO_Cur(ms);
+                            texture = CurLoader.CreateTextureFromICO_Cur(ms);
 
-                            _markerIcons.Add(Path.GetFileNameWithoutExtension(icon).ToLower(), texture);
+                            // Not Add. The key is the file name without its extension,
+                            // lowercased, and the four patterns above are gathered from
+                            // several directories - so bank.ico and bank.png, or the same
+                            // name in two folders, collide. Add threw on the duplicate,
+                            // the catch logged it, and the texture that had already been
+                            // created was left referenced by nothing: never stored, so
+                            // never reached by the dispose loop at the top of this method
+                            // either. One leaked GPU texture per duplicate, every time
+                            // this runs - and it runs on every world entry. A capture of
+                            // one session had 328 of them.
+                            StoreMarkerIcon(Path.GetFileNameWithoutExtension(icon).ToLower(), ref texture);
                         }
                         catch (Exception ee)
                         {
                             Log.Error($"{ee}");
+                        }
+                        finally
+                        {
+                            // Still held means it never made it into the dictionary.
+                            if (texture != null && !texture.IsDisposed)
+                            {
+                                texture.Dispose();
+                            }
                         }
                         finally
                         {
@@ -1905,15 +1948,24 @@ namespace ClassicUO.Game.UI.Gumps
                         fs.CopyTo(ms);
                         ms.Seek(0, SeekOrigin.Begin);
 
+                        Texture2D texture = null;
+
                         try
                         {
-                            Texture2D texture = Texture2D.FromStream(Client.Game.GraphicsDevice, ms);
+                            texture = Texture2D.FromStream(Client.Game.GraphicsDevice, ms);
 
-                            _markerIcons.Add(Path.GetFileNameWithoutExtension(icon).ToLower(), texture);
+                            StoreMarkerIcon(Path.GetFileNameWithoutExtension(icon).ToLower(), ref texture);
                         }
                         catch (Exception ee)
                         {
                             Log.Error($"{ee}");
+                        }
+                        finally
+                        {
+                            if (texture != null && !texture.IsDisposed)
+                            {
+                                texture.Dispose();
+                            }
                         }
                         finally
                         {

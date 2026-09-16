@@ -560,3 +560,42 @@ exhausted card:
 **This is on `release` too**, unchanged, and in upstream TazUO `main`. Getting
 it into the public build is the usual promotion off `release`, and needs a
 version bump to publish.
+
+## Follow-up, 2026-09-16: what the session logs actually showed
+
+Five session logs, one of them covering the crash. Corrections and findings:
+
+**The runaway atlas loop did not happen.** One `creating texture` line at
+`08:55:03.0257`, the crash at `08:55:03.2106`. Page growth over the whole 60-hour
+process was 24, then 5, then 3 - a cache filling and plateauing. The bound added
+to `AddSprite` stands as hardening for a loop that provably cannot terminate, but
+it is **not** the fix for this crash and would not have prevented it.
+
+**The device was lost two and a half hours before the crash.** At `06:23:40` the
+same `0x887A0006` already failed, from `RenderedText.CreateTexture()`, which
+catches and swallows. The client then ran until `08:55:03` - profile saves firing
+on the hour - before a creature needing a new atlas page hit a path with no catch.
+
+Windows' System log carried **nvlddmkm Event 153, `\Device\Video3`, GPUID 100** an
+hour before the first failure. That is the display driver reporting a contained
+error: the offending context dies, the GPU does not. It is why one client died
+and a second client on the same machine kept running.
+
+**The freeze is explained.** FNA presents a frame only if `Draw` returned, so once
+the device is gone the window keeps its last frame while `Update` carries on -
+movement, sound and network all working against a picture that will never change.
+
+### Changed
+
+| | |
+| --- | --- |
+| `GpuDeviceWatch` + hooks in `TextureAtlas` and `RenderedText` | The first refusal is now one clear line with uptime, frames drawn, atlas pages per cache, managed memory and the current scene - then an SDL message box (no GPU needed) and a clean exit, instead of hours of frozen zombie followed by a stack pointing at innocent code. |
+| `WorldMapGump.LoadMarkers` | **Real GPU texture leak.** `_markerIcons.Add` keyed on the filename without extension, lowercased, across `.cur`/`.ico`/`.png`/`.jpg` from several directories - so `bank.ico` and `bank.png` collide. `Add` threw, the catch logged, and the already-created texture was left referenced by nothing, so the dispose loop at the top of the method never reached it. One leak per duplicate, **on every world entry**. 328 in the captured session. |
+| `Gumps.Gump.GetGump` | A null texture is the cache-miss sentinel, so an index the files do not contain was re-asked on every call forever. Misses are remembered now - including a sprite `AddSprite` refuses, which would otherwise be retried for the life of the client. |
+| `PaperDollInteractable` | Reports each absent graphic once per session rather than once per draw. Over a thousand log lines in one session came from a handful of graphics. |
+
+### Not chased yet
+
+`No container (1093733167) found`, about eight per second for at least five
+seconds, from `PacketHandlers` `AddItemToContainer` - the server pushing contents
+into a container this client is not holding.

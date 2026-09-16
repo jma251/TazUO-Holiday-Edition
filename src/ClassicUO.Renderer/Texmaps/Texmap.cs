@@ -15,6 +15,11 @@ namespace ClassicUO.Renderer.Texmaps
             _spriteInfos = new SpriteInfo[TexmapsLoader.Instance.Entries.Length];
         }
 
+        /// <summary>Atlas pages this cache has taken from the device. Each is
+        /// width x height x 4 bytes and is never given back, so it is the number
+        /// worth having when the card stops answering.</summary>
+        public int AtlasPages => _atlas.TexturesCount;
+
         public ref readonly SpriteInfo GetTexmap(uint idx)
         {
             if (idx >= _spriteInfos.Length)

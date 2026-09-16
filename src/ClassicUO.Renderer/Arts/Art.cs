@@ -22,6 +22,11 @@ namespace ClassicUO.Renderer.Arts
             _realArtBounds = new Rectangle[_spriteInfos.Length];
         }
 
+        /// <summary>Atlas pages this cache has taken from the device. Each is
+        /// width x height x 4 bytes and is never given back, so it is the number
+        /// worth having when the card stops answering.</summary>
+        public int AtlasPages => _atlas.TexturesCount;
+
         public ref readonly SpriteInfo GetLand(uint idx)
             => ref Get((uint)(idx & ~0x4000));
 

@@ -475,14 +475,24 @@ namespace ClassicUO.Game.UI.Controls
 
             if (Client.Game.Gumps.GetGump((ushort)(animID + offset)).Texture == null)
             {
-                if(animID + offset != 61000) //Not sure why the paperdoll is always trying to create this animation, I think it's a bug on the server side
+                //Not sure why the paperdoll is always trying to create this animation, I think it's a bug on the server side
+                if (animID + offset != 61000 && _reportedMissingGumps.Add((ushort)(animID + offset)))
+                {
+                    // Once per graphic, not once per draw. A shard whose items use
+                    // paperdoll art the client does not ship put over a thousand of these
+                    // in one session - the same handful of graphics, over and over, each
+                    // one a write to the log file. Saying it once still says it.
                     Log.Error(
                         $"Texture not found in paperdoll: gump_graphic: {(ushort)(animID + offset)}"
                     );
+                }
             }
 
             return (ushort)(animID + offset);
         }
+
+        /// <summary>Graphics already reported absent, so each is said once per session.</summary>
+        private static readonly HashSet<ushort> _reportedMissingGumps = new HashSet<ushort>();
 
         protected class GumpPicEquipment : GumpPic
         {

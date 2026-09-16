@@ -119,10 +119,29 @@ namespace ClassicUO.Renderer
             return texture;
         }
 
+        /// <summary>
+        /// Throws if the device refuses, having first said so somewhere useful. With
+        /// sprite sizes bounded above, a refusal here is the device being gone rather
+        /// than a bad request, and that is worth one clear line in the log instead of a
+        /// stack trace pointing at whichever creature happened to walk on screen.
+        /// </summary>
         private void CreateNewTexture2D()
         {
             Utility.Logging.Log.Trace($"creating texture: {_width}x{_height} {_format}");
-            Texture2D texture = new Texture2D(_device, _width, _height, false, _format);
+
+            Texture2D texture;
+
+            try
+            {
+                texture = new Texture2D(_device, _width, _height, false, _format);
+            }
+            catch (Exception ex)
+            {
+                GpuDeviceWatch.Report($"TextureAtlas page {_textureList.Count + 1} ({_width}x{_height} {_format})", ex);
+
+                throw;
+            }
+
             _textureList.Add(texture);
 
             _packer?.Dispose();

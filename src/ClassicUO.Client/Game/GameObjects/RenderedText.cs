@@ -679,7 +679,16 @@ namespace ClassicUO.Game
                             SurfaceFormat.Color
                         );
                     }
-                    catch(Exception e){
+                    catch (Exception e)
+                    {
+                        // Swallowed on purpose - one unrenderable string is not worth
+                        // ending a session over - but this is usually the first place a
+                        // dead device shows up, and until now it went by as a bare stack
+                        // trace hours before anything visible went wrong.
+                        ClassicUO.Renderer.GpuDeviceWatch.Report(
+                            $"RenderedText texture ({fi.Width}x{fi.Height})", e
+                        );
+
                         Log.Error(e.ToString());
                     }
                 }
