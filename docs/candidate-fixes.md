@@ -599,3 +599,92 @@ movement, sound and network all working against a picture that will never change
 `No container (1093733167) found`, about eight per second for at least five
 seconds, from `PacketHandlers` `AddItemToContainer` - the server pushing contents
 into a container this client is not holding.
+
+## The 2026-09-16 crash dump: what killed the device
+
+A 57 MB minidump of the crashed process, read with the `minidump` Python package.
+It settles the cause.
+
+**Hard facts from the dump**
+
+| | |
+| --- | --- |
+| Process started | `2026-09-14 01:37:37` UTC - matching the session log's first atlas page at `01:37:40` |
+| Crashed | `2026-09-16 08:55:03` UTC |
+| Uptime | **2 days, 7 hours, 17 minutes** |
+| CPU | 1d 4h 58m user, 1h 40m kernel - about half a core, sustained |
+| Threads | 104, all parked in `ntdll`/`win32u` waits |
+| Managed exception | HRESULT `0x80131509`, `COR_E_INVALIDOPERATION` - the `InvalidOperationException` from `Texture2D creation failed!` |
+| OS | Windows 11 build 26200, 28 logical processors |
+
+**The graphics stack was torn down and rebuilt inside the process.** The dump's
+unloaded-module list, in order:
+
+```
+combase.dll, psapi.dll, resourcepolicyclient.dll,
+nvgpucomp64.dll, NvMemMapStoragex.dll, nvwgf2umx.dll, nvldumdx.dll,
+d3d11.dll, dxgi.dll,
+powrprof.dll, UMPDC.dll, directxdatabasehelper.dll, resourcepolicyclient.dll
+```
+
+Every one of those is also in the *loaded* list, at the same base address. So
+`dxgi`, `d3d11` and the entire NVIDIA user-mode driver chain - `nvldumdx`,
+`nvwgf2umx`, `NvMemMapStoragex`, `nvgpucomp64` - were **unloaded and loaded again
+while the client was running**. The client's device belonged to the stack that
+went away, and nothing here rebuilds a device. Every texture creation after that
+point failed.
+
+This is the same event Windows recorded as **nvlddmkm Event 153, `\Device\Video3`,
+GPUID 100**, an hour before the client's first symptom. Event 153 is a *contained*
+error: the offending context dies, the GPU does not - which is why a second client
+on the same machine was untouched, and why nothing flickered or popped a
+"display driver stopped responding" notice.
+
+**Suggestive, not proven:** `powrprof.dll` and `UMPDC.dll` - the power-profile and
+user-mode power-dependency-coordinator libraries - unloaded immediately after the
+graphics stack, and the session log shows the player had been idle since `03:35`
+local with nothing but hourly profile saves. A GPU power-state transition during
+a long idle fits every observation, including "only after long sessions". It is
+not the same as proof; the dump records what was unloaded, not why.
+
+**The character is not the variable. The idling is.** Nothing in the dump or the
+logs distinguishes one character from another. What distinguishes this one is
+that it is the one left logged in.
+
+### Not a client bug in origin; a client bug in response
+
+The driver reset is not something this client caused or can prevent. What it did
+wrong was fail to notice: `Present` silently stops producing new frames, so the
+window holds its last image while `Update` runs on; `RenderedText` catches its own
+texture failure and swallows it; and the process finally dies hours later on
+whichever unrelated draw first needed a texture on a path with no catch. That is
+what `GpuDeviceWatch` now addresses.
+
+**Worth considering, not done:** holding `SetThreadExecutionState` with
+`ES_DISPLAY_REQUIRED` while in game would keep the display and GPU out of the
+idle power transition entirely. That is a real behaviour change - it keeps a
+monitor awake - so it belongs behind a setting, and it is a decision rather than
+a fix.
+
+## The 2026-09-12 dumps: nine launch failures, unrelated
+
+Nine dumps inside eight minutes, each only 41 modules deep - the process died
+during assembly loading, before the graphics stack existed. Extracted from dump
+memory:
+
+```
+System.IO.FileLoadException at ClassicUO.Bootstrap.Main(System.String[])
+Could not load file or assembly 'System.Text.Json, Version=8.0.0.5,
+Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51' or one of its dependencies.
+The located assembly's manifest definition does not match the assembly
+reference. (Exception from HRESULT: 0x80131040)
+```
+
+The package is pinned at `8.0.5`, whose assembly version is `8.0.0.5`, and the
+reference does not match without a binding redirect. `Directory.Build.props` sets
+`AutoGenerateBindingRedirects` and `GenerateBindingRedirectsOutputType`, which is
+what generates `ClassicUO.exe.config` with the redirect in it.
+
+**That `.config` file is load-bearing.** If it is ever dropped from the publish
+output or the zip, every launch fails exactly like this, before any log exists to
+say why.
